@@ -1,0 +1,9 @@
+package com.tfg.kanban.common;
+
+/** Regla de negocio incumplida (p. ej. superar el limite WIP). Se traduce a HTTP 409. */
+public class BusinessRuleException extends RuntimeException {
+
+    public BusinessRuleException(String message) {
+        super(message);
+    }
+}

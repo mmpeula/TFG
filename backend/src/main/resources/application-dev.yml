@@ -1,0 +1,26 @@
+# Perfil dev: la base de datos Oracle corre en local (o el contenedor de la BD
+# publicado en localhost:1521), y el backend se ejecuta fuera de Docker.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:oracle:thin:@//localhost:1521/FREEPDB1}
+    username: ${DB_USERNAME:kanban}
+    password: ${DB_PASSWORD:kanban}
+
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+
+app:
+  security:
+    jwt:
+      # Solo para desarrollo local. En docker/produccion es obligatorio JWT_SECRET.
+      secret: ${JWT_SECRET:dev-secret-cambiar-esto-en-produccion-min-32-chars}
+  storage:
+    upload-dir: ${UPLOAD_DIR:./uploads}
+
+logging:
+  level:
+    com.tfg.kanban: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE

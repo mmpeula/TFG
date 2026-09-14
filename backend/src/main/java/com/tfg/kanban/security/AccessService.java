@@ -1,0 +1,162 @@
+package com.tfg.kanban.security;
+
+import com.tfg.kanban.domain.model.Role;
+import com.tfg.kanban.domain.repository.AttachmentRepository;
+import com.tfg.kanban.domain.repository.CommentRepository;
+import com.tfg.kanban.domain.repository.TeamMemberRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Reglas de autorizacion a nivel de recurso, usadas desde {@code @PreAuthorize}
+ * con el nombre de bean {@code access}: por ejemplo
+ * {@code @PreAuthorize("@access.canManageProject(#projectId)")}.
+ *
+ * <p>La comprobacion no mira el rol global del usuario sino el rol que tiene
+ * <b>en el equipo</b> dueno del recurso (entidad {@code TeamMember}). Si el
+ * usuario no pertenece a ese equipo, no tiene ningun permiso sobre el recurso.</p>
+ *
+ * <ul>
+ *   <li><b>Leer</b>: cualquier miembro del equipo (los tres roles).</li>
+ *   <li><b>Escribir</b> (tareas, columnas, comentarios, adjuntos): RESPONSABLE y MIEMBRO.</li>
+ *   <li><b>Administrar</b> (equipo, proyecto, tableros, miembros): solo RESPONSABLE.</li>
+ * </ul>
+ */
+@Component("access")
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class AccessService {
+
+    private static final Set<Role> WRITERS = Set.of(Role.RESPONSABLE, Role.MIEMBRO);
+
+    private final TeamMemberRepository teamMemberRepository;
+    private final CommentRepository commentRepository;
+    private final AttachmentRepository attachmentRepository;
+
+    public Optional<Role> roleInTeam(Long teamId) {
+        return SecurityUtils.currentUserId()
+                .flatMap(userId -> teamMemberRepository.findByTeam_IdAndUser_Id(teamId, userId))
+                .map(com.tfg.kanban.domain.model.TeamMember::getRole);
+    }
+
+    public Optional<Role> roleInProject(Long projectId) {
+        return SecurityUtils.currentUserId()
+                .flatMap(userId -> teamMemberRepository.findRoleByProject(projectId, userId));
+    }
+
+    public Optional<Role> roleInBoard(Long boardId) {
+        return SecurityUtils.currentUserId()
+                .flatMap(userId -> teamMemberRepository.findRoleByBoard(boardId, userId));
+    }
+
+    public Optional<Role> roleInColumn(Long columnId) {
+        return SecurityUtils.currentUserId()
+                .flatMap(userId -> teamMemberRepository.findRoleByColumn(columnId, userId));
+    }
+
+    public Optional<Role> roleInTask(Long taskId) {
+        return SecurityUtils.currentUserId()
+                .flatMap(userId -> teamMemberRepository.findRoleByTask(taskId, userId));
+    }
+
+    public boolean isTeamMember(Long teamId) {
+        return roleInTeam(teamId).isPresent();
+    }
+
+    public boolean canManageTeam(Long teamId) {
+        return roleInTeam(teamId).filter(Role.RESPONSABLE::equals).isPresent();
+    }
+
+    public boolean canReadProject(Long projectId) {
+        return roleInProject(projectId).isPresent();
+    }
+
+    public boolean canWriteProject(Long projectId) {
+        return roleInProject(projectId).filter(WRITERS::contains).isPresent();
+    }
+
+    public boolean canManageProject(Long projectId) {
+        return roleInProject(projectId).filter(Role.RESPONSABLE::equals).isPresent();
+    }
+
+    public boolean canReadBoard(Long boardId) {
+        return roleInBoard(boardId).isPresent();
+    }
+
+    public boolean canWriteBoard(Long boardId) {
+        return roleInBoard(boardId).filter(WRITERS::contains).isPresent();
+    }
+
+    public boolean canManageBoard(Long boardId) {
+        return roleInBoard(boardId).filter(Role.RESPONSABLE::equals).isPresent();
+    }
+
+    public boolean canReadColumn(Long columnId) {
+        return roleInColumn(columnId).isPresent();
+    }
+
+    public boolean canWriteColumn(Long columnId) {
+        return roleInColumn(columnId).filter(WRITERS::contains).isPresent();
+    }
+
+    public boolean canManageColumn(Long columnId) {
+        return roleInColumn(columnId).filter(Role.RESPONSABLE::equals).isPresent();
+    }
+
+    public boolean canReadTask(Long taskId) {
+        return roleInTask(taskId).isPresent();
+    }
+
+    public boolean canWriteTask(Long taskId) {
+        return roleInTask(taskId).filter(WRITERS::contains).isPresent();
+    }
+
+    public boolean canManageTask(Long taskId) {
+        return roleInTask(taskId).filter(Role.RESPONSABLE::equals).isPresent();
+    }
+
+    /** El autor puede editar/borrar su comentario; el RESPONSABLE del equipo, cualquiera. */
+    public boolean canModifyComment(Long commentId) {
+        Long userId = SecurityUtils.currentUserId().orElse(null);
+        if (userId == null) {
+            return false;
+        }
+        return commentRepository.findById(commentId)
+                .map(comment -> comment.getAuthor().getId().equals(userId)
+                        || roleInTask(comment.getTask().getId()).filter(Role.RESPONSABLE::equals).isPresent())
+                .orElse(false);
+    }
+
+    public boolean canReadComment(Long commentId) {
+        return commentRepository.findById(commentId)
+                .map(comment -> canReadTask(comment.getTask().getId()))
+                .orElse(false);
+    }
+
+    public boolean canReadAttachment(Long attachmentId) {
+        return attachmentRepository.findById(attachmentId)
+                .map(attachment -> canReadTask(attachment.getTask().getId()))
+                .orElse(false);
+    }
+
+    /** Quien lo subio puede borrarlo; el RESPONSABLE del equipo, cualquiera. */
+    public boolean canDeleteAttachment(Long attachmentId) {
+        Long userId = SecurityUtils.currentUserId().orElse(null);
+        if (userId == null) {
+            return false;
+        }
+        return attachmentRepository.findById(attachmentId)
+                .map(attachment -> attachment.getUploadedBy().getId().equals(userId)
+                        || roleInTask(attachment.getTask().getId()).filter(Role.RESPONSABLE::equals).isPresent())
+                .orElse(false);
+    }
+
+    /** Cada usuario puede editar su propio perfil. */
+    public boolean isSelf(Long userId) {
+        return SecurityUtils.currentUserId().filter(userId::equals).isPresent();
+    }
+}

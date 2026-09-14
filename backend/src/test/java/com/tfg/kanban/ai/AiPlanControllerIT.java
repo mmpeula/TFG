@@ -1,0 +1,111 @@
+package com.tfg.kanban.ai;
+
+import com.tfg.kanban.AbstractApiIT;
+import com.tfg.kanban.domain.model.Role;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+
+import java.nio.charset.StandardCharsets;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * En los tests el modulo de IA esta apagado (app.ai.enabled=false), asi que no se
+ * habla con ningun modelo: lo que se fija aqui es el contrato del endpoint, que es
+ * justo donde ya se colo un fallo (el @RequestBody de Swagger tapando al de Spring).
+ */
+class AiPlanControllerIT extends AbstractApiIT {
+
+    private record Contexto(TestUser responsable, TestUser miembro, Long projectId, Long boardId) {
+    }
+
+    private Contexto contexto() throws Exception {
+        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser miembro = registerUser(Role.MIEMBRO);
+        Long teamId = createTeam(responsable, "Equipo IA");
+        addMember(responsable, teamId, miembro, Role.MIEMBRO);
+        Long projectId = createProject(responsable, teamId, "Practica con IA");
+        Long boardId = createBoard(responsable, projectId, "Tablero IA");
+        return new Contexto(responsable, miembro, projectId, boardId);
+    }
+
+    @Test
+    @DisplayName("El cuerpo de «aplicar» se enlaza y crea las tareas aceptadas con su responsable")
+    void applyBindsBodyAndAssigns() throws Exception {
+        Contexto ctx = contexto();
+
+        String body = """
+                {"boardId":%d,"tasks":[
+                  {"title":"Modelar el esquema","reason":"Lo pide el guion","tag":"analisis",
+                   "priority":"ALTA","estimatedHours":6,"assigneeId":%d,"assigneeName":"Quien sea"}
+                ]}
+                """.formatted(ctx.boardId(), ctx.miembro().id());
+
+        mockMvc.perform(authorized(post("/api/projects/{id}/ai-plan/apply", ctx.projectId()), ctx.responsable())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].title").value("Modelar el esquema"))
+                .andExpect(jsonPath("$[0].aiGenerated").value(true))
+                .andExpect(jsonPath("$[0].assignee.id").value(ctx.miembro().id()))
+                .andExpect(jsonPath("$[0].columnName").value("Por hacer"));
+    }
+
+    @Test
+    @DisplayName("Aplicar sin tareas se rechaza con el error de validacion")
+    void applyRejectsEmptySelection() throws Exception {
+        Contexto ctx = contexto();
+
+        mockMvc.perform(authorized(post("/api/projects/{id}/ai-plan/apply", ctx.projectId()), ctx.responsable())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"boardId\":%d,\"tasks\":[]}".formatted(ctx.boardId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("Un MIEMBRO no puede lanzar ni aplicar la planificacion")
+    void onlyResponsableCanUseAi() throws Exception {
+        Contexto ctx = contexto();
+
+        mockMvc.perform(authorized(post("/api/projects/{id}/ai-plan", ctx.projectId()), ctx.miembro()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(multipart("/api/projects/{id}/ai-plan/document", ctx.projectId())
+                        .file(new MockMultipartFile("file", "guion.txt", "text/plain",
+                                "contenido".getBytes(StandardCharsets.UTF_8)))
+                        .header(HttpHeaders.AUTHORIZATION, ctx.miembro().bearer()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Con la IA apagada se responde 503, no un 500")
+    void reportsUnavailableWhenDisabled() throws Exception {
+        Contexto ctx = contexto();
+
+        mockMvc.perform(multipart("/api/projects/{id}/ai-plan/document", ctx.projectId())
+                        .file(new MockMultipartFile("file", "guion.txt", "text/plain",
+                                "Practica de biblioteca".getBytes(StandardCharsets.UTF_8)))
+                        .header(HttpHeaders.AUTHORIZATION, ctx.responsable().bearer()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("AI_UNAVAILABLE"));
+    }
+
+    @Test
+    @DisplayName("Un documento con formato no admitido se rechaza antes de llamar al modelo")
+    void rejectsUnsupportedDocument() throws Exception {
+        Contexto ctx = contexto();
+
+        mockMvc.perform(multipart("/api/projects/{id}/ai-plan/document", ctx.projectId())
+                        .file(new MockMultipartFile("file", "guion.pages", "application/octet-stream", "x".getBytes()))
+                        .header(HttpHeaders.AUTHORIZATION, ctx.responsable().bearer()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+    }
+}

@@ -1,0 +1,32 @@
+# Perfil usado por los tests de integracion. El datasource lo inyecta
+# Testcontainers via @ServiceConnection, por eso aqui no hay url ni credenciales.
+spring:
+  # Valores de relleno: @ServiceConnection los sustituye por los del contenedor
+  # de Testcontainers. Estan aqui solo para que resuelvan los placeholders
+  # obligatorios de application.yml.
+  datasource:
+    url: jdbc:oracle:thin:@//localhost:1521/FREEPDB1
+    username: test
+    password: test
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+app:
+  # En los tests no se habla con ningun modelo: se comprueban el 503 y el parseo.
+  ai:
+    enabled: false
+    base-url: http://localhost:11434
+    model: modelo-de-pruebas
+  security:
+    jwt:
+      secret: secreto-de-pruebas-con-al-menos-32-caracteres
+      expiration-minutes: 30
+      issuer: tfg-kanban-test
+
+logging:
+  level:
+    com.tfg.kanban: DEBUG
+    org.testcontainers: INFO
