@@ -1,0 +1,278 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  boards, comments, attachments, projects, tasks, teams, users, workspaces,
+  type TaskPayload, type WorkspacePayload,
+} from '@/api/endpoints'
+import { toErrorMessage } from '@/lib/api-client'
+import { useUi } from '@/state/context'
+import type { AttachmentResponse, Role } from '@/types/api'
+
+export const keys = {
+  workspaces: ['workspaces'] as const,
+  workspace: (id: number) => ['workspaces', id] as const,
+  members: (id: number) => ['teams', id, 'members'] as const,
+  project: (id: number) => ['projects', 'detalle', id] as const,
+  activity: (id: number) => ['projects', 'detalle', id, 'activity'] as const,
+  boards: (projectId: number) => ['projects', 'detalle', projectId, 'boards'] as const,
+  board: (id: number) => ['boards', id] as const,
+  comments: (taskId: number) => ['tasks', taskId, 'comments'] as const,
+  attachments: (taskId: number) => ['tasks', taskId, 'attachments'] as const,
+}
+
+const enabled = (id?: number) => typeof id === 'number' && Number.isFinite(id)
+
+export const useWorkspaces = () => useQuery({ queryKey: keys.workspaces, queryFn: workspaces.list })
+
+export const useWorkspace = (workspaceId?: number) =>
+  useQuery({
+    queryKey: keys.workspace(workspaceId!),
+    queryFn: () => workspaces.get(workspaceId!),
+    enabled: enabled(workspaceId),
+  })
+
+export const useTeamMembers = (teamId?: number) =>
+  useQuery({ queryKey: keys.members(teamId!), queryFn: () => teams.members(teamId!), enabled: enabled(teamId) })
+
+export const useProject = (projectId?: number) =>
+  useQuery({ queryKey: keys.project(projectId!), queryFn: () => projects.get(projectId!), enabled: enabled(projectId) })
+
+export const useActivity = (projectId?: number) =>
+  useQuery({ queryKey: keys.activity(projectId!), queryFn: () => projects.activity(projectId!), enabled: enabled(projectId) })
+
+export const useProjectBoards = (projectId?: number) =>
+  useQuery({ queryKey: keys.boards(projectId!), queryFn: () => boards.byProject(projectId!), enabled: enabled(projectId) })
+
+export const useBoard = (boardId?: number) =>
+  useQuery({ queryKey: keys.board(boardId!), queryFn: () => boards.get(boardId!), enabled: enabled(boardId) })
+
+export const useComments = (taskId?: number) =>
+  useQuery({ queryKey: keys.comments(taskId!), queryFn: () => comments.byTask(taskId!), enabled: enabled(taskId) })
+
+export const useAttachments = (taskId?: number) =>
+  useQuery({ queryKey: keys.attachments(taskId!), queryFn: () => attachments.byTask(taskId!), enabled: enabled(taskId) })
+
+/** Toda mutacion avisa con un toast y refresca lo que toca. */
+function useOnError() {
+  const { pushToast } = useUi()
+  return (error: unknown) => pushToast(toErrorMessage(error))
+}
+
+/**
+ * Crear, editar y borrar workspaces. Se invalida tambien el espacio de proyectos
+ * porque por debajo el workspace es uno de ellos, con su tablero y su equipo.
+ */
+export function useWorkspaceMutations(workspaceId?: number) {
+  const queryClient = useQueryClient()
+  const { pushToast } = useUi()
+  const onError = useOnError()
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: keys.workspaces })
+    queryClient.invalidateQueries({ queryKey: ['projects'] })
+  }
+
+  return {
+    create: useMutation({
+      mutationFn: (payload: WorkspacePayload) => workspaces.create(payload),
+      onSuccess: (workspace) => { invalidate(); pushToast(`Workspace «${workspace.name}» creado`) },
+      onError,
+    }),
+    update: useMutation({
+      mutationFn: (payload: WorkspacePayload) => workspaces.update(workspaceId!, payload),
+      onSuccess: () => { invalidate(); pushToast('Workspace actualizado') },
+      onError,
+    }),
+    remove: useMutation({
+      mutationFn: () => workspaces.remove(workspaceId!),
+      onSuccess: () => { invalidate(); pushToast('Workspace borrado') },
+      onError,
+    }),
+  }
+}
+
+/**
+ * Miembros del workspace. Sigue siendo el equipo por debajo, de ahi el nombre de
+ * las llamadas; lo que cambia es que ya no hay pantalla de equipos donde crearlos
+ * o borrarlos: eso lo hace el workspace.
+ */
+export function useMemberMutations(teamId?: number) {
+  const queryClient = useQueryClient()
+  const { pushToast } = useUi()
+  const onError = useOnError()
+  const invalidate = () => {
+    if (teamId) queryClient.invalidateQueries({ queryKey: keys.members(teamId) })
+    // La tarjeta del workspace muestra cuanta gente hay.
+    queryClient.invalidateQueries({ queryKey: keys.workspaces })
+  }
+
+  return {
+    addMember: useMutation({
+      mutationFn: (payload: { email: string; role: Role }) => teams.addMember(teamId!, payload),
+      onSuccess: (member) => { invalidate(); pushToast(`${member.user.fullName} anadido al workspace`) },
+      onError,
+    }),
+    updateRole: useMutation({
+      mutationFn: ({ userId, role }: { userId: number; role: Role }) => teams.updateMemberRole(teamId!, userId, role),
+      onSuccess: () => { invalidate(); pushToast('Rol actualizado') },
+      onError,
+    }),
+    removeMember: useMutation({
+      mutationFn: (userId: number) => teams.removeMember(teamId!, userId),
+      onSuccess: () => { invalidate(); pushToast('Ya no esta en el workspace') },
+      onError,
+    }),
+  }
+}
+
+/** Editar el propio perfil: nombre siempre, contrasena solo si se rellena. */
+export function useUserMutations(userId?: number) {
+  const queryClient = useQueryClient()
+  const { pushToast } = useUi()
+  const onError = useOnError()
+
+  return {
+    update: useMutation({
+      mutationFn: (payload: { fullName: string; password?: string }) => users.update(userId!, payload),
+      onSuccess: () => {
+        // "auth","me" lleva el token como tercer trozo de la key: se invalida por
+        // prefijo para no tener que conocerlo aqui.
+        queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
+        pushToast('Perfil actualizado')
+      },
+      onError,
+    }),
+  }
+}
+
+export function useBoardMutations(boardId?: number, projectId?: number) {
+  const queryClient = useQueryClient()
+  const { pushToast } = useUi()
+  const onError = useOnError()
+  const invalidate = () => {
+    if (boardId) queryClient.invalidateQueries({ queryKey: keys.board(boardId) })
+    if (projectId) {
+      queryClient.invalidateQueries({ queryKey: keys.boards(projectId) })
+      queryClient.invalidateQueries({ queryKey: keys.activity(projectId) })
+    }
+    queryClient.invalidateQueries({ queryKey: ['tasks'] })
+  }
+
+  return {
+    createBoard: useMutation({
+      mutationFn: (payload: { name: string; description?: string }) => boards.create(projectId!, payload),
+      onSuccess: () => { invalidate(); pushToast('Tablero creado con sus columnas por defecto') },
+      onError,
+    }),
+    removeBoard: useMutation({
+      mutationFn: (id: number) => boards.remove(id),
+      onSuccess: () => { invalidate(); pushToast('Tablero borrado') },
+      onError,
+    }),
+    createColumn: useMutation({
+      mutationFn: (payload: { name: string; wipLimit?: number | null }) => boards.createColumn(boardId!, payload),
+      onSuccess: () => { invalidate(); pushToast('Columna creada') },
+      onError,
+    }),
+    updateColumn: useMutation({
+      mutationFn: ({ columnId, payload }: { columnId: number; payload: { name: string; wipLimit?: number | null } }) =>
+        boards.updateColumn(columnId, payload),
+      onSuccess: () => { invalidate(); pushToast('Columna actualizada') },
+      onError,
+    }),
+    moveColumn: useMutation({
+      mutationFn: ({ columnId, position }: { columnId: number; position: number }) =>
+        boards.moveColumn(columnId, position),
+      onSuccess: invalidate,
+      onError: (error) => { onError(error); invalidate() },
+    }),
+    removeColumn: useMutation({
+      mutationFn: (columnId: number) => boards.removeColumn(columnId),
+      onSuccess: () => { invalidate(); pushToast('Columna borrada') },
+      onError,
+    }),
+  }
+}
+
+export function useTaskMutations(boardId?: number, projectId?: number) {
+  const queryClient = useQueryClient()
+  const { pushToast } = useUi()
+  const onError = useOnError()
+  const invalidate = () => {
+    if (boardId) queryClient.invalidateQueries({ queryKey: keys.board(boardId) })
+    if (projectId) queryClient.invalidateQueries({ queryKey: keys.activity(projectId) })
+    queryClient.invalidateQueries({ queryKey: ['tasks'] })
+  }
+
+  return {
+    create: useMutation({
+      mutationFn: ({ columnId, payload }: { columnId: number; payload: TaskPayload }) =>
+        tasks.create(columnId, payload),
+      onSuccess: () => { invalidate(); pushToast('Tarea creada') },
+      onError,
+    }),
+    update: useMutation({
+      mutationFn: ({ taskId, payload }: { taskId: number; payload: TaskPayload }) => tasks.update(taskId, payload),
+      onSuccess: () => { invalidate(); pushToast('Tarea actualizada') },
+      onError,
+    }),
+    /** Persiste el drag & drop. Si el backend lo rechaza, se recarga el tablero. */
+    move: useMutation({
+      mutationFn: ({ taskId, columnId, position }: { taskId: number; columnId: number; position: number }) =>
+        tasks.move(taskId, { columnId, position }),
+      onSuccess: invalidate,
+      onError: (error) => { onError(error); invalidate() },
+    }),
+    remove: useMutation({
+      mutationFn: (taskId: number) => tasks.remove(taskId),
+      onSuccess: () => { invalidate(); pushToast('Tarea borrada') },
+      onError,
+    }),
+  }
+}
+
+export function useCommentMutations(taskId: number, onChanged?: () => void) {
+  const queryClient = useQueryClient()
+  const { pushToast } = useUi()
+  const onError = useOnError()
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: keys.comments(taskId) })
+    onChanged?.()
+  }
+
+  return {
+    create: useMutation({ mutationFn: (content: string) => comments.create(taskId, content), onSuccess: invalidate, onError }),
+    update: useMutation({
+      mutationFn: ({ commentId, content }: { commentId: number; content: string }) => comments.update(commentId, content),
+      onSuccess: invalidate,
+      onError,
+    }),
+    remove: useMutation({
+      mutationFn: (commentId: number) => comments.remove(commentId),
+      onSuccess: () => { invalidate(); pushToast('Comentario borrado') },
+      onError,
+    }),
+  }
+}
+
+export function useAttachmentMutations(taskId: number, onChanged?: () => void) {
+  const queryClient = useQueryClient()
+  const { pushToast } = useUi()
+  const onError = useOnError()
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: keys.attachments(taskId) })
+    onChanged?.()
+  }
+
+  return {
+    upload: useMutation({
+      mutationFn: (file: File) => attachments.upload(taskId, file),
+      onSuccess: () => { invalidate(); pushToast('Fichero adjuntado') },
+      onError,
+    }),
+    remove: useMutation({
+      mutationFn: (attachmentId: number) => attachments.remove(attachmentId),
+      onSuccess: () => { invalidate(); pushToast('Adjunto borrado') },
+      onError,
+    }),
+    download: useMutation({ mutationFn: (item: AttachmentResponse) => attachments.download(item), onError }),
+  }
+}

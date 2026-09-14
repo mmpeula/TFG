@@ -1,0 +1,63 @@
+.card {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  transition: var(--transition);
+}
+.card:hover { border-color: var(--color-neutral-500); }
+.flagged { border-color: var(--color-neutral-500); }
+/* Lo terminado se apaga en vez de colorearse. */
+.done { background: var(--color-neutral-100); }
+.done .title { color: var(--color-neutral-500); }
+.dragging { opacity: .4; }
+/* Solo la tarjeta que se arrastra flota, porque de verdad esta por encima. */
+.overlay { box-shadow: var(--shadow-lg); cursor: grabbing; }
+.highlight {
+  box-shadow: 0 0 0 2px var(--color-accent-500);
+  transition: box-shadow .2s ease;
+}
+
+.head { display: flex; align-items: center; gap: var(--space-2); }
+.code { font-size: 11px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+.priority { width: 6px; height: 6px; border-radius: 999px; flex: none; }
+.menu {
+  margin-left: auto;
+  display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: var(--radius-sm);
+  color: var(--color-neutral-500);
+  opacity: 0;
+}
+.card:hover .menu, .menu:focus-visible { opacity: 1; }
+.menu:hover { background: var(--color-neutral-200); color: var(--color-text); }
+
+.title { font-size: 13.5px; font-weight: 450; line-height: 1.45; margin-top: 6px; }
+.doneTitle { text-decoration: line-through; text-decoration-color: var(--color-neutral-400); color: var(--color-neutral-500); }
+.check { display: inline-grid; place-items: center; color: var(--color-accent-2-500); margin-right: 5px; vertical-align: -2px; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: var(--space-2); }
+.foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-neutral-200);
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}
+.stat { display: inline-flex; align-items: center; gap: 3px; }
+.due { margin-left: auto; }
+.dueSoon { color: var(--color-accent-700); font-weight: 700; }
+.grip {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  border-radius: var(--radius-md);
+}
+.content { position: relative; pointer-events: none; }
+.content button, .content a { pointer-events: auto; }

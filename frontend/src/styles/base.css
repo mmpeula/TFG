@@ -1,0 +1,82 @@
+@import "./tokens.css";
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/*
+ * Sin tipografia de titulares: la jerarquia sale del peso y de apretar el
+ * interletrado, que es lo que hace que un texto grande no parezca inflado.
+ */
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  margin: 0;
+  text-align: left;
+  text-wrap: pretty;
+}
+h1 { letter-spacing: -0.028em; }
+
+p { margin: 0; text-wrap: pretty; }
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  /* El agente de usuario centra el texto de los botones; aqui todo va a la
+     izquierda salvo los que se alinean solos con flex (componente Button). */
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+input, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+a { color: inherit; text-decoration: none; }
+
+ul, ol { margin: 0; padding: 0; list-style: none; }
+
+/* El foco si lleva el azul: es la unica pista de donde esta el teclado. */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--color-accent-600);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::selection { background: var(--color-accent-200); color: var(--color-text); }
+
+/* Barras de scroll finas y sin color. */
+* { scrollbar-color: var(--color-neutral-300) transparent; scrollbar-width: thin; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-300);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
+  }
+}

@@ -1,0 +1,50 @@
+/*
+ * Un solo boton con cuatro pesos. El primario es casi negro: en una pagina
+ * blanca pesa menos que uno de color y deja el azul libre para el foco.
+ */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1;
+  padding: 8px 13px;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+.button:disabled { opacity: .45; cursor: not-allowed; }
+
+.primary { background: var(--color-neutral-900); color: #ffffff; }
+.primary:hover:not(:disabled) { background: var(--color-neutral-800); }
+.primary:active:not(:disabled) { background: var(--color-neutral-900); }
+
+.secondary {
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-300);
+  color: var(--color-neutral-800);
+}
+.secondary:hover:not(:disabled) { background: var(--color-neutral-100); border-color: var(--color-neutral-400); }
+
+.ghost { background: transparent; color: var(--color-neutral-600); }
+.ghost:hover:not(:disabled) { background: var(--color-neutral-200); color: var(--color-text); }
+
+/* Sobre fondo oscuro se invierte: blanco lleno y blanco al aire. */
+.onDark { background: #ffffff; color: var(--color-neutral-900); }
+.onDark:hover:not(:disabled) { background: var(--color-neutral-200); }
+
+.onDarkGhost {
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / .28);
+  color: rgb(255 255 255 / .9);
+}
+.onDarkGhost:hover:not(:disabled) { background: rgb(255 255 255 / .12); }
+
+.destructive { background: #b42318; color: #ffffff; }
+.destructive:hover:not(:disabled) { background: #97180c; }
+
+.small { padding: 6px 10px; font-size: 12px; }
+.block { width: 100%; }

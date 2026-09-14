@@ -1,0 +1,12 @@
+.zone {
+  border: 2px dashed var(--color-accent-400);
+  background: var(--color-accent-100);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent-700);
+  animation: appear .15s ease;
+}
+@keyframes appear { from { opacity: 0 } to { opacity: 1 } }

@@ -1,0 +1,19 @@
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+}
+.icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--color-accent-200);
+  color: var(--color-accent-700);
+}
+.title { font-size: 17px; }
+.body { font-size: 13px; color: var(--color-neutral-600); max-width: 34ch; }

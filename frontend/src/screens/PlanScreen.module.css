@@ -1,0 +1,72 @@
+.head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--space-4); flex-wrap: wrap;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-divider);
+}
+.window { font-size: 13px; color: var(--color-neutral-700); }
+.dim { color: var(--color-neutral-500); font-weight: 400; }
+.note { font-size: 12px; color: var(--color-neutral-500); margin-top: 3px; }
+.link { font-size: 12px; color: var(--color-text); text-decoration: underline; text-underline-offset: 2px; }
+.headActions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+
+.mobileTabs { display: flex; overflow-x: auto; margin-top: var(--space-3); }
+
+/*
+ * Los sprints son columnas, una junto a otra, como el tablero: cada una un
+ * tramo del calendario. Con mas sprints de los que caben, se desplaza en
+ * horizontal en vez de amontonarse.
+ */
+.sprints {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.sprint {
+  flex: 0 0 300px;
+  width: 300px;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+/* El sprint en curso se marca oscureciendo su borde: sin fondo ni color de mas. */
+.currentSprint { border-color: var(--color-neutral-900); }
+
+.sprintHead { display: flex; flex-direction: column; gap: 6px; }
+.sprintName {
+  font-size: 13px; font-weight: 600; letter-spacing: -0.01em;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+}
+.now {
+  font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em;
+  background: var(--color-neutral-900); color: #ffffff;
+  border-radius: 4px; padding: 1px 5px;
+}
+.range { font-size: 12px; color: var(--color-neutral-500); }
+.count { font-size: 11px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+
+.sprintEmpty { font-size: 12px; color: var(--color-neutral-400); margin-top: var(--space-2); }
+
+/* Todas las tareas del sprint juntas, sin bandas por estado: eso se ve en la
+   insignia de cada tarjeta (PlanTaskCard), no separandolas en la pantalla. */
+.cards { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+
+.loose { padding-top: var(--space-4); margin-top: var(--space-4); border-top: 1px solid var(--color-divider); }
+.looseTitle { font-size: 13px; font-weight: 600; }
+.looseCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 767px) {
+  .head { flex-direction: column; align-items: stretch; }
+  /* En movil se ve un sprint cada vez (pestanas arriba), asi que ocupa todo el ancho. */
+  .sprints { overflow-x: visible; }
+  .sprint { flex: 1 1 auto; width: 100%; }
+}

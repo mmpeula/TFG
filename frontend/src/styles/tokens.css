@@ -1,0 +1,70 @@
+/*
+ * Sistema de diseno de PlanifIA.
+ *
+ * Una sola escala de grises, un unico acento y nada mas. La regla es que el
+ * color signifique algo: si un elemento no comunica estado, va en gris. Por eso
+ * la accion principal es casi negra y el azul queda reservado a lo que el
+ * usuario tiene que mirar (foco, seleccion, la IA).
+ *
+ * Los nombres de los tokens se conservan de la version anterior para que ningun
+ * componente tenga que cambiar de vocabulario; lo que cambia son los valores.
+ */
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #fafafa;
+  --color-text: #18181b;
+  --color-divider: #e8e8ea;
+
+  /* Grises: del fondo hundido al texto. */
+  --color-neutral-100: #fafafa; --color-neutral-200: #f2f2f3;
+  --color-neutral-300: #e4e4e7; --color-neutral-400: #d1d1d6;
+  --color-neutral-500: #a0a0a8; --color-neutral-600: #71717a;
+  --color-neutral-700: #52525b; --color-neutral-800: #3f3f46;
+  --color-neutral-900: #18181b;
+
+  /*
+   * Acento. El 600 es el azul de trabajo; el 900 se usa como accion principal
+   * porque un boton negro pesa menos en la pagina que uno de color.
+   */
+  --color-accent: #18181b;
+  --color-accent-100: #f4f7fe; --color-accent-200: #e6edfc;
+  --color-accent-300: #c7d8f8; --color-accent-400: #8fb0ef;
+  --color-accent-500: #5b87e3; --color-accent-600: #3466cf;
+  --color-accent-700: #2a52a8; --color-accent-800: #223f80;
+  --color-accent-900: #18181b;
+
+  /* Verde discreto: solo para lo terminado y lo que va bien. */
+  --color-accent-2-100: #f3f8f4; --color-accent-2-200: #e2efe6;
+  --color-accent-2-300: #c3dfcc; --color-accent-2-400: #92c2a2;
+  --color-accent-2-500: #5f9e74; --color-accent-2-600: #467e59;
+  --color-accent-2-700: #366245; --color-accent-2-800: #2a4c36;
+  --color-accent-2-900: #1d3325;
+
+  /*
+   * Una sola familia. Se usa la del sistema: carga instantanea, se ve nativa en
+   * cada equipo y quita una dependencia externa. La jerarquia la dan el peso y
+   * el interletrado, no una segunda tipografia.
+   */
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+               Arial, "Noto Sans", sans-serif;
+  --font-heading: var(--font-body);
+
+  /* Escala de 4 en 4: predecible y facil de tener en la cabeza. */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px;
+  --space-4: 16px; --space-6: 24px; --space-8: 32px;
+
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px;
+
+  /*
+   * Casi todo se separa con una linea de 1 px, no con sombra. Las sombras
+   * quedan para lo que de verdad flota por encima de la pagina.
+   */
+  --shadow-sm: 0 1px 2px rgb(24 24 27 / .05);
+  --shadow-md: 0 4px 12px rgb(24 24 27 / .07);
+  --shadow-lg: 0 16px 40px rgb(24 24 27 / .12);
+
+  --transition: background .12s ease, color .12s ease, border-color .12s ease,
+                opacity .12s ease, transform .12s ease;
+
+  --sidebar-width: 236px;
+}
