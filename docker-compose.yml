@@ -1,0 +1,97 @@
+# Pila completa del TFG: base de datos Oracle + backend Spring Boot + frontend React.
+# Arranque:  docker compose up --build
+# Requisitos: fichero .env en la raiz (copiar de .env.example).
+
+services:
+
+  # ---------------------------------------------------------------- Oracle XE
+  oracle-db:
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: planifia-oracle
+    environment:
+      # Contrasena de SYS/SYSTEM
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD}
+      # Usuario de aplicacion que crea la imagen automaticamente en FREEPDB1
+      APP_USER: ${DB_USERNAME}
+      APP_USER_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${ORACLE_PORT:-1521}:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      # Script incluido en la imagen gvenzl: comprueba que la BD acepta conexiones.
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      # La primera arrancada crea la base de datos y tarda varios minutos.
+      start_period: 180s
+    restart: unless-stopped
+
+  # ------------------------------------------------------- Backend Spring Boot
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: planifia-backend
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:oracle:thin:@//oracle-db:1521/FREEPDB1
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-120}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      SERVER_PORT: 8080
+      UPLOAD_DIR: /app/uploads
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10MB}
+      # Modulo de IA: modelo local servido por Ollama en la maquina anfitriona.
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3}
+      AI_ENABLED: ${AI_ENABLED:-true}
+    # Permite al contenedor resolver la maquina anfitriona, donde corre Ollama.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Los ficheros adjuntos de las tareas viven fuera del contenedor.
+      - uploads-data:/app/uploads
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    restart: unless-stopped
+
+  # ------------------------------------------------------ Frontend React/Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: planifia-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    healthcheck:
+      # 127.0.0.1 y no "localhost": dentro del contenedor localhost resuelve
+      # primero a ::1 y Nginx solo escucha en IPv4.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  oracle-data:
+    driver: local
+  uploads-data:
+    driver: local
