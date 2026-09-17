@@ -107,7 +107,7 @@ public class TeamService {
         TeamMember member = TeamMember.builder()
                 .team(team)
                 .user(user)
-                .role(request.role() == null ? Role.MIEMBRO : request.role())
+                .role(ensureTeamRole(request.role() == null ? Role.MIEMBRO : request.role()))
                 .build();
 
         return TeamMemberResponse.from(teamMemberRepository.save(member));
@@ -116,12 +116,25 @@ public class TeamService {
     @Transactional
     public TeamMemberResponse updateMemberRole(Long teamId, Long userId, UpdateMemberRoleRequest request) {
         TeamMember member = getMember(teamId, userId);
+        Role role = ensureTeamRole(request.role());
 
-        if (member.getRole() == Role.RESPONSABLE && request.role() != Role.RESPONSABLE) {
+        if (member.getRole() == Role.RESPONSABLE && role != Role.RESPONSABLE) {
             ensureNotLastResponsable(teamId);
         }
-        member.setRole(request.role());
+        member.setRole(role);
         return TeamMemberResponse.from(member);
+    }
+
+    /**
+     * ADMIN es un rol global (administra la plataforma, no un equipo): no tiene
+     * sentido como rol de {@link TeamMember} y aqui se rechaza explicitamente,
+     * aunque el DTO de entrada acepte cualquier valor del enum {@link Role}.
+     */
+    private Role ensureTeamRole(Role role) {
+        if (role == Role.ADMIN) {
+            throw new BusinessRuleException("ADMIN es un rol de plataforma, no se puede asignar en un equipo");
+        }
+        return role;
     }
 
     @Transactional

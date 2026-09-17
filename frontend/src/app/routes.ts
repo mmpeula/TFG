@@ -27,6 +27,7 @@ export const ROUTES = {
   pulsoById: (id: string | number) => `/workspaces/${id}/pulso`,
 
   configuracion: '/configuracion',
+  administracion: '/administracion',
 
   legacyEquipos: '/equipos',
   legacyEquipo: '/equipos/:teamId',

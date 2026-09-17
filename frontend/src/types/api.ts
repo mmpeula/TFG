@@ -20,7 +20,12 @@ export interface PageResponse<T> {
   last: boolean
 }
 
-export type Role = 'RESPONSABLE' | 'MIEMBRO' | 'OBSERVADOR'
+/**
+ * ADMIN es distinto de los otros tres: es un rol global de plataforma, nunca
+ * de equipo. Solo aparece en UserResponse.role, jamas en el rol de un
+ * TeamMember (ver lib/roles.ts).
+ */
+export type Role = 'RESPONSABLE' | 'MIEMBRO' | 'OBSERVADOR' | 'ADMIN'
 export type TaskPriority = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA'
 /** De que va la tarea. Es lo unico que colorea la interfaz (ver lib/taskTypes.ts). */
 export type TaskType = 'EPICA' | 'HISTORIA' | 'TAREA' | 'BUG' | 'INCIDENCIA'

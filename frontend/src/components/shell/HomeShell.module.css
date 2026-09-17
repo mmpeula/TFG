@@ -42,4 +42,6 @@
   .top { padding: var(--space-3) var(--space-4); }
   .content { padding: var(--space-4); gap: var(--space-4); }
   .profileName { display: none; }
+  /* El boton de administracion se queda como icono solo, igual que el resto. */
+  .adminLinkLabel { display: none; }
 }

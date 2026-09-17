@@ -25,11 +25,13 @@ import java.util.List;
 
 /**
  * Configuracion de seguridad: API stateless protegida con JWT y RBAC
- * sobre los roles RESPONSABLE / MIEMBRO / OBSERVADOR.
+ * sobre los roles RESPONSABLE / MIEMBRO / OBSERVADOR / ADMIN.
  *
  * La autorizacion real vive en {@link AccessService}, invocado desde las
  * anotaciones {@code @PreAuthorize} de los controladores: el rol que cuenta es el
- * que el usuario tiene en el equipo dueno del recurso, no su rol global.
+ * que el usuario tiene en el equipo dueno del recurso, no su rol global. La
+ * unica excepcion es ADMIN: un rol global sin equipo, reservado a la gestion
+ * de cuentas de la plataforma ({@code UserController}).
  */
 @Configuration
 @EnableWebSecurity

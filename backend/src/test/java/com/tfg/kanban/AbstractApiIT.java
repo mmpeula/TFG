@@ -54,9 +54,9 @@ public abstract class AbstractApiIT extends AbstractOracleContainerTest {
      * Registra un usuario y le deja el rol global indicado.
      *
      * <p>El alta siempre crea un MIEMBRO: el rol global no se puede pedir al
-     * registrarse (lo concede despues un RESPONSABLE global). Cuando el test
-     * necesita otro rol se asigna en base de datos y se vuelve a iniciar sesion,
-     * porque las autoridades salen del token y no de la fila de la tabla.</p>
+     * registrarse (un ADMIN lo concede despues). Cuando el test necesita otro
+     * rol se asigna en base de datos y se vuelve a iniciar sesion, porque las
+     * autoridades salen del token y no de la fila de la tabla.</p>
      */
     protected TestUser registerUser(Role role) throws Exception {
         String email = "user-" + UUID.randomUUID() + "@uni.es";

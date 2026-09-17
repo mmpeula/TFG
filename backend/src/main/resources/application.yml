@@ -57,6 +57,11 @@ app:
       issuer: ${JWT_ISSUER:tfg-kanban}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  admin:
+    # Cuenta que se crea al arrancar si todavia no existe ningun ADMIN (vease
+    # AdminBootstrapRunner). Cambia estos valores antes de desplegar de verdad.
+    email: ${ADMIN_EMAIL:admin@planifia.local}
+    password: ${ADMIN_PASSWORD:admin123}
   ai:
     # Planificacion automatica con un modelo que corre en local (Ollama).
     # Nada sale de la maquina: no hay servicios externos ni claves de API.

@@ -142,6 +142,22 @@ class TeamServiceTest {
     }
 
     @Test
+    @DisplayName("ADMIN es un rol de plataforma: no se puede invitar a nadie con el")
+    void cannotInviteMemberAsAdmin() {
+        Team team = Team.builder().id(5L).name("Grupo 4").owner(owner).build();
+        User invited = User.builder().id(2L).email("luis@uni.es").fullName("Luis Perez").build();
+
+        when(teamRepository.findById(5L)).thenReturn(Optional.of(team));
+        when(userRepository.findByEmailIgnoreCase("luis@uni.es")).thenReturn(Optional.of(invited));
+
+        AddMemberRequest request = new AddMemberRequest("luis@uni.es", Role.ADMIN);
+
+        assertThatThrownBy(() -> teamService.addMember(5L, request))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("rol de plataforma");
+    }
+
+    @Test
     @DisplayName("Si no se indica rol al invitar, la persona entra como MIEMBRO")
     void addMemberDefaultsToMiembro() {
         Team team = Team.builder().id(5L).name("Grupo 4").owner(owner).build();

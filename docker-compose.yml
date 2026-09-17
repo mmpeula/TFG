@@ -53,6 +53,11 @@ services:
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3}
       AI_ENABLED: ${AI_ENABLED:-true}
+      # Cuenta de administrador de la plataforma que se crea al primer arranque
+      # si todavia no existe ninguna (vease AdminBootstrapRunner). Cambia el
+      # valor por defecto antes de desplegar de verdad.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@planifia.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
     # Permite al contenedor resolver la maquina anfitriona, donde corre Ollama.
     extra_hosts:
       - "host.docker.internal:host-gateway"

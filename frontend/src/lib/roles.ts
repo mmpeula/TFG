@@ -16,16 +16,23 @@ export function canManage(role: Role | null | undefined): boolean {
   return role === 'RESPONSABLE'
 }
 
+/** Solo ADMIN: gestiona las cuentas de la plataforma (rol global, sin equipo). */
+export function isAdmin(role: Role | null | undefined): boolean {
+  return role === 'ADMIN'
+}
+
 export const ROLE_LABELS: Record<Role, string> = {
   RESPONSABLE: 'Responsable',
   MIEMBRO: 'Miembro',
   OBSERVADOR: 'Observador',
+  ADMIN: 'Administrador',
 }
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   RESPONSABLE: 'Control total del equipo y sus proyectos',
   MIEMBRO: 'Crea y mueve tareas, comenta y adjunta ficheros',
   OBSERVADOR: 'Solo lectura',
+  ADMIN: 'Gestiona las cuentas de toda la plataforma',
 }
 
 export const PRIORITY_LABELS = {

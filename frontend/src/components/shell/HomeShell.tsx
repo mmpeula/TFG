@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ListChecks, LogOut } from 'lucide-react'
+import { ListChecks, LogOut, UserCog } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
+import { Button } from '@/components/ui/Button'
 import { Tooltip } from '@/components/ui/Controls'
 import styles from './HomeShell.module.css'
 import { ROUTES } from '@/app/routes'
 import { useAuth } from '@/state/context'
+import { isAdmin } from '@/lib/roles'
 
 /**
  * Marco de la pantalla inicial. No lleva barra lateral a proposito: en el nivel
@@ -26,6 +28,17 @@ export function HomeShell({ children }: { children: ReactNode }) {
         </button>
 
         <div className={styles.actions}>
+          {isAdmin(user?.role) && (
+            <Button
+              variant="secondary"
+              small
+              onClick={() => navigate(ROUTES.administracion)}
+              aria-label="Administracion de la plataforma"
+            >
+              <UserCog size={15} strokeWidth={2.75} />
+              <span className={styles.adminLinkLabel}>Administración</span>
+            </Button>
+          )}
           <button className={styles.profile} onClick={() => navigate(ROUTES.configuracion)}>
             <Avatar user={user} size={30} />
             <span className={styles.profileName}>{user?.fullName}</span>

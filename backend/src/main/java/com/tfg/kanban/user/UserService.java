@@ -3,6 +3,7 @@ package com.tfg.kanban.user;
 import com.tfg.kanban.common.BusinessRuleException;
 import com.tfg.kanban.common.PageResponse;
 import com.tfg.kanban.common.ResourceNotFoundException;
+import com.tfg.kanban.domain.model.Role;
 import com.tfg.kanban.domain.model.User;
 import com.tfg.kanban.domain.repository.UserRepository;
 import com.tfg.kanban.security.SecurityUtils;
@@ -49,6 +50,9 @@ public class UserService {
     @Transactional
     public UserResponse updateGlobalRole(Long id, UpdateGlobalRoleRequest request) {
         User user = getUser(id);
+        if (user.getRole() == Role.ADMIN && request.role() != Role.ADMIN) {
+            ensureNotLastAdmin();
+        }
         user.setRole(request.role());
         return UserResponse.from(user);
     }
@@ -63,7 +67,22 @@ public class UserService {
             throw new BusinessRuleException("No puedes deshabilitar tu propia cuenta");
         }
         User user = getUser(id);
+        if (user.getRole() == Role.ADMIN) {
+            ensureNotLastAdmin();
+        }
         user.setEnabled(false);
+    }
+
+    /** Da de alta de nuevo una cuenta deshabilitada. */
+    @Transactional
+    public void enable(Long id) {
+        getUser(id).setEnabled(true);
+    }
+
+    private void ensureNotLastAdmin() {
+        if (userRepository.countByRole(Role.ADMIN) <= 1) {
+            throw new BusinessRuleException("La plataforma debe tener al menos un administrador");
+        }
     }
 
     public User getUser(Long id) {

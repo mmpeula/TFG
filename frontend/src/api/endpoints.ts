@@ -212,4 +212,13 @@ export const users = {
   /** Nombre siempre; contrasena solo si se quiere cambiar. */
   update: (userId: number, payload: { fullName: string; password?: string }) =>
     apiClient.put<UserResponse>(`/users/${userId}`, payload).then((r) => r.data),
+  /** Listado del panel de administracion: sin filtro trae toda la plataforma. */
+  list: (search: string) =>
+    apiClient
+      .get<PageResponse<UserResponse>>('/users', { params: { search, size: 200 } })
+      .then((r) => r.data),
+  updateGlobalRole: (userId: number, role: Role) =>
+    apiClient.patch<UserResponse>(`/users/${userId}/role`, { role }).then((r) => r.data),
+  disable: (userId: number) => apiClient.delete<void>(`/users/${userId}`),
+  enable: (userId: number) => apiClient.patch<void>(`/users/${userId}/enable`),
 }

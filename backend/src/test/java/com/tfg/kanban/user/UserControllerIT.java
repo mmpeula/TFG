@@ -74,9 +74,9 @@ class UserControllerIT extends AbstractApiIT {
     }
 
     @Test
-    @DisplayName("El rol global solo lo cambia un RESPONSABLE global")
-    void onlyGlobalResponsableChangesRoles() throws Exception {
-        TestUser admin = registerUser(Role.RESPONSABLE);
+    @DisplayName("El rol global solo lo cambia un ADMIN")
+    void onlyAdminChangesGlobalRoles() throws Exception {
+        TestUser admin = registerUser(Role.ADMIN);
         TestUser member = registerUser(Role.MIEMBRO);
 
         mockMvc.perform(authorized(patch("/api/users/{id}/role", admin.id()), member)
@@ -92,9 +92,42 @@ class UserControllerIT extends AbstractApiIT {
     }
 
     @Test
+    @DisplayName("Ser RESPONSABLE de un equipo no da permisos de administrador de la plataforma")
+    void teamResponsableIsNotPlatformAdmin() throws Exception {
+        // RNF-02: el rol que cuenta es el del equipo dueno del recurso, y las
+        // cuentas de usuario no son de ningun equipo. Ser el RESPONSABLE de un
+        // equipo (o de todos los equipos en los que se participa) no debe abrir
+        // la gestion de cuentas de otras personas de la plataforma.
+        TestUser teamLeader = registerUser(Role.RESPONSABLE);
+        TestUser other = registerUser(Role.MIEMBRO);
+
+        mockMvc.perform(authorized(patch("/api/users/{id}/role", other.id()), teamLeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"OBSERVADOR\"}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(authorized(delete("/api/users/{id}", other.id()), teamLeader))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("ADMIN no se puede asignar como rol de un equipo")
+    void adminCannotBeATeamRole() throws Exception {
+        TestUser owner = registerUser(Role.MIEMBRO);
+        TestUser invitee = registerUser(Role.MIEMBRO);
+        Long teamId = createTeam(owner, "Equipo de prueba");
+
+        mockMvc.perform(authorized(post("/api/teams/{id}/members", teamId), owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"%s\",\"role\":\"ADMIN\"}".formatted(invitee.email())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+    }
+
+    @Test
     @DisplayName("Dar de baja una cuenta la deshabilita; nadie puede darse de baja a si mismo")
     void disableAccount() throws Exception {
-        TestUser admin = registerUser(Role.RESPONSABLE);
+        TestUser admin = registerUser(Role.ADMIN);
         TestUser victim = registerUser(Role.MIEMBRO);
 
         mockMvc.perform(authorized(delete("/api/users/{id}", admin.id()), admin))
@@ -115,4 +148,28 @@ class UserControllerIT extends AbstractApiIT {
                                 """.formatted(victim.email())))
                 .andExpect(status().isConflict());
     }
+
+    @Test
+    @DisplayName("Una cuenta reactivada puede volver a iniciar sesion")
+    void enableAccount() throws Exception {
+        TestUser admin = registerUser(Role.ADMIN);
+        TestUser user = registerUser(Role.MIEMBRO);
+
+        mockMvc.perform(authorized(delete("/api/users/{id}", user.id()), admin))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(authorized(patch("/api/users/{id}/enable", user.id()), admin))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"password123"}
+                                """.formatted(user.email())))
+                .andExpect(status().isOk());
+    }
+
+    // La regla de "nunca sin administradores" (UserService.ensureNotLastAdmin) se
+    // prueba en UserServiceTest con un repositorio simulado: el Oracle de estos
+    // tests de integracion es compartido con el resto de clases y siempre tiene
+    // al menos el administrador que crea AdminBootstrapRunner al arrancar, asi
+    // que "queda un unico ADMIN en toda la base de datos" no es reproducible aqui.
 }

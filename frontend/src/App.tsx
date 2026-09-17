@@ -11,6 +11,7 @@ import { MembersScreen } from './screens/MembersScreen'
 import { WorkspaceSettingsScreen } from './screens/WorkspaceSettingsScreen'
 import { PulseScreen } from './screens/PulseScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
+import { AdminScreen } from './screens/AdminScreen'
 
 /**
  * Redireccion de una ruta antigua a su equivalente nueva, conservando el id.
@@ -42,6 +43,8 @@ export function App() {
         <Route path={ROUTES.pulso} element={<PulseScreen />} />
 
         <Route path={ROUTES.configuracion} element={<SettingsScreen />} />
+        {/* Solo la ve quien tiene rol global ADMIN; AdminScreen redirige al resto. */}
+        <Route path={ROUTES.administracion} element={<AdminScreen />} />
 
         {/* Rutas de la version anterior. */}
         <Route path={ROUTES.legacyEquipos} element={<Navigate to={ROUTES.workspaces} replace />} />

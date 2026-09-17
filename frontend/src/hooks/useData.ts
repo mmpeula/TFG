@@ -17,6 +17,7 @@ export const keys = {
   board: (id: number) => ['boards', id] as const,
   comments: (taskId: number) => ['tasks', taskId, 'comments'] as const,
   attachments: (taskId: number) => ['tasks', taskId, 'attachments'] as const,
+  adminUsers: ['admin', 'users'] as const,
 }
 
 const enabled = (id?: number) => typeof id === 'number' && Number.isFinite(id)
@@ -138,6 +139,43 @@ export function useUserMutations(userId?: number) {
         queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
         pushToast('Perfil actualizado')
       },
+      onError,
+    }),
+  }
+}
+
+/**
+ * Listado de la plataforma para el panel de administracion (rol ADMIN).
+ *
+ * Trae hasta 200 cuentas de una vez y el filtrado por texto se hace en el
+ * cliente (ver AdminScreen), igual que se hace con las tareas del tablero:
+ * a esta escala una unica peticion es mas sencilla que repetirla en cada tecla.
+ */
+export function useAdminUsers() {
+  return useQuery({ queryKey: keys.adminUsers, queryFn: () => users.list('') })
+}
+
+/** Cambiar el rol global, dar de baja o reactivar una cuenta. Solo para ADMIN. */
+export function useAdminUserMutations() {
+  const queryClient = useQueryClient()
+  const { pushToast } = useUi()
+  const onError = useOnError()
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: keys.adminUsers })
+
+  return {
+    updateRole: useMutation({
+      mutationFn: ({ userId, role }: { userId: number; role: Role }) => users.updateGlobalRole(userId, role),
+      onSuccess: () => { invalidate(); pushToast('Rol actualizado') },
+      onError,
+    }),
+    disable: useMutation({
+      mutationFn: (userId: number) => users.disable(userId),
+      onSuccess: () => { invalidate(); pushToast('Cuenta deshabilitada') },
+      onError,
+    }),
+    enable: useMutation({
+      mutationFn: (userId: number) => users.enable(userId),
+      onSuccess: () => { invalidate(); pushToast('Cuenta reactivada') },
       onError,
     }),
   }

@@ -47,16 +47,17 @@ public class UserController {
     }
 
     @Operation(summary = "Actualizar el perfil",
-            description = "Solo el propio usuario o un RESPONSABLE global pueden modificar una cuenta.")
-    @PreAuthorize("@access.isSelf(#id) or hasRole('RESPONSABLE')")
+            description = "Solo el propio usuario o el administrador de la plataforma pueden modificar una cuenta.")
+    @PreAuthorize("@access.isSelf(#id) or hasRole('ADMIN')")
     @PutMapping("/{id}")
     public UserResponse update(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) {
         return userService.update(id, request);
     }
 
     @Operation(summary = "Cambiar el rol global de un usuario",
-            description = "Reservado a RESPONSABLE global. El rol dentro de cada equipo se gestiona en /api/teams.")
-    @PreAuthorize("hasRole('RESPONSABLE')")
+            description = "Reservado al administrador de la plataforma. Es un rol independiente de los "
+                    + "equipos; el rol dentro de cada equipo se gestiona en /api/teams.")
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/role")
     public UserResponse updateRole(@PathVariable Long id, @Valid @RequestBody UpdateGlobalRoleRequest request) {
         return userService.updateGlobalRole(id, request);
@@ -65,10 +66,19 @@ public class UserController {
     @Operation(summary = "Deshabilitar una cuenta",
             description = "Baja logica: la cuenta deja de poder acceder pero se conserva su historial.")
     @ApiResponses(@ApiResponse(responseCode = "204", description = "Cuenta deshabilitada"))
-    @PreAuthorize("hasRole('RESPONSABLE')")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> disable(@PathVariable Long id) {
         userService.disable(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Reactivar una cuenta deshabilitada")
+    @ApiResponses(@ApiResponse(responseCode = "204", description = "Cuenta reactivada"))
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/{id}/enable")
+    public ResponseEntity<Void> enable(@PathVariable Long id) {
+        userService.enable(id);
         return ResponseEntity.noContent().build();
     }
 }

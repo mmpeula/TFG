@@ -1,0 +1,53 @@
+package com.tfg.kanban.user;
+
+import com.tfg.kanban.domain.model.Role;
+import com.tfg.kanban.domain.model.User;
+import com.tfg.kanban.domain.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Deja siempre una cuenta ADMIN lista para entrar, porque ese rol no se puede
+ * pedir al registrarse (RF-01) ni conceder desde la aplicacion sin que ya
+ * exista un administrador antes: sin este arranque, nadie podria llegar nunca
+ * al primero.
+ *
+ * <p>Si ya hay algun ADMIN no hace nada. Si el correo configurado en
+ * {@link AdminProperties} pertenece a una cuenta existente, esa cuenta se
+ * asciende (y se reactiva si estaba deshabilitada) en vez de duplicarla.</p>
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class AdminBootstrapRunner implements ApplicationRunner {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final AdminProperties adminProperties;
+
+    @Override
+    @Transactional
+    public void run(ApplicationArguments args) {
+        if (userRepository.existsByRole(Role.ADMIN)) {
+            return;
+        }
+
+        String email = adminProperties.getEmail().trim().toLowerCase();
+        User admin = userRepository.findByEmailIgnoreCase(email).orElseGet(() -> User.builder()
+                .email(email)
+                .fullName("Administrador")
+                .passwordHash(passwordEncoder.encode(adminProperties.getPassword()))
+                .build());
+
+        admin.setRole(Role.ADMIN);
+        admin.setEnabled(true);
+        userRepository.save(admin);
+
+        log.info("Cuenta de administrador lista: {}", email);
+    }
+}
