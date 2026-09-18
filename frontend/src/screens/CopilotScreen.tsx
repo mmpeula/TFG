@@ -107,8 +107,8 @@ export function CopilotScreen() {
     setSelected(plan ? plan.tasks.map((_, index) => index) : [])
   }
 
-  // El profesor (OBSERVADOR) solo mira: no es alumno, no cuenta para el reparto.
-  const teamSize = members?.filter((member) => member.role !== 'OBSERVADOR').length ?? 0
+  // El docente solo mira: no es alumno, no cuenta para el reparto.
+  const teamSize = members?.filter((member) => member.role !== 'DOCENTE').length ?? 0
   const people = chosenPeople ?? (teamSize || 1)
 
   /** Mensaje de error util cuando el modelo local no responde. */

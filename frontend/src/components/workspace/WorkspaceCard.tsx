@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { CheckCircle2, Clock, Users } from 'lucide-react'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import styles from './WorkspaceCard.module.css'
@@ -7,13 +8,18 @@ import type { WorkspaceResponse } from '@/types/api'
 /**
  * Tarjeta de la pantalla inicial. Lleva solo lo que ayuda a decidir en cual
  * entrar: cuanto queda, cuanto se ha avanzado y si el grupo se ha movido.
+ *
+ * `alert` es el unico hueco pensado para otra pantalla (el panel docente):
+ * el resto de usos no lo pasan y la tarjeta queda igual que siempre.
  */
 export function WorkspaceCard({
   workspace,
   onOpen,
+  alert,
 }: {
   workspace: WorkspaceResponse
   onOpen: (workspace: WorkspaceResponse) => void
+  alert?: ReactNode
 }) {
   const color = colorOf(workspace)
   const vacio = workspace.totalTasks === 0
@@ -59,6 +65,7 @@ export function WorkspaceCard({
           <Clock size={12} strokeWidth={2.75} />
           {lastActivityLabel(workspace.lastActivityAt)}
         </span>
+        {alert && <span className={styles.footAlert}>{alert}</span>}
       </div>
     </button>
   )

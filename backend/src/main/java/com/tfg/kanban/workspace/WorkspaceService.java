@@ -2,6 +2,7 @@ package com.tfg.kanban.workspace;
 
 import com.tfg.kanban.activity.ActivityService;
 import com.tfg.kanban.common.CountByEntity;
+import com.tfg.kanban.common.BusinessRuleException;
 import com.tfg.kanban.common.ResourceNotFoundException;
 import com.tfg.kanban.domain.model.*;
 import com.tfg.kanban.domain.repository.*;
@@ -132,6 +133,9 @@ public class WorkspaceService {
     public WorkspaceResponse create(CreateWorkspaceRequest request) {
         User owner = userRepository.findById(currentUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario", currentUserId()));
+        if (owner.getRole() != Role.MIEMBRO && owner.getRole() != Role.RESPONSABLE) {
+            throw new BusinessRuleException("Solo una cuenta MIEMBRO puede crear un workspace");
+        }
         String name = request.name().trim();
 
         Team team = Team.builder()

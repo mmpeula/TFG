@@ -21,17 +21,22 @@ export function isAdmin(role: Role | null | undefined): boolean {
   return role === 'ADMIN'
 }
 
+/** DOCENTE: sigue un workspace sin intervenir en él. */
+export function isTeacher(role: Role | null | undefined): boolean {
+  return role === 'DOCENTE'
+}
+
 export const ROLE_LABELS: Record<Role, string> = {
   RESPONSABLE: 'Responsable',
   MIEMBRO: 'Miembro',
-  OBSERVADOR: 'Observador',
+  DOCENTE: 'Docente',
   ADMIN: 'Administrador',
 }
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   RESPONSABLE: 'Control total del equipo y sus proyectos',
   MIEMBRO: 'Crea y mueve tareas, comenta y adjunta ficheros',
-  OBSERVADOR: 'Solo lectura',
+  DOCENTE: 'Sigue los equipos asignados en modo lectura',
   ADMIN: 'Gestiona las cuentas de toda la plataforma',
 }
 

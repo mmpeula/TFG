@@ -17,7 +17,7 @@ import { relativeTime } from '@/lib/format'
 import { ROUTES } from '@/app/routes'
 import type { Role } from '@/types/api'
 
-const ROLES: Role[] = ['RESPONSABLE', 'MIEMBRO', 'OBSERVADOR']
+const ROLES: Role[] = ['RESPONSABLE', 'MIEMBRO', 'DOCENTE']
 
 /**
  * Quien trabaja en este workspace y que puede hacer cada uno.
@@ -188,7 +188,7 @@ export function MembersScreen() {
 
           <p className={styles.help}>
             <b>Responsable</b> administra el workspace y lanza el copiloto. <b>Miembro</b> crea y mueve
-            tareas. <b>Observador</b> solo mira.
+            tareas. <b>Docente</b> solo sigue el progreso.
           </p>
         </div>
       )}

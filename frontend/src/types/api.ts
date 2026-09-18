@@ -25,7 +25,8 @@ export interface PageResponse<T> {
  * de equipo. Solo aparece en UserResponse.role, jamas en el rol de un
  * TeamMember (ver lib/roles.ts).
  */
-export type Role = 'RESPONSABLE' | 'MIEMBRO' | 'OBSERVADOR' | 'ADMIN'
+/** Rol global (cuenta) y rol dentro de un workspace. RESPONSABLE nunca es global. */
+export type Role = 'RESPONSABLE' | 'MIEMBRO' | 'DOCENTE' | 'ADMIN'
 export type TaskPriority = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA'
 /** De que va la tarea. Es lo unico que colorea la interfaz (ver lib/taskTypes.ts). */
 export type TaskType = 'EPICA' | 'HISTORIA' | 'TAREA' | 'BUG' | 'INCIDENCIA'

@@ -34,3 +34,4 @@
 
 .foot { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-1); }
 .meta { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--color-neutral-600); }
+.footAlert { margin-left: auto; }

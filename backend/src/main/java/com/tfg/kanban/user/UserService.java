@@ -50,6 +50,9 @@ public class UserService {
     @Transactional
     public UserResponse updateGlobalRole(Long id, UpdateGlobalRoleRequest request) {
         User user = getUser(id);
+        if (!isAccountRole(request.role())) {
+            throw new BusinessRuleException("Una cuenta solo puede ser ADMIN, DOCENTE o MIEMBRO");
+        }
         if (user.getRole() == Role.ADMIN && request.role() != Role.ADMIN) {
             ensureNotLastAdmin();
         }
@@ -83,6 +86,10 @@ public class UserService {
         if (userRepository.countByRole(Role.ADMIN) <= 1) {
             throw new BusinessRuleException("La plataforma debe tener al menos un administrador");
         }
+    }
+
+    private boolean isAccountRole(Role role) {
+        return role == Role.ADMIN || role == Role.DOCENTE || role == Role.MIEMBRO;
     }
 
     public User getUser(Long id) {

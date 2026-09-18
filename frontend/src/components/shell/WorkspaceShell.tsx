@@ -9,6 +9,7 @@ import styles from './WorkspaceShell.module.css'
 import { ROUTES } from '@/app/routes'
 import { useAuth } from '@/state/context'
 import { colorOf, iconOf } from '@/lib/workspace'
+import { canManage } from '@/lib/roles'
 import type { WorkspaceResponse } from '@/types/api'
 
 const ICON = { size: 15, strokeWidth: 2.75 } as const
@@ -35,6 +36,7 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
   const { pathname } = useLocation()
   const { user, signOut } = useAuth()
   const [helpOpen, setHelpOpen] = useState(false)
+  const isTeacher = user?.role === 'DOCENTE'
 
   useShortcuts(
     useMemo(
@@ -42,19 +44,19 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
         newTask: onNewTask,
         board: () => navigate(ROUTES.tableroById(workspaceId)),
         plan: () => navigate(ROUTES.planById(workspaceId)),
-        copilot: () => navigate(ROUTES.copilotoById(workspaceId)),
+        copilot: isTeacher ? undefined : () => navigate(ROUTES.copilotoById(workspaceId)),
         pulse: () => navigate(ROUTES.pulsoById(workspaceId)),
         help: () => setHelpOpen(true),
         escape: () => setHelpOpen(false),
       }),
-      [navigate, onNewTask, workspaceId],
+      [isTeacher, navigate, onNewTask, workspaceId],
     ),
   )
 
   const tabs = [
     { label: 'Plan', icon: <CalendarRange {...ICON} />, to: ROUTES.planById(workspaceId) },
     { label: 'Tablero', icon: <Columns3 {...ICON} />, to: ROUTES.tableroById(workspaceId) },
-    { label: 'Copiloto', icon: <Bot {...ICON} />, to: ROUTES.copilotoById(workspaceId) },
+    ...(!isTeacher ? [{ label: 'Copiloto', icon: <Bot {...ICON} />, to: ROUTES.copilotoById(workspaceId) }] : []),
     { label: 'Miembros', icon: <Users {...ICON} />, to: ROUTES.miembrosById(workspaceId) },
   ]
 
@@ -62,9 +64,9 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
     <div className={styles.shell}>
       <header className={styles.top}>
         <div className={styles.identity}>
-          <button className={styles.back} onClick={() => navigate(ROUTES.workspaces)}>
+          <button className={styles.back} onClick={() => navigate(isTeacher ? ROUTES.docente : ROUTES.workspaces)}>
             <ArrowLeft size={15} strokeWidth={2.75} />
-            Mis workspaces
+            {isTeacher ? 'Panel docente' : 'Mis espacios de trabajo'}
           </button>
           <h1 className={styles.name}>
             {workspace && (
@@ -78,15 +80,17 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
 
         <div className={styles.actions}>
           {action}
-          <Tooltip label="Ajustes del workspace">
-            <button
-              className={styles.icon}
-              onClick={() => navigate(ROUTES.ajustesById(workspaceId))}
-              aria-label="Ajustes del workspace"
-            >
-              <Settings size={16} strokeWidth={2.75} />
-            </button>
-          </Tooltip>
+          {canManage(workspace?.myRole) && (
+            <Tooltip label="Ajustes del workspace">
+              <button
+                className={styles.icon}
+                onClick={() => navigate(ROUTES.ajustesById(workspaceId))}
+                aria-label="Ajustes del workspace"
+              >
+                <Settings size={16} strokeWidth={2.75} />
+              </button>
+            </Tooltip>
+          )}
           <button className={styles.profile} onClick={() => navigate(ROUTES.configuracion)} aria-label="Mi cuenta">
             <Avatar user={user} size={28} />
           </button>

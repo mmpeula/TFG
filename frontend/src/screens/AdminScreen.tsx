@@ -16,7 +16,7 @@ import { isAdmin, ROLE_LABELS } from '@/lib/roles'
 import { ROUTES } from '@/app/routes'
 import type { Role, UserResponse } from '@/types/api'
 
-const ROLES: Role[] = ['RESPONSABLE', 'MIEMBRO', 'OBSERVADOR', 'ADMIN']
+const ROLES: Role[] = ['MIEMBRO', 'DOCENTE', 'ADMIN']
 
 function matches(user: UserResponse, term: string): boolean {
   const q = term.trim().toLowerCase()
@@ -40,7 +40,7 @@ export function AdminScreen() {
   const people = useMemo(() => (data?.content ?? []).filter((u) => matches(u, search)), [data, search])
 
   if (!isAdmin(user?.role)) {
-    return <Navigate to={ROUTES.workspaces} replace />
+    return <Navigate to={ROUTES.home} replace />
   }
 
   return (

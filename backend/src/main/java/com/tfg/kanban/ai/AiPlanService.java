@@ -138,10 +138,10 @@ public class AiPlanService {
             throw new AiUnavailableException("El modulo de IA esta desactivado en la configuracion del servidor");
         }
 
-        // El OBSERVADOR (el profesor, normalmente) solo mira: no cuenta para el
+        // El DOCENTE solo sigue el equipo: no cuenta para el
         // reparto ni para el maximo de personas entre las que repartir.
         List<TeamMember> members = project.getTeam().getMembers().stream()
-                .filter(member -> member.getRole() != Role.OBSERVADOR)
+                .filter(member -> member.getRole() != Role.DOCENTE)
                 .toList();
         List<Task> existing = existingTasks(project);
         String notas = indications == null || indications.isBlank() ? null

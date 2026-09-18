@@ -104,10 +104,12 @@ public class TeamService {
             throw new BusinessRuleException("El usuario ya pertenece al equipo");
         }
 
+        Role teamRole = ensureTeamRole(request.role() == null ? Role.MIEMBRO : request.role());
+        ensureRoleMatchesAccount(user, teamRole);
         TeamMember member = TeamMember.builder()
                 .team(team)
                 .user(user)
-                .role(ensureTeamRole(request.role() == null ? Role.MIEMBRO : request.role()))
+                .role(teamRole)
                 .build();
 
         return TeamMemberResponse.from(teamMemberRepository.save(member));
@@ -117,6 +119,7 @@ public class TeamService {
     public TeamMemberResponse updateMemberRole(Long teamId, Long userId, UpdateMemberRoleRequest request) {
         TeamMember member = getMember(teamId, userId);
         Role role = ensureTeamRole(request.role());
+        ensureRoleMatchesAccount(member.getUser(), role);
 
         if (member.getRole() == Role.RESPONSABLE && role != Role.RESPONSABLE) {
             ensureNotLastResponsable(teamId);
@@ -126,15 +129,27 @@ public class TeamService {
     }
 
     /**
-     * ADMIN es un rol global (administra la plataforma, no un equipo): no tiene
-     * sentido como rol de {@link TeamMember} y aqui se rechaza explicitamente,
-     * aunque el DTO de entrada acepte cualquier valor del enum {@link Role}.
+     * RESPONSABLE es una responsabilidad dentro del equipo, no un rol de cuenta.
      */
     private Role ensureTeamRole(Role role) {
-        if (role == Role.ADMIN) {
-            throw new BusinessRuleException("ADMIN es un rol de plataforma, no se puede asignar en un equipo");
+        if (role != Role.RESPONSABLE && role != Role.MIEMBRO && role != Role.DOCENTE) {
+            throw new BusinessRuleException("En un equipo solo se puede asignar RESPONSABLE, MIEMBRO o DOCENTE");
         }
         return role;
+    }
+
+    private void ensureRoleMatchesAccount(User user, Role teamRole) {
+        if (teamRole == Role.DOCENTE && user.getRole() != Role.DOCENTE) {
+            throw new BusinessRuleException("Solo una cuenta DOCENTE puede seguir un equipo como docente");
+        }
+        if ((teamRole == Role.MIEMBRO || teamRole == Role.RESPONSABLE) && !isMemberAccount(user.getRole())) {
+            throw new BusinessRuleException("Solo una cuenta MIEMBRO puede trabajar o ser responsable de un equipo");
+        }
+    }
+
+    /** Permite que las cuentas antiguas RESPONSABLE sigan usando sus equipos. */
+    private boolean isMemberAccount(Role role) {
+        return role == Role.MIEMBRO || role == Role.RESPONSABLE;
     }
 
     @Transactional

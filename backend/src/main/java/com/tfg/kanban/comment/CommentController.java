@@ -33,7 +33,7 @@ public class CommentController {
         return commentService.findByTask(taskId, pageable);
     }
 
-    @Operation(summary = "Comentar una tarea", description = "RESPONSABLE o MIEMBRO; los OBSERVADOR no comentan.")
+    @Operation(summary = "Comentar una tarea", description = "RESPONSABLE o MIEMBRO; los DOCENTE no comentan.")
     @ApiResponses(@ApiResponse(responseCode = "201", description = "Comentario creado"))
     @PreAuthorize("@access.canWriteTask(#taskId)")
     @PostMapping("/api/tasks/{taskId}/comments")

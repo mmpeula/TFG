@@ -3,14 +3,14 @@ package com.tfg.kanban.domain.model;
 /**
  * Roles del sistema (RBAC).
  *
- * <p>Los tres primeros son roles <b>de equipo</b>: el que cuenta es el que la
+ * <p>{@link #RESPONSABLE}, {@link #MIEMBRO} y {@link #DOCENTE} son roles <b>de equipo</b>: el que cuenta es el que la
  * persona tiene en el equipo dueno del recurso (vease {@code TeamMember} y
  * {@code AccessService}), nunca su rol global.</p>
  *
  * <ul>
  *   <li>{@link #RESPONSABLE}: coordina el equipo, crea proyectos/tableros y asigna tareas.</li>
  *   <li>{@link #MIEMBRO}: participa en el trabajo, mueve y edita sus tareas.</li>
- *   <li>{@link #OBSERVADOR}: acceso de solo lectura (p. ej. el profesor de la asignatura).</li>
+ *   <li>{@link #DOCENTE}: acceso de solo lectura para seguir un equipo.</li>
  * </ul>
  *
  * <p>{@link #ADMIN} es distinto de los tres anteriores: es un rol <b>global</b>,
@@ -25,6 +25,9 @@ package com.tfg.kanban.domain.model;
 public enum Role {
     RESPONSABLE,
     MIEMBRO,
+    DOCENTE,
+    /** @deprecated Las cuentas y asignaciones nuevas usan {@link #DOCENTE}. */
+    @Deprecated
     OBSERVADOR,
     ADMIN;
 

@@ -1,17 +1,19 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ListChecks, LogOut, UserCog } from 'lucide-react'
+import { ListChecks, LogOut } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
-import { Button } from '@/components/ui/Button'
 import { Tooltip } from '@/components/ui/Controls'
 import styles from './HomeShell.module.css'
-import { ROUTES } from '@/app/routes'
+import { homeForRole, ROUTES } from '@/app/routes'
 import { useAuth } from '@/state/context'
-import { isAdmin } from '@/lib/roles'
 
 /**
  * Marco de la pantalla inicial. No lleva barra lateral a proposito: en el nivel
- * de «mis workspaces» no hay nada que navegar todavia, solo elegir uno.
+ * de «mis espacios de trabajo» no hay nada que navegar todavia, solo elegir uno.
+ *
+ * El panel docente y el de administracion no tienen boton aqui a proposito:
+ * viven como una tarjeta mas en la cuadricula de "Mis espacios de trabajo" (ver
+ * PanelCard), no en la cabecera. Es la unica lista de la aplicacion.
  */
 export function HomeShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth()
@@ -20,7 +22,7 @@ export function HomeShell({ children }: { children: ReactNode }) {
   return (
     <div className={styles.shell}>
       <header className={styles.top}>
-        <button className={styles.brand} onClick={() => navigate(ROUTES.workspaces)}>
+        <button className={styles.brand} onClick={() => navigate(homeForRole(user?.role ?? 'MIEMBRO'))}>
           <span className={styles.mark}>
             <ListChecks size={15} strokeWidth={2.5} />
           </span>
@@ -28,17 +30,6 @@ export function HomeShell({ children }: { children: ReactNode }) {
         </button>
 
         <div className={styles.actions}>
-          {isAdmin(user?.role) && (
-            <Button
-              variant="secondary"
-              small
-              onClick={() => navigate(ROUTES.administracion)}
-              aria-label="Administracion de la plataforma"
-            >
-              <UserCog size={15} strokeWidth={2.75} />
-              <span className={styles.adminLinkLabel}>Administración</span>
-            </Button>
-          )}
           <button className={styles.profile} onClick={() => navigate(ROUTES.configuracion)}>
             <Avatar user={user} size={30} />
             <span className={styles.profileName}>{user?.fullName}</span>

@@ -28,6 +28,7 @@ export const ROUTES = {
 
   configuracion: '/configuracion',
   administracion: '/administracion',
+  docente: '/docente',
 
   legacyEquipos: '/equipos',
   legacyEquipo: '/equipos/:teamId',
@@ -37,3 +38,10 @@ export const ROUTES = {
   legacyCopiloto: '/proyecto/:workspaceId/copiloto',
   legacyPulso: '/proyecto/:workspaceId/pulso',
 } as const
+
+/** El destino inicial depende exclusivamente del rol global de la cuenta. */
+export function homeForRole(role: 'ADMIN' | 'DOCENTE' | 'MIEMBRO' | 'RESPONSABLE'): string {
+  if (role === 'ADMIN') return ROUTES.administracion
+  if (role === 'DOCENTE') return ROUTES.docente
+  return ROUTES.workspaces
+}

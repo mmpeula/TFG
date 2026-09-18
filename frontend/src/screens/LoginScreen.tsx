@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { Loader2, Waves } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -7,22 +7,19 @@ import styles from './Auth.module.css'
 import { auth } from '@/api/endpoints'
 import { toErrorMessage } from '@/lib/api-client'
 import { useAuth } from '@/state/context'
-import { ROUTES } from '@/app/routes'
+import { ROUTES, homeForRole } from '@/app/routes'
 
 export function LoginScreen() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { signIn, isAuthenticated } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-
-  const from = (location.state as { from?: string } | null)?.from ?? ROUTES.home
 
   const mutation = useMutation({
     mutationFn: auth.login,
     onSuccess: (response) => {
       signIn(response)
-      navigate(from, { replace: true })
+      navigate(homeForRole(response.user.role), { replace: true })
     },
   })
 
