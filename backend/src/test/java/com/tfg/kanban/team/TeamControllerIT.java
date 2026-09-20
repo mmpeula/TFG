@@ -31,8 +31,8 @@ class TeamControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Un extrano no puede ver el equipo")
     void outsiderCannotSeeTeam() throws Exception {
-        TestUser owner = registerUser(Role.RESPONSABLE);
-        TestUser outsider = registerUser(Role.RESPONSABLE);
+        TestUser owner = registerUser(Role.MIEMBRO);
+        TestUser outsider = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(owner, "Equipo privado");
 
         mockMvc.perform(authorized(get("/api/teams/{id}", teamId), outsider))
@@ -43,7 +43,7 @@ class TeamControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("El RESPONSABLE anade miembros y les cambia el rol; el MIEMBRO no puede")
     void memberManagementIsRestrictedToResponsable() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
         TestUser otro = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo con miembros");
@@ -73,7 +73,7 @@ class TeamControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("No se puede dejar al equipo sin ningun RESPONSABLE")
     void cannotRemoveLastResponsable() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo de una persona");
 
         mockMvc.perform(authorized(patch("/api/teams/{id}/members/{userId}", teamId, responsable.id()), responsable)
@@ -84,9 +84,32 @@ class TeamControllerIT extends AbstractApiIT {
     }
 
     @Test
+    @DisplayName("Quien creo el equipo puede salirse si deja otro responsable, y el equipo pasa a esa persona")
+    void theCreatorCanLeaveHandingOverTheTeam() throws Exception {
+        TestUser creador = registerUser(Role.MIEMBRO);
+        TestUser companero = registerUser(Role.MIEMBRO);
+        Long teamId = createTeam(creador, "Equipo que cambia de manos");
+        addMember(creador, teamId, companero, Role.RESPONSABLE);
+
+        mockMvc.perform(authorized(delete("/api/teams/{id}/members/{userId}", teamId, creador.id()), creador))
+                .andExpect(status().isNoContent());
+
+        // Con Team.members en cascade + orphanRemoval, un borrado por repositorio se
+        // deshacia solo al volcar los cambios y esto devolvia 204 sin borrar nada.
+        mockMvc.perform(authorized(get("/api/teams/{id}/members", teamId), companero))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].user.id").value(companero.id()));
+
+        // Y quien queda es ya el unico responsable: no puede irse tambien.
+        mockMvc.perform(authorized(delete("/api/teams/{id}/members/{userId}", teamId, companero.id()), companero))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     @DisplayName("No se borra un equipo que aun tiene proyectos")
     void cannotDeleteTeamWithProjects() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo con proyecto");
         createProject(responsable, teamId, "Practica 1");
 

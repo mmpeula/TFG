@@ -98,7 +98,7 @@ class UserControllerIT extends AbstractApiIT {
         // cuentas de usuario no son de ningun equipo. Ser el RESPONSABLE de un
         // equipo (o de todos los equipos en los que se participa) no debe abrir
         // la gestion de cuentas de otras personas de la plataforma.
-        TestUser teamLeader = registerUser(Role.RESPONSABLE);
+        TestUser teamLeader = registerUser(Role.MIEMBRO);
         TestUser other = registerUser(Role.MIEMBRO);
 
         mockMvc.perform(authorized(patch("/api/users/{id}/role", other.id()), teamLeader)

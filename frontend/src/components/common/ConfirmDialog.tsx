@@ -40,8 +40,16 @@ export function ConfirmDialog({
               variant="destructive"
               disabled={isPending}
               onClick={async () => {
-                await onConfirm()
-                setOpen(false)
+                try {
+                  await onConfirm()
+                  setOpen(false)
+                } catch {
+                  // Que la accion se rechace es normal: el servidor tiene reglas que
+                  // no se pueden comprobar desde aqui (salirse dejando al equipo sin
+                  // responsable, por ejemplo). El motivo ya se le cuenta al usuario en
+                  // un aviso; aqui solo hay que evitar que la promesa quede sin
+                  // gestionar, y el dialogo se queda abierto para que pueda leerlo.
+                }
               }}
             >
               {confirmLabel}

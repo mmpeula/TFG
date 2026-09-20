@@ -8,16 +8,32 @@
 }
 
 .bubble {
-  width: 48px; height: 48px; border-radius: 999px;
+  position: relative;
+  width: 46px; height: 46px; border-radius: 999px;
   display: grid; place-items: center;
   background: var(--color-neutral-900); color: #ffffff;
+  /* Lo unico que flota en toda la aplicacion, asi que si lleva sombra: es lo que
+     lo despega del contenido. Pero no se levanta al pasar por encima, como
+     tampoco lo hacen las tarjetas; solo aclara un poco. */
   box-shadow: var(--shadow-md);
   transition: var(--transition);
 }
-.bubble:hover { background: var(--color-neutral-800); transform: translateY(-1px); }
+.bubble:hover { background: var(--color-neutral-800); }
+/* El anillo del foco es redondo como el boton: con el radio pequeno que pone la
+   regla global quedaba un cuadrado alrededor de un circulo. */
+.bubble:focus-visible { border-radius: 999px; }
+
+/* Mientras esta cerrado, avisa de que hay una conversacion empezada. En gris,
+   que aqui el color no significa nada. */
+.pip {
+  position: absolute; top: 2px; right: 2px;
+  width: 9px; height: 9px; border-radius: 999px;
+  background: var(--color-neutral-400);
+  border: 2px solid var(--color-neutral-900);
+}
 
 .panel {
-  width: min(380px, calc(100vw - var(--space-6) * 2));
+  width: min(384px, calc(100vw - var(--space-6) * 2));
   background: var(--color-bg);
   border: 1px solid var(--color-neutral-300);
   border-radius: var(--radius-md);
@@ -27,21 +43,29 @@
 }
 
 .head {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-divider);
+  background: var(--color-neutral-100);
 }
-.title { font-size: 13px; font-weight: 650; }
+.mark {
+  width: 24px; height: 24px; border-radius: var(--radius-sm); flex: none;
+  display: grid; place-items: center;
+  background: var(--color-neutral-900); color: #ffffff;
+}
+.titles { display: flex; flex-direction: column; gap: 1px; margin-right: auto; }
+.title { font-size: 13px; font-weight: 650; letter-spacing: -0.01em; }
+.hint { font-size: 11px; color: var(--color-neutral-600); }
+
 .close {
-  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  width: 26px; height: 26px; border-radius: var(--radius-sm); flex: none;
   display: grid; place-items: center; color: var(--color-neutral-500);
   transition: var(--transition);
 }
 .close:hover { background: var(--color-neutral-200); color: var(--color-text); }
 
-/* El chat trae su propio borde y esquinas redondeadas, que aqui sobran: ya se las
-   pone el panel. */
-.panel > :last-child { border: none; border-radius: 0; }
+/* El chat trae su propio borde y esquinas, que aqui sobran: ya los pone el panel. */
+.body > * { border: none; border-radius: 0; }
 
 @keyframes subir {
   from { opacity: 0; transform: translateY(6px); }
@@ -49,10 +73,9 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .panel { animation: none; }
-  .bubble:hover { transform: none; }
 }
 
 @media (max-width: 767px) {
-  .dock { right: var(--space-4); bottom: var(--space-4); left: var(--space-4); align-items: flex-end; }
+  .dock { right: var(--space-4); bottom: var(--space-4); left: var(--space-4); }
   .panel { width: 100%; }
 }

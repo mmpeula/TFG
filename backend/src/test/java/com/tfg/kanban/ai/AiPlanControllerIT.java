@@ -26,7 +26,7 @@ class AiPlanControllerIT extends AbstractApiIT {
     }
 
     private Contexto contexto() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo IA");
         addMember(responsable, teamId, miembro, Role.MIEMBRO);

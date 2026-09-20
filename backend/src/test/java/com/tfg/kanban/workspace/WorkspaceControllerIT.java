@@ -100,7 +100,7 @@ class WorkspaceControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("La tarjeta cuenta como hechas las tareas de la ultima columna")
     void progressCountsTheLastColumn() throws Exception {
-        TestUser user = registerUser(Role.RESPONSABLE);
+        TestUser user = registerUser(Role.MIEMBRO);
         Long workspaceId = createWorkspace(user, "Ingenieria del Software");
 
         var detail = mockMvc.perform(authorized(get("/api/workspaces/{id}", workspaceId), user)).andReturn();
@@ -126,8 +126,8 @@ class WorkspaceControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("La lista solo trae los workspaces de los que uno es miembro")
     void listOnlyShowsMine() throws Exception {
-        TestUser ana = registerUser(Role.RESPONSABLE);
-        TestUser luis = registerUser(Role.RESPONSABLE);
+        TestUser ana = registerUser(Role.MIEMBRO);
+        TestUser luis = registerUser(Role.MIEMBRO);
 
         Long mio = createWorkspace(ana, "Mi asignatura");
         createWorkspace(luis, "La suya");
@@ -142,8 +142,8 @@ class WorkspaceControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Un extrano no puede ni ver ni tocar el workspace")
     void strangersAreRejected() throws Exception {
-        TestUser ana = registerUser(Role.RESPONSABLE);
-        TestUser extrano = registerUser(Role.RESPONSABLE);
+        TestUser ana = registerUser(Role.MIEMBRO);
+        TestUser extrano = registerUser(Role.MIEMBRO);
         Long workspaceId = createWorkspace(ana, "Bases de Datos");
 
         mockMvc.perform(authorized(get("/api/workspaces/{id}", workspaceId), extrano))
@@ -155,7 +155,7 @@ class WorkspaceControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Un MIEMBRO del equipo lo ve pero no lo administra")
     void membersCanReadButNotManage() throws Exception {
-        TestUser ana = registerUser(Role.RESPONSABLE);
+        TestUser ana = registerUser(Role.MIEMBRO);
         TestUser luis = registerUser(Role.MIEMBRO);
         Long workspaceId = createWorkspace(ana, "Bases de Datos");
 
@@ -175,7 +175,7 @@ class WorkspaceControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Editar cambia nombre, color, icono y la ventana de fechas")
     void updateChangesTheCard() throws Exception {
-        TestUser user = registerUser(Role.RESPONSABLE);
+        TestUser user = registerUser(Role.MIEMBRO);
         Long workspaceId = createWorkspace(user, "Bases de Datos");
 
         mockMvc.perform(authorized(put("/api/workspaces/{id}", workspaceId), user)
@@ -201,7 +201,7 @@ class WorkspaceControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Borrar el workspace se lleva por delante su tablero")
     void deleteRemovesTheBoard() throws Exception {
-        TestUser user = registerUser(Role.RESPONSABLE);
+        TestUser user = registerUser(Role.MIEMBRO);
         Long workspaceId = createWorkspace(user, "Para borrar");
         var detail = mockMvc.perform(authorized(get("/api/workspaces/{id}", workspaceId), user)).andReturn();
         Long boardId = json(detail).get("boardId").asLong();

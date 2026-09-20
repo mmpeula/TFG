@@ -15,7 +15,7 @@ class TaskControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Un MIEMBRO crea, edita y borra tareas")
     void memberManagesTasks() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo tareas");
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
@@ -42,7 +42,7 @@ class TaskControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Mover una tarea de columna la coloca en la posicion pedida y reindexa el origen")
     void moveTaskBetweenColumns() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo drag and drop");
         Long projectId = createProject(responsable, teamId, "Practica drag and drop");
         Long boardId = createBoard(responsable, projectId, "Tablero drag");
@@ -75,7 +75,7 @@ class TaskControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("El limite WIP de la columna destino bloquea el movimiento")
     void wipLimitBlocksMove() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo WIP");
         Long projectId = createProject(responsable, teamId, "Practica WIP");
         Long boardId = createBoard(responsable, projectId, "Tablero WIP");
@@ -109,7 +109,7 @@ class TaskControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Un DOCENTE puede leer el tablero pero no tocar las tareas")
     void observerIsReadOnly() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser observador = registerUser(Role.DOCENTE);
         Long teamId = createTeam(responsable, "Equipo observado");
         addMember(responsable, teamId, observador, Role.DOCENTE);
@@ -141,7 +141,7 @@ class TaskControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("No se puede asignar una tarea a alguien de fuera del equipo")
     void cannotAssignOutsider() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser extrano = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo asignaciones");
         Long projectId = createProject(responsable, teamId, "Practica asignaciones");
@@ -160,7 +160,7 @@ class TaskControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("El buscador combina los filtros de tablero, columna y prioridad")
     void searchCombinesFilters() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo filtros");
         Long projectId = createProject(responsable, teamId, "Practica filtros");
         Long boardId = createBoard(responsable, projectId, "Tablero filtros");
@@ -204,7 +204,7 @@ class TaskControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("El buscador de tareas filtra por proyecto y por persona asignada")
     void searchFiltersTasks() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo busqueda");
         Long projectId = createProject(responsable, teamId, "Practica busqueda");
         Long boardId = createBoard(responsable, projectId, "Tablero busqueda");

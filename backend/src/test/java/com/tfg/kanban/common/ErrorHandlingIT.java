@@ -47,7 +47,7 @@ class ErrorHandlingIT extends AbstractApiIT {
     @Test
     @DisplayName("Una ruta que no existe responde 404, no 500")
     void unknownEndpointReturnsNotFound() throws Exception {
-        TestUser user = registerUser(Role.RESPONSABLE);
+        TestUser user = registerUser(Role.MIEMBRO);
 
         mockMvc.perform(authorized(get("/api/no-existe"), user))
                 .andExpect(status().isNotFound())
@@ -58,7 +58,7 @@ class ErrorHandlingIT extends AbstractApiIT {
     @Test
     @DisplayName("Un cuerpo JSON ilegible responde 400 MALFORMED_REQUEST")
     void malformedJsonReturnsBadRequest() throws Exception {
-        TestUser user = registerUser(Role.RESPONSABLE);
+        TestUser user = registerUser(Role.MIEMBRO);
 
         mockMvc.perform(authorized(post("/api/teams"), user)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -70,7 +70,7 @@ class ErrorHandlingIT extends AbstractApiIT {
     @Test
     @DisplayName("Un parametro con el tipo equivocado responde 400 MALFORMED_REQUEST")
     void parameterTypeMismatchReturnsBadRequest() throws Exception {
-        TestUser user = registerUser(Role.RESPONSABLE);
+        TestUser user = registerUser(Role.MIEMBRO);
 
         mockMvc.perform(authorized(get("/api/tasks"), user).param("projectId", "no-es-un-numero"))
                 .andExpect(status().isBadRequest())

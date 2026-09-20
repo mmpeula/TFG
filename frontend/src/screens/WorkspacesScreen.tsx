@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { GraduationCap, LayoutGrid, Plus, UserCog } from 'lucide-react'
 import { HomeShell } from '@/components/shell/HomeShell'
 import { WorkspaceCard } from '@/components/workspace/WorkspaceCard'
+import { WorkspaceCardActions } from '@/components/workspace/WorkspaceCardActions'
 import { PanelCard } from '@/components/workspace/PanelCard'
 import { WorkspaceFormModal } from '@/components/workspace/WorkspaceFormModal'
 import { Button } from '@/components/ui/Button'
@@ -90,7 +91,12 @@ export function WorkspacesScreen() {
       ) : (
         <div className={styles.grid}>
           {propios.map((workspace) => (
-            <WorkspaceCard key={workspace.id} workspace={workspace} onOpen={open} />
+            <WorkspaceCard
+              key={workspace.id}
+              workspace={workspace}
+              onOpen={open}
+              actions={<WorkspaceCardActions workspace={workspace} />}
+            />
           ))}
           {sigueAlgunEquipo && (
             <PanelCard

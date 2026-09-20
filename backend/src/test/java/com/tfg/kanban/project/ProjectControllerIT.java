@@ -15,7 +15,7 @@ class ProjectControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("El RESPONSABLE crea el proyecto y todo el equipo puede verlo")
     void createAndReadProject() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo proyecto");
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
@@ -36,7 +36,7 @@ class ProjectControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Un MIEMBRO no puede crear, editar ni borrar proyectos")
     void memberCannotManageProjects() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo RBAC");
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
@@ -63,7 +63,7 @@ class ProjectControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("El listado de proyectos filtra por equipo y por estado")
     void listFiltersByTeamAndStatus() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo filtros");
         Long enCurso = createProject(responsable, teamId, "Practica en curso");
         createProject(responsable, teamId, "Practica planificada");
@@ -95,7 +95,7 @@ class ProjectControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("No se pueden repetir nombres de proyecto dentro del mismo equipo")
     void rejectsDuplicatedProjectName() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo duplicados");
         createProject(responsable, teamId, "Practica repetida");
 
@@ -111,7 +111,7 @@ class ProjectControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Con el modulo de IA desactivado, generar responde 503 y no 500")
     void aiPlanReportsUnavailableWhenDisabled() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo IA");
         Long projectId = createProject(responsable, teamId, "Practica con IA");
 
@@ -125,7 +125,7 @@ class ProjectControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("La actividad del proyecto registra la creacion")
     void activityIsRecorded() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo actividad");
         Long projectId = createProject(responsable, teamId, "Practica con historial");
 

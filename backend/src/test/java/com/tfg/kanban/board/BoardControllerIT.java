@@ -15,7 +15,7 @@ class BoardControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("El tablero nace con las tres columnas por defecto")
     void boardIsCreatedWithDefaultColumns() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo tablero");
         Long projectId = createProject(responsable, teamId, "Practica tablero");
         Long boardId = createBoard(responsable, projectId, "Tablero principal");
@@ -31,7 +31,7 @@ class BoardControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Solo el RESPONSABLE crea, reordena y borra columnas")
     void columnManagementIsRestricted() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo columnas");
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
@@ -66,7 +66,7 @@ class BoardControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("No se borra una columna que tiene tareas")
     void cannotDeleteColumnWithTasks() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo columna llena");
         Long projectId = createProject(responsable, teamId, "Practica columna llena");
         Long boardId = createBoard(responsable, projectId, "Tablero");
@@ -81,9 +81,9 @@ class BoardControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("El listado de tableros de un proyecto trae el rol propio y no las columnas")
     void listsBoardsOfProject() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
-        TestUser ajeno = registerUser(Role.RESPONSABLE);
+        TestUser ajeno = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo listado");
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
         Long projectId = createProject(responsable, teamId, "Practica listado");
@@ -112,7 +112,7 @@ class BoardControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Solo el RESPONSABLE edita el tablero")
     void onlyResponsableUpdatesBoard() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
         TestUser observador = registerUser(Role.DOCENTE);
         Long teamId = createTeam(responsable, "Equipo edicion");
@@ -146,7 +146,7 @@ class BoardControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Solo el RESPONSABLE borra el tablero, y se lleva columnas y tareas")
     void onlyResponsableDeletesBoard() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo borrado");
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
@@ -174,8 +174,8 @@ class BoardControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Las columnas se listan ordenadas y con el numero de tareas")
     void listsColumnsWithTaskCount() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
-        TestUser ajeno = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
+        TestUser ajeno = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo columnas listadas");
         Long projectId = createProject(responsable, teamId, "Practica columnas listadas");
         Long boardId = createBoard(responsable, projectId, "Tablero columnas listadas");

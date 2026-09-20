@@ -125,20 +125,43 @@ class TeamServiceTest {
 
         assertThatThrownBy(() -> teamService.updateMemberRole(5L, 1L, request))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("al menos un RESPONSABLE");
+                .hasMessageContaining("sin responsable");
     }
 
     @Test
-    @DisplayName("No se puede expulsar al creador del equipo")
-    void cannotRemoveOwner() {
+    @DisplayName("El creador tampoco puede salirse si es el unico responsable: el equipo se quedaria sin nadie que lo administre")
+    void theOwnerCannotLeaveAsTheOnlyResponsable() {
         Team team = Team.builder().id(5L).name("Grupo 4").owner(owner).build();
         TeamMember membership = TeamMember.builder().id(9L).team(team).user(owner).role(Role.RESPONSABLE).build();
+        team.getMembers().add(membership);
 
         when(teamMemberRepository.findByTeam_IdAndUser_Id(5L, 1L)).thenReturn(Optional.of(membership));
+        when(teamMemberRepository.countByTeam_IdAndRole(5L, Role.RESPONSABLE)).thenReturn(1L);
 
         assertThatThrownBy(() -> teamService.removeMember(5L, 1L))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("creador del equipo");
+                .hasMessageContaining("sin responsable");
+    }
+
+    @Test
+    @DisplayName("El creador si puede salirse si deja a otro responsable, y el equipo pasa a ser de esa persona")
+    void theOwnerCanLeaveHandingOverTheTeam() {
+        User otra = User.builder().id(2L).email("luis@uni.es").fullName("Luis Perez").build();
+        Team team = Team.builder().id(5L).name("Grupo 4").owner(owner).build();
+        TeamMember suya = TeamMember.builder().id(9L).team(team).user(owner).role(Role.RESPONSABLE).build();
+        TeamMember laOtra = TeamMember.builder().id(10L).team(team).user(otra).role(Role.RESPONSABLE).build();
+        team.getMembers().add(suya);
+        team.getMembers().add(laOtra);
+
+        when(teamMemberRepository.findByTeam_IdAndUser_Id(5L, 1L)).thenReturn(Optional.of(suya));
+        when(teamMemberRepository.countByTeam_IdAndRole(5L, Role.RESPONSABLE)).thenReturn(2L);
+
+        teamService.removeMember(5L, 1L);
+
+        // Sin traspaso, el equipo se quedaria a nombre de alguien que ya no esta y
+        // nadie podria borrarlo al quedarse vacio.
+        assertThat(team.getOwner()).isEqualTo(otra);
+        assertThat(team.getMembers()).containsExactly(laOtra);
     }
 
     @Test
@@ -193,13 +216,16 @@ class TeamServiceTest {
     void memberCanLeaveTeam() {
         Team team = Team.builder().id(5L).name("Grupo 4").owner(owner).build();
         User member = User.builder().id(2L).fullName("Luis Perez").build();
+        TeamMember suya = TeamMember.builder().id(8L).team(team).user(owner).role(Role.RESPONSABLE).build();
         TeamMember membership = TeamMember.builder().id(9L).team(team).user(member).role(Role.MIEMBRO).build();
+        team.getMembers().add(suya);
+        team.getMembers().add(membership);
 
         when(teamMemberRepository.findByTeam_IdAndUser_Id(5L, 2L)).thenReturn(Optional.of(membership));
 
         teamService.removeMember(5L, 2L);
 
-        org.mockito.Mockito.verify(teamMemberRepository).delete(membership);
+        assertThat(team.getMembers()).containsExactly(suya);
     }
 
     @Test

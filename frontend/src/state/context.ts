@@ -77,6 +77,43 @@ export interface HelpChatMessage {
   error?: boolean
 }
 
+/**
+ * Lo que hay escrito y elegido en la pantalla de Copiloto, por workspace.
+ *
+ * Vive fuera de la pantalla por lo mismo que la generacion: subir un documento,
+ * escribir las indicaciones y luego pasarse al tablero a mirar algo no puede
+ * costar tener que volver a subirlo todo. El fichero se guarda tal cual —es una
+ * referencia en memoria, sigue valiendo—; lo que no sobrevive es recargar la
+ * pagina, y ahi no hay nada que hacer sin volver a elegirlo.
+ */
+export interface CopilotDraft {
+  file: File | null
+  text: string
+  indications: string
+  /** Entre cuantas personas repartir; null es «las que haya en el equipo». */
+  people: number | null
+  /** null = todas marcadas, que es lo normal al generar. Un array, lo que el usuario dejo marcado a mano. */
+  selected: number[] | null
+  /** Titulos de la ultima tanda llevada al tablero, para el resumen de confirmacion. */
+  appliedTitles: string[] | null
+  scheduleApplied: boolean
+}
+
+export interface CopilotDraftsValue {
+  draftOf: (workspaceId: number) => CopilotDraft
+  patch: (workspaceId: number, cambios: Partial<CopilotDraft>) => void
+}
+
+export const EMPTY_COPILOT_DRAFT: CopilotDraft = {
+  file: null,
+  text: '',
+  indications: '',
+  people: null,
+  selected: null,
+  appliedTitles: null,
+  scheduleApplied: false,
+}
+
 export interface HelpChatValue {
   open: boolean
   toggle: () => void
@@ -91,6 +128,7 @@ export const UiContext = createContext<UiValue | null>(null)
 export const AuthContext = createContext<AuthValue | null>(null)
 export const CopilotJobsContext = createContext<CopilotJobsValue | null>(null)
 export const HelpChatContext = createContext<HelpChatValue | null>(null)
+export const CopilotDraftsContext = createContext<CopilotDraftsValue | null>(null)
 
 export function useUi(): UiValue {
   const context = useContext(UiContext)
@@ -114,6 +152,12 @@ export function useCopilotJobs(): CopilotJobsValue {
 export function useCopilotJob(workspaceId: number): CopilotJob | undefined {
   const { jobs } = useCopilotJobs()
   return jobs[workspaceId]
+}
+
+export function useCopilotDrafts(): CopilotDraftsValue {
+  const context = useContext(CopilotDraftsContext)
+  if (!context) throw new Error('useCopilotDrafts debe usarse dentro de <CopilotDraftsProvider>')
+  return context
 }
 
 export function useHelpChat(): HelpChatValue {

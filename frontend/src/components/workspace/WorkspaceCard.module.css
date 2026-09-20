@@ -1,3 +1,16 @@
+.wrap { position: relative; }
+
+/* El menu de acciones se superpone en la esquina en vez de ir dentro de la
+   tarjeta: asi no le roba sitio al contenido ni parte el area clicable. Solo
+   aparece del todo al pasar por encima o al enfocarlo con el teclado, para que
+   la cuadricula siga leyendose limpia. */
+.actions {
+  position: absolute; top: var(--space-2); right: var(--space-2); z-index: 1;
+  opacity: 0; transition: var(--transition);
+}
+.wrap:hover .actions, .actions:focus-within { opacity: 1; }
+@media (hover: none) { .actions { opacity: 1; } }
+
 .card {
   position: relative;
   display: flex; flex-direction: column; gap: var(--space-2);

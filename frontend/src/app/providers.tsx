@@ -4,6 +4,7 @@ import { queryClient } from '@/app/query-client'
 import { AuthProvider } from '@/state/auth'
 import { UiProvider } from '@/state/ui'
 import { CopilotJobsProvider } from '@/state/copilotJobs'
+import { CopilotDraftsProvider } from '@/state/copilotDraft'
 import { HelpChatProvider } from '@/state/helpChat'
 import { ToastStack } from '@/components/ui/Toast'
 
@@ -19,12 +20,14 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <UiProvider>
         <CopilotJobsProvider>
-          <HelpChatProvider>
-            <AuthProvider>
-              {children}
-              <ToastStack />
-            </AuthProvider>
-          </HelpChatProvider>
+          <CopilotDraftsProvider>
+            <HelpChatProvider>
+              <AuthProvider>
+                {children}
+                <ToastStack />
+              </AuthProvider>
+            </HelpChatProvider>
+          </CopilotDraftsProvider>
         </CopilotJobsProvider>
       </UiProvider>
     </QueryClientProvider>

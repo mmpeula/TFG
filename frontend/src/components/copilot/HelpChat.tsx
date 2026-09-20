@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
-import { MessageCircleQuestion, X } from 'lucide-react'
+import { Bot, MessageCircleQuestion, X } from 'lucide-react'
 import { Chat } from './Chat'
 import styles from './HelpChat.module.css'
 import { workspaces as workspacesApi } from '@/api/endpoints'
@@ -64,17 +64,25 @@ export function HelpChat({ workspaceId }: { workspaceId: number }) {
       {open && (
         <div className={styles.panel} role="dialog" aria-label="Chat de ayuda">
           <header className={styles.head}>
-            <span className={styles.title}>Pregunta sobre este workspace</span>
+            <span className={styles.mark} aria-hidden="true">
+              <Bot size={14} strokeWidth={2.75} />
+            </span>
+            <span className={styles.titles}>
+              <span className={styles.title}>Copiloto</span>
+              <span className={styles.hint}>Responde sobre este workspace</span>
+            </span>
             <button className={styles.close} onClick={close} aria-label="Cerrar el chat">
               <X size={15} strokeWidth={2.75} />
             </button>
           </header>
-          <Chat
-            messages={messages}
-            pending={ask.isPending}
-            onSend={send}
-            onReset={() => reset(workspaceId)}
-          />
+          <div className={styles.body}>
+            <Chat
+              messages={messages}
+              pending={ask.isPending}
+              onSend={send}
+              onReset={() => reset(workspaceId)}
+            />
+          </div>
         </div>
       )}
 
@@ -82,9 +90,11 @@ export function HelpChat({ workspaceId }: { workspaceId: number }) {
         className={styles.bubble}
         onClick={toggle}
         aria-expanded={open}
+        aria-haspopup="dialog"
         aria-label={open ? 'Cerrar el chat de ayuda' : 'Abrir el chat de ayuda'}
       >
-        {open ? <X size={20} strokeWidth={2.5} /> : <MessageCircleQuestion size={20} strokeWidth={2.5} />}
+        {open ? <X size={19} strokeWidth={2.5} /> : <MessageCircleQuestion size={19} strokeWidth={2.5} />}
+        {!open && messages.length > 0 && <span className={styles.pip} aria-hidden="true" />}
       </button>
     </div>
   )

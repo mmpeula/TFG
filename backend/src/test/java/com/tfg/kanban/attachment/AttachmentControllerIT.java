@@ -21,7 +21,7 @@ class AttachmentControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Subir, listar, descargar y borrar un adjunto")
     void attachmentLifecycle() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo adjuntos");
         Long projectId = createProject(responsable, teamId, "Practica adjuntos");
         Long boardId = createBoard(responsable, projectId, "Tablero adjuntos");
@@ -53,7 +53,7 @@ class AttachmentControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Se rechaza un tipo de fichero no permitido")
     void rejectsForbiddenContentType() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo tipos");
         Long projectId = createProject(responsable, teamId, "Practica tipos");
         Long boardId = createBoard(responsable, projectId, "Tablero tipos");
@@ -72,7 +72,7 @@ class AttachmentControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Un DOCENTE puede descargar pero no subir adjuntos")
     void observerCannotUpload() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser observador = registerUser(Role.DOCENTE);
         Long teamId = createTeam(responsable, "Equipo adjuntos lectura");
         addMember(responsable, teamId, observador, Role.DOCENTE);

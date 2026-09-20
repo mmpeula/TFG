@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/Button'
 import styles from './Chat.module.css'
 import type { ChatTurn } from '@/types/api'
 
-export interface ChatMessage extends ChatTurn {
+/** Solo la usa este componente: el estado del chat flotante define la suya (ver state/context). */
+interface ChatMessage extends ChatTurn {
   /** Lo que el modelo tenia delante al responder; se muestra en pequeno. */
   context?: string
   error?: boolean

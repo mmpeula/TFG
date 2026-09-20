@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
@@ -13,7 +12,7 @@ import { projects as projectsApi } from '@/api/endpoints'
 import {
   keys, useProject, useProjectBoards, useTeamMembers, useWorkspace, useWorkspaceMutations,
 } from '@/hooks/useData'
-import { useCopilotJob, useCopilotJobs, useUi } from '@/state/context'
+import { useCopilotDrafts, useCopilotJob, useCopilotJobs, useUi } from '@/state/context'
 import { toErrorMessage } from '@/lib/api-client'
 import { canManage } from '@/lib/roles'
 import { ROUTES } from '@/app/routes'
@@ -44,35 +43,28 @@ export function CopilotScreen() {
   const copilotJobs = useCopilotJobs()
   const job = useCopilotJob(workspaceId)
 
-  const [file, setFile] = useState<File | null>(null)
-  const [descripcion, setDescripcion] = useState('')
-  const [indicaciones, setIndicaciones] = useState('')
-  const [chosenPeople, setChosenPeople] = useState<number | null>(null)
-  // Titulos de la ultima tanda anadida al tablero, para el resumen plegable de
-  // confirmacion. null cuando no hay nada reciente que mostrar.
-  const [appliedTitles, setAppliedTitles] = useState<string[] | null>(null)
-  const [scheduleApplied, setScheduleApplied] = useState(false)
+  // Nada de estado local aqui: el borrador (documento, descripcion,
+  // indicaciones, personas y lo que quede marcado de la propuesta) vive por
+  // encima de las rutas, para que irse un momento al tablero no obligue a
+  // volver a subir el enunciado ni a reescribir las indicaciones.
+  const { draftOf, patch } = useCopilotDrafts()
+  const draft = draftOf(workspaceId)
+  const { file, text: descripcion, indications: indicaciones, appliedTitles, scheduleApplied } = draft
+  const set = (cambios: Partial<typeof draft>) => patch(workspaceId, cambios)
 
   const plan = job?.status === 'done' ? job.plan : undefined
   const error = job?.status === 'error' ? job.error : undefined
   const proponiendo = job?.status === 'pending'
 
-  // Cada vez que llega una propuesta nueva (o al montar, si ya habia una
-  // terminada de antes), se marca todo: es lo que se espera al generar. Si el
-  // usuario desmarca algo a mano, se conserva mientras siga siendo la misma
-  // propuesta (aunque navegue fuera y vuelva). Ajustado durante el render en
-  // vez de en un efecto: no hace falta un renderizado extra para algo que ya
-  // se sabe en cuanto cambia "plan".
-  const [selected, setSelected] = useState<number[]>(() => plan?.tasks.map((_, index) => index) ?? [])
-  const [previousPlan, setPreviousPlan] = useState(plan)
-  if (plan !== previousPlan) {
-    setPreviousPlan(plan)
-    setSelected(plan ? plan.tasks.map((_, index) => index) : [])
-  }
+  // Al generar se marca todo, que es lo que se espera; en cuanto el usuario
+  // desmarca algo a mano se guarda su eleccion. Basta con volver a null al
+  // lanzar una generacion o al descartar la propuesta, que son los dos unicos
+  // momentos en los que el plan deja de ser el mismo.
+  const selected = draft.selected ?? (plan?.tasks.map((_, index) => index) ?? [])
 
   // El docente solo mira: no es alumno, no cuenta para el reparto.
   const teamSize = members?.filter((member) => member.role !== 'DOCENTE').length ?? 0
-  const people = chosenPeople ?? (teamSize || 1)
+  const people = draft.people ?? (teamSize || 1)
 
   const apply = useMutation({
     mutationFn: () => {
@@ -86,7 +78,7 @@ export function CopilotScreen() {
       // cual, parece que no ha pasado nada (o que se ha quedado atascada) en
       // vez de reflejar que ya esta hecho. El resumen plegable de abajo es la
       // confirmacion de que salio bien.
-      setAppliedTitles(created.map((task) => task.title))
+      set({ appliedTitles: created.map((task) => task.title), selected: null })
       copilotJobs.clear(workspaceId)
 
       const boardId = boards?.[0]?.id
@@ -101,8 +93,7 @@ export function CopilotScreen() {
 
   /** Documento si lo hay, si no la descripcion, si tampoco el guion ya guardado del proyecto. */
   function runGenerate() {
-    setAppliedTitles(null)
-    setScheduleApplied(false)
+    set({ appliedTitles: null, scheduleApplied: false, selected: null })
     copilotJobs.start({
       workspaceId,
       workspaceName: workspace?.name ?? 'el workspace',
@@ -132,7 +123,7 @@ export function CopilotScreen() {
       },
       {
         onSuccess: () => {
-          setScheduleApplied(true)
+          set({ scheduleApplied: true })
           queryClient.invalidateQueries({ queryKey: keys.project(workspaceId) })
         },
       },
@@ -150,25 +141,23 @@ export function CopilotScreen() {
         loading={loadingProject}
         file={file}
         onFile={(next) => {
-          setFile(next)
+          set({ file: next, appliedTitles: null })
           // Si hay una generacion en marcha, tocar el documento no debe hacer
           // que su "generando…" desaparezca: sigue corriendo igual, solo se
           // descarta un resultado o error ya terminado, que ahora si quedaria
           // desactualizado.
           if (job?.status !== 'pending') copilotJobs.clear(workspaceId)
-          setAppliedTitles(null)
         }}
         text={descripcion}
         onText={(next) => {
-          setDescripcion(next)
+          set({ text: next, appliedTitles: null })
           if (job?.status !== 'pending') copilotJobs.clear(workspaceId)
-          setAppliedTitles(null)
         }}
         indications={indicaciones}
-        onIndications={setIndicaciones}
+        onIndications={(next) => set({ indications: next })}
         people={people}
         maxPeople={teamSize || undefined}
-        onPeople={setChosenPeople}
+        onPeople={(next) => set({ people: next })}
         onRun={runGenerate}
         running={proponiendo}
       >
@@ -215,11 +204,11 @@ export function CopilotScreen() {
                   model={plan.model}
                   applying={apply.isPending}
                   onToggle={(index) =>
-                    setSelected((current) =>
-                      current.includes(index)
-                        ? current.filter((item) => item !== index)
-                        : [...current, index],
-                    )
+                    set({
+                      selected: selected.includes(index)
+                        ? selected.filter((item) => item !== index)
+                        : [...selected, index],
+                    })
                   }
                   onApply={() => apply.mutate()}
                   onRegenerate={runGenerate}

@@ -15,7 +15,7 @@ class CommentControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Un miembro comenta, edita su comentario y lo borra")
     void commentLifecycle() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo comentarios");
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
@@ -49,7 +49,7 @@ class CommentControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Otro miembro no puede editar un comentario ajeno, pero el RESPONSABLE si puede borrarlo")
     void onlyAuthorOrResponsableCanModify() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser autor = registerUser(Role.MIEMBRO);
         TestUser otro = registerUser(Role.MIEMBRO);
         Long teamId = createTeam(responsable, "Equipo moderacion");
@@ -78,7 +78,7 @@ class CommentControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("Un DOCENTE lee los comentarios pero no puede escribir")
     void observerCannotComment() throws Exception {
-        TestUser responsable = registerUser(Role.RESPONSABLE);
+        TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser observador = registerUser(Role.DOCENTE);
         Long teamId = createTeam(responsable, "Equipo lectura");
         addMember(responsable, teamId, observador, Role.DOCENTE);
