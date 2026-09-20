@@ -154,7 +154,7 @@ class TeamServiceTest {
 
         assertThatThrownBy(() -> teamService.addMember(5L, request))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("rol de plataforma");
+                .hasMessageContaining("En un equipo solo se puede asignar");
     }
 
     @Test

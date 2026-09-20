@@ -71,7 +71,7 @@ class AuthControllerIT extends AbstractApiIT {
         mockMvc.perform(patch("/api/users/{id}/role", victima.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"role\":\"OBSERVADOR\"}"))
+                        .content("{\"role\":\"DOCENTE\"}"))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(put("/api/users/{id}", victima.id())

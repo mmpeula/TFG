@@ -76,12 +76,12 @@ class CommentControllerIT extends AbstractApiIT {
     }
 
     @Test
-    @DisplayName("Un OBSERVADOR lee los comentarios pero no puede escribir")
+    @DisplayName("Un DOCENTE lee los comentarios pero no puede escribir")
     void observerCannotComment() throws Exception {
         TestUser responsable = registerUser(Role.RESPONSABLE);
-        TestUser observador = registerUser(Role.OBSERVADOR);
+        TestUser observador = registerUser(Role.DOCENTE);
         Long teamId = createTeam(responsable, "Equipo lectura");
-        addMember(responsable, teamId, observador, Role.OBSERVADOR);
+        addMember(responsable, teamId, observador, Role.DOCENTE);
         Long projectId = createProject(responsable, teamId, "Practica lectura");
         Long boardId = createBoard(responsable, projectId, "Tablero lectura");
         Long taskId = createTask(responsable, columnIds(responsable, boardId)[0], "Tarea leida");

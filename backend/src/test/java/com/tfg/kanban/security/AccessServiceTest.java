@@ -74,9 +74,9 @@ class AccessServiceTest {
     }
 
     @Test
-    @DisplayName("El OBSERVADOR solo lee")
+    @DisplayName("El DOCENTE solo lee")
     void observerIsReadOnly() {
-        withProjectRole(Role.OBSERVADOR);
+        withProjectRole(Role.DOCENTE);
 
         assertThat(accessService.canReadProject(7L)).isTrue();
         assertThat(accessService.canWriteProject(7L)).isFalse();
@@ -94,13 +94,14 @@ class AccessServiceTest {
     }
 
     @Test
-    @DisplayName("El rol que cuenta es el del equipo, no el rol global del usuario")
-    void teamRoleWinsOverGlobalRole() {
-        // El usuario es OBSERVADOR global pero MIEMBRO en este equipo
-        TestSecurity.authenticateAs(1L, "OBSERVADOR");
-        withProjectRole(Role.MIEMBRO);
+    @DisplayName("El rol que cuenta es el del equipo, no el rol de la cuenta")
+    void teamRoleWinsOverAccountRole() {
+        // La cuenta es MIEMBRO (con la que nace todo el mundo) pero en este equipo
+        // es la responsable: administrar el proyecto depende de lo segundo.
+        TestSecurity.authenticateAs(1L, "MIEMBRO");
+        withProjectRole(Role.RESPONSABLE);
 
-        assertThat(accessService.canWriteProject(7L)).isTrue();
+        assertThat(accessService.canManageProject(7L)).isTrue();
     }
 
     // ------------------------------------------------ comentarios y adjuntos
@@ -183,7 +184,7 @@ class AccessServiceTest {
     @DisplayName("Los permisos de tablero, columna y tarea siguen la misma regla de tres niveles")
     void boardColumnAndTaskPermissions() {
         when(teamMemberRepository.findRoleByBoard(2L, 1L)).thenReturn(Optional.of(Role.MIEMBRO));
-        when(teamMemberRepository.findRoleByColumn(5L, 1L)).thenReturn(Optional.of(Role.OBSERVADOR));
+        when(teamMemberRepository.findRoleByColumn(5L, 1L)).thenReturn(Optional.of(Role.DOCENTE));
         when(teamMemberRepository.findRoleByTask(11L, 1L)).thenReturn(Optional.of(Role.RESPONSABLE));
 
         assertThat(accessService.canReadBoard(2L)).isTrue();

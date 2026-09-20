@@ -86,9 +86,9 @@ class UserControllerIT extends AbstractApiIT {
 
         mockMvc.perform(authorized(patch("/api/users/{id}/role", member.id()), admin)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"role\":\"OBSERVADOR\"}"))
+                        .content("{\"role\":\"DOCENTE\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.role").value("OBSERVADOR"));
+                .andExpect(jsonPath("$.role").value("DOCENTE"));
     }
 
     @Test
@@ -103,7 +103,7 @@ class UserControllerIT extends AbstractApiIT {
 
         mockMvc.perform(authorized(patch("/api/users/{id}/role", other.id()), teamLeader)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"role\":\"OBSERVADOR\"}"))
+                        .content("{\"role\":\"DOCENTE\"}"))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(authorized(delete("/api/users/{id}", other.id()), teamLeader))

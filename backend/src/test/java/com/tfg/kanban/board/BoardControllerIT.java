@@ -114,10 +114,10 @@ class BoardControllerIT extends AbstractApiIT {
     void onlyResponsableUpdatesBoard() throws Exception {
         TestUser responsable = registerUser(Role.RESPONSABLE);
         TestUser miembro = registerUser(Role.MIEMBRO);
-        TestUser observador = registerUser(Role.OBSERVADOR);
+        TestUser observador = registerUser(Role.DOCENTE);
         Long teamId = createTeam(responsable, "Equipo edicion");
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
-        addMember(responsable, teamId, observador, Role.OBSERVADOR);
+        addMember(responsable, teamId, observador, Role.DOCENTE);
         Long projectId = createProject(responsable, teamId, "Practica edicion");
         Long boardId = createBoard(responsable, projectId, "Nombre viejo");
 

@@ -90,7 +90,7 @@ class JwtAuthenticationFilterTest {
     @Test
     @DisplayName("Si ya hay autenticacion en el contexto, el filtro no la pisa")
     void doesNotOverrideExistingAuthentication() throws Exception {
-        TestSecurity.authenticateAs(99L, "OBSERVADOR");
+        TestSecurity.authenticateAs(99L, "DOCENTE");
         String token = jwtService.generateToken("otra@uni.es", 1L, "RESPONSABLE");
 
         run("Bearer " + token);

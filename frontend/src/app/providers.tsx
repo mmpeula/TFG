@@ -4,23 +4,27 @@ import { queryClient } from '@/app/query-client'
 import { AuthProvider } from '@/state/auth'
 import { UiProvider } from '@/state/ui'
 import { CopilotJobsProvider } from '@/state/copilotJobs'
+import { HelpChatProvider } from '@/state/helpChat'
 import { ToastStack } from '@/components/ui/Toast'
 
 /**
- * Providers globales: cache de servidor, sesion, estado de interfaz y las
- * generaciones de planificacion en curso. CopilotJobsProvider vive aqui, por
- * encima de las rutas, para que generar una planificacion no dependa de seguir
- * en la pestana Copiloto: la peticion sigue aunque el usuario navegue a otra.
+ * Providers globales: cache de servidor, sesion, estado de interfaz, las
+ * generaciones de planificacion en curso y el chat de ayuda. Los dos ultimos
+ * viven aqui, por encima de las rutas, porque ninguno debe depender de seguir en
+ * la pantalla desde la que se lanzo: ni la generacion ni una pregunta a medias se
+ * pierden al cambiar de seccion.
  */
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <UiProvider>
         <CopilotJobsProvider>
-          <AuthProvider>
-            {children}
-            <ToastStack />
-          </AuthProvider>
+          <HelpChatProvider>
+            <AuthProvider>
+              {children}
+              <ToastStack />
+            </AuthProvider>
+          </HelpChatProvider>
         </CopilotJobsProvider>
       </UiProvider>
     </QueryClientProvider>

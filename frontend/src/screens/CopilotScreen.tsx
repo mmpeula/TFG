@@ -1,10 +1,7 @@
-import { useState, type ReactNode } from 'react'
-import { useParams } from 'react-router-dom'
+import { useState } from 'react'
+import { Navigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import axios from 'axios'
-import { MessageCircle, Sparkles } from 'lucide-react'
 import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
-import { Chat, type ChatMessage } from '@/components/copilot/Chat'
 import {
   AiErrorCard, AiWorkbench, AppliedTasksSummary, PrivacyNote, ProposalPanel, SuggestedScheduleCard,
   WorkloadSummary,
@@ -12,58 +9,26 @@ import {
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
 import styles from './CopilotScreen.module.css'
-import { projects as projectsApi, workspaces as workspacesApi } from '@/api/endpoints'
+import { projects as projectsApi } from '@/api/endpoints'
 import {
   keys, useProject, useProjectBoards, useTeamMembers, useWorkspace, useWorkspaceMutations,
 } from '@/hooks/useData'
 import { useCopilotJob, useCopilotJobs, useUi } from '@/state/context'
 import { toErrorMessage } from '@/lib/api-client'
-import type { ChatTurn } from '@/types/api'
-
-type CopilotTab = 'planificar' | 'hablar'
-
-const ICON = { size: 15, strokeWidth: 2.75 } as const
-const TABS: { value: CopilotTab; label: string; icon: ReactNode }[] = [
-  { value: 'planificar', label: 'Planificar', icon: <Sparkles {...ICON} /> },
-  { value: 'hablar', label: 'Hablar', icon: <MessageCircle {...ICON} /> },
-]
-
-/** Igual que las pestanas de Plan/Tablero/Copiloto de arriba, no un control de formulario. */
-function CopilotTabs({ value, onChange }: { value: CopilotTab; onChange: (value: CopilotTab) => void }) {
-  return (
-    <div className={styles.tabs} role="tablist" aria-label="Que quieres hacer">
-      {TABS.map((item) => (
-        <button
-          key={item.value}
-          role="tab"
-          aria-selected={item.value === value}
-          className={[styles.tab, item.value === value && styles.tabActive].filter(Boolean).join(' ')}
-          onClick={() => onChange(item.value)}
-        >
-          {item.icon}
-          {item.label}
-        </button>
-      ))}
-    </div>
-  )
-}
+import { canManage } from '@/lib/roles'
+import { ROUTES } from '@/app/routes'
 
 /**
- * El copiloto del workspace.
- *
- * Dos apartados elegibles con una pestana, no dos cosas apiladas: conviven dos
- * herramientas de naturaleza distinta —<b>preguntar</b>, que no toca nada, y
- * <b>planificar</b>, que devuelve una propuesta que hay que aceptar— y cada una
- * se elige aparte en vez de compartir la misma pantalla larga. Dentro de cada
- * una, nada de submenus: la caja de planificar (documento o descripcion, nunca
- * hace falta elegir un modo antes) y el chat estan siempre a la vista en cuanto
- * se entra en su pestana. El modelo corre en local y nunca escribe en el
- * tablero por su cuenta.
+ * El copiloto del workspace: automatizar tareas a partir de un documento o una
+ * descripcion, nada mas. Preguntarle algo puntual al modelo es otra cosa —el
+ * desplegable de ayuda de la cabecera (ver HelpChat)— y esta abierto a
+ * cualquiera; esta pantalla, en cambio, solo la ve quien administra el equipo,
+ * porque lo que hace (proponer y aplicar tareas al tablero) tambien esta
+ * restringido en el servidor a ese rol.
  *
  * Generar tarda: la peticion en si la lanza {@link useCopilotJobs}, anclada por
- * encima de las rutas, asi que sigue en marcha aunque el usuario cambie de
- * pestana (Hablar) o se vaya a mirar el tablero o los miembros. Esta pantalla
- * solo lee su resultado.
+ * encima de las rutas, asi que sigue en marcha aunque el usuario se vaya a
+ * mirar el tablero o los miembros. Esta pantalla solo lee su resultado.
  */
 export function CopilotScreen() {
   const { workspaceId: param } = useParams()
@@ -79,8 +44,6 @@ export function CopilotScreen() {
   const copilotJobs = useCopilotJobs()
   const job = useCopilotJob(workspaceId)
 
-  const [tab, setTab] = useState<CopilotTab>('planificar')
-  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [file, setFile] = useState<File | null>(null)
   const [descripcion, setDescripcion] = useState('')
   const [indicaciones, setIndicaciones] = useState('')
@@ -111,30 +74,6 @@ export function CopilotScreen() {
   const teamSize = members?.filter((member) => member.role !== 'DOCENTE').length ?? 0
   const people = chosenPeople ?? (teamSize || 1)
 
-  /** Mensaje de error util cuando el modelo local no responde. */
-  function describe(err: unknown): string {
-    const status = axios.isAxiosError(err) ? err.response?.status : undefined
-    return status === 503
-      ? `${toErrorMessage(err)} El modelo corre en tu maquina: comprueba que Ollama esta arrancado.`
-      : toErrorMessage(err)
-  }
-
-  const ask = useMutation({
-    mutationFn: (message: string) => {
-      const history: ChatTurn[] = messages.map(({ role, content }) => ({ role, content }))
-      return workspacesApi.ask(workspaceId, message, history)
-    },
-    onSuccess: (response) => {
-      setMessages((current) => [
-        ...current,
-        { role: 'assistant', content: response.answer, context: response.contextSummary },
-      ])
-    },
-    onError: (err) => {
-      setMessages((current) => [...current, { role: 'assistant', content: describe(err), error: true }])
-    },
-  })
-
   const apply = useMutation({
     mutationFn: () => {
       const boardId = boards?.[0]?.id
@@ -159,11 +98,6 @@ export function CopilotScreen() {
     },
     onError: (err) => pushToast(toErrorMessage(err)),
   })
-
-  function send(message: string) {
-    setMessages((current) => [...current, { role: 'user', content: message }])
-    ask.mutate(message)
-  }
 
   /** Documento si lo hay, si no la descripcion, si tampoco el guion ya guardado del proyecto. */
   function runGenerate() {
@@ -205,11 +139,12 @@ export function CopilotScreen() {
     )
   }
 
+  if (workspace && !canManage(workspace.myRole)) {
+    return <Navigate to={ROUTES.planById(workspaceId)} replace />
+  }
+
   return (
     <WorkspaceShell workspace={workspace} workspaceId={workspaceId}>
-      <CopilotTabs value={tab} onChange={setTab} />
-
-      {tab === 'planificar' && (
       <AiWorkbench
         briefing={project?.briefing ?? ''}
         loading={loadingProject}
@@ -294,16 +229,6 @@ export function CopilotScreen() {
           </>
         )}
       </AiWorkbench>
-      )}
-
-      {tab === 'hablar' && (
-        <Chat
-          messages={messages}
-          pending={ask.isPending}
-          onSend={send}
-          onReset={() => setMessages([])}
-        />
-      )}
 
       <PrivacyNote />
     </WorkspaceShell>

@@ -63,9 +63,34 @@ export interface CopilotJobsValue {
   clear: (workspaceId: number) => void
 }
 
+/**
+ * El chat de ayuda flota por encima de todo el workspace, asi que su conversacion
+ * no puede vivir en la pantalla que hay debajo: cambiar de Plan a Tablero la
+ * borraria a media pregunta. Se guarda aqui, por workspace, junto con si el panel
+ * esta abierto, para que cambiar de seccion no interrumpa nada.
+ */
+export interface HelpChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  /** Lo que el modelo tenia delante al responder; se muestra en pequeno. */
+  context?: string
+  error?: boolean
+}
+
+export interface HelpChatValue {
+  open: boolean
+  toggle: () => void
+  close: () => void
+  /** Conversacion de este workspace, vacia si todavia no se ha preguntado nada. */
+  messagesOf: (workspaceId: number) => HelpChatMessage[]
+  append: (workspaceId: number, message: HelpChatMessage) => void
+  reset: (workspaceId: number) => void
+}
+
 export const UiContext = createContext<UiValue | null>(null)
 export const AuthContext = createContext<AuthValue | null>(null)
 export const CopilotJobsContext = createContext<CopilotJobsValue | null>(null)
+export const HelpChatContext = createContext<HelpChatValue | null>(null)
 
 export function useUi(): UiValue {
   const context = useContext(UiContext)
@@ -89,4 +114,10 @@ export function useCopilotJobs(): CopilotJobsValue {
 export function useCopilotJob(workspaceId: number): CopilotJob | undefined {
   const { jobs } = useCopilotJobs()
   return jobs[workspaceId]
+}
+
+export function useHelpChat(): HelpChatValue {
+  const context = useContext(HelpChatContext)
+  if (!context) throw new Error('useHelpChat debe usarse dentro de <HelpChatProvider>')
+  return context
 }

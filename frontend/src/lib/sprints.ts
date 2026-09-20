@@ -69,6 +69,25 @@ function soloFecha(value: string | Date): Date {
 }
 
 /**
+ * Suma dias de calendario, no de 24 horas.
+ *
+ * En la ultima semana de octubre se atrasa el reloj: 21 dias de 86.400.000 ms
+ * desde el 13 de octubre no caen el 3 de noviembre a las 00:00 sino el 2 a las
+ * 23:00. Con eso los sprints salian corridos un dia y, peor, quedaba un hueco de
+ * una hora entre el final de uno y el principio del siguiente donde las tareas de
+ * ese dia desaparecian del plan. El constructor por partes respeta el cambio de
+ * hora porque cuenta dias del calendario.
+ */
+function sumarDias(date: Date, dias: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + dias)
+}
+
+/** Dias de calendario entre dos fechas; redondea porque un dia con cambio de hora dura 23 o 25 horas. */
+function diasEntre(desde: Date, hasta: Date): number {
+  return Math.round((hasta.getTime() - desde.getTime()) / DIA)
+}
+
+/**
  * En que punto esta la tarea.
  *
  * Se deduce de la columna y no de un campo propio: la primera columna es lo que
@@ -110,7 +129,7 @@ export function buildPlan(
   if (end < start) end = start
 
   const dias = Math.max(1, options.sprintDays)
-  const total = Math.floor((end.getTime() - start.getTime()) / DIA) + 1
+  const total = diasEntre(start, end) + 1
   let cuantos = Math.max(1, Math.ceil(total / dias))
   // Un ultimo sprint de dos dias sueltos no es un sprint: se suma al anterior.
   const sobra = total - (cuantos - 1) * dias
@@ -118,8 +137,8 @@ export function buildPlan(
 
   const sprints: Sprint[] = []
   for (let i = 0; i < cuantos; i++) {
-    const inicio = new Date(start.getTime() + i * dias * DIA)
-    const ultimo = new Date(inicio.getTime() + (dias - 1) * DIA)
+    const inicio = sumarDias(start, i * dias)
+    const ultimo = sumarDias(inicio, dias - 1)
     // El ultimo sprint llega siempre hasta el final de la ventana: si se recorta
     // o se alarga por el resto de la division, ninguna tarea puede quedar fuera.
     const fin = i === cuantos - 1 ? end : ultimo

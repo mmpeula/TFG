@@ -1,6 +1,7 @@
 package com.tfg.kanban.workspace.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -29,7 +30,8 @@ public record CreateWorkspaceRequest(
         String icon,
 
         @Schema(description = "Duracion del sprint en dias, igual para todo el plan; si se omite, 14")
-        @Min(value = 1, message = "la duracion del sprint debe ser de al menos 1 dia")
+        @Min(value = 7, message = "un sprint dura al menos una semana")
+        @Max(value = 28, message = "un sprint dura como mucho cuatro semanas")
         Integer sprintDays
 ) {
 }

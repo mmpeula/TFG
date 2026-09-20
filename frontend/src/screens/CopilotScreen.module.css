@@ -1,16 +1,2 @@
-/* Planificar / Hablar: mismo lenguaje que las pestanas de Plan/Tablero/Copiloto
-   de la cabecera (texto + subrayado), no un control de formulario pequeno —
-   aqui se elige entre dos herramientas completas, no una opcion de ajuste. */
-.tabs { display: flex; gap: var(--space-4); border-bottom: 1px solid var(--color-divider); }
-.tab {
-  display: flex; align-items: center; gap: 7px;
-  padding: var(--space-3) var(--space-1);
-  font-size: 14px; font-weight: 650; color: var(--color-neutral-500);
-  border-bottom: 2px solid transparent;
-  transition: var(--transition);
-}
-.tab:hover { color: var(--color-text); }
-.tabActive { color: var(--color-accent-700); border-bottom-color: var(--color-accent-600); }
-
 .source { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .nothing { font-size: 13px; color: var(--color-neutral-600); line-height: 1.5; }

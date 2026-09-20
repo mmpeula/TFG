@@ -39,6 +39,10 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      # Sin esto el contenedor va en UTC y, de madrugada, "hoy" para el servidor
+      # es todavia el dia anterior: los sprints y las fechas que calcula la IA
+      # saldrian corridos un dia respecto al calendario de quien lo usa.
+      TZ: ${TZ:-Europe/Madrid}
       DB_URL: jdbc:oracle:thin:@//oracle-db:1521/FREEPDB1
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}

@@ -74,8 +74,8 @@ class AiPlanServiceTest {
                 .team(team).user(User.builder().id(1L).fullName("Ana Garcia").build()).build());
         team.getMembers().add(TeamMember.builder().id(2L)
                 .team(team).user(User.builder().id(2L).fullName("Luis Perez").build()).build());
-        // El profesor: OBSERVADOR en el equipo, no un alumno. No debe entrar en el reparto.
-        team.getMembers().add(TeamMember.builder().id(3L).role(Role.OBSERVADOR)
+        // El profesor: DOCENTE en el equipo, no un alumno. No debe entrar en el reparto.
+        team.getMembers().add(TeamMember.builder().id(3L).role(Role.DOCENTE)
                 .team(team).user(User.builder().id(3L).fullName("Profesor Soto").build()).build());
         project = Project.builder()
                 .id(7L).name("Practica 2").team(team)
@@ -212,7 +212,7 @@ class AiPlanServiceTest {
     // ------------------------------------------------- el profesor no es un alumno
 
     @Test
-    @DisplayName("El profesor (OBSERVADOR) nunca recibe tareas del reparto")
+    @DisplayName("El profesor (DOCENTE) nunca recibe tareas del reparto")
     void observerNeverGetsAssignedWork() {
         modelReplies("""
                 {"tasks":[{"title":"A"},{"title":"B"},{"title":"C"},{"title":"D"},{"title":"E"}]}""");
@@ -250,18 +250,26 @@ class AiPlanServiceTest {
                 .satisfies(t -> assertThat(t.assigneeId()).isNotEqualTo(3L));
     }
 
+    /*
+     * Las fechas de estas pruebas son relativas a hoy a proposito: la planificacion
+     * propuesta se valida contra la fecha actual, asi que una fecha fija acabaria
+     * quedandose en el pasado y rompiendo la prueba con el tiempo.
+     */
+    private static final LocalDate INICIO = LocalDate.now().plusWeeks(2);
+    private static final LocalDate ENTREGA = LocalDate.now().plusWeeks(12);
+
     @Test
     @DisplayName("Si el documento dice fechas y duracion de sprint, se propone al usuario")
     void parsesScheduleWhenDocumentStatesIt() {
         modelReplies("""
                 {"tasks":[{"title":"Modelar el esquema"}],
-                 "schedule":{"startDate":"2026-10-01","deadline":"2026-12-20","sprintDays":14}}""");
+                 "schedule":{"startDate":"%s","deadline":"%s","sprintDays":14}}""".formatted(INICIO, ENTREGA));
 
         var schedule = service.generate(7L, null, null).schedule();
 
         assertThat(schedule).isNotNull();
-        assertThat(schedule.startDate()).isEqualTo(LocalDate.of(2026, 10, 1));
-        assertThat(schedule.deadline()).isEqualTo(LocalDate.of(2026, 12, 20));
+        assertThat(schedule.startDate()).isEqualTo(INICIO);
+        assertThat(schedule.deadline()).isEqualTo(ENTREGA);
         assertThat(schedule.sprintDays()).isEqualTo(14);
     }
 
@@ -270,13 +278,95 @@ class AiPlanServiceTest {
     void parsesSpanishAliasesForSchedule() {
         modelReplies("""
                 {"tasks":[{"title":"Modelar el esquema"}],
-                 "schedule":{"fechaInicio":"2026-10-01","fechaEntrega":"2026-12-20","duracionSprint":7}}""");
+                 "schedule":{"fechaInicio":"%s","fechaEntrega":"%s","duracionSprint":7}}"""
+                .formatted(INICIO, ENTREGA));
 
         var schedule = service.generate(7L, null, null).schedule();
 
         assertThat(schedule).isNotNull();
-        assertThat(schedule.startDate()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(schedule.startDate()).isEqualTo(INICIO);
         assertThat(schedule.sprintDays()).isEqualTo(7);
+    }
+
+    @Test
+    @DisplayName("Un curso ya pasado se adelanta al calendario actual: el dia y el mes son del enunciado, el ano lo inventa el modelo")
+    void movesAStaleScheduleIntoTheCurrentCalendar() {
+        LocalDate inicioViejo = LocalDate.now().minusYears(1).plusWeeks(3);
+        LocalDate entregaVieja = inicioViejo.plusWeeks(9);
+        modelReplies("""
+                {"tasks":[{"title":"Modelar el esquema"}],
+                 "schedule":{"startDate":"%s","deadline":"%s","sprintDays":21}}"""
+                .formatted(inicioViejo, entregaVieja));
+
+        var schedule = service.generate(7L, null, null).schedule();
+
+        assertThat(schedule).isNotNull();
+        assertThat(schedule.sprintDays()).isEqualTo(21);
+        // Mismo dia y mes, un ano despues: la ventana se conserva entera.
+        assertThat(schedule.startDate()).isEqualTo(inicioViejo.plusYears(1));
+        assertThat(schedule.deadline()).isEqualTo(entregaVieja.plusYears(1));
+        assertThat(schedule.deadline()).isAfter(LocalDate.now());
+    }
+
+    @Test
+    @DisplayName("Una fecha de inicio suelta y pasada tambien se adelanta")
+    void movesAStalePastStartDateWithoutDeadline() {
+        LocalDate inicioViejo = LocalDate.now().minusMonths(2);
+        modelReplies("""
+                {"tasks":[{"title":"Modelar el esquema"}], "schedule":{"startDate":"%s"}}"""
+                .formatted(inicioViejo));
+
+        var schedule = service.generate(7L, null, null).schedule();
+
+        assertThat(schedule).isNotNull();
+        assertThat(schedule.startDate()).isEqualTo(inicioViejo.plusYears(1));
+    }
+
+    @Test
+    @DisplayName("Una practica ya empezada no se toca: lo que manda es que la entrega siga por venir")
+    void keepsAPastStartWhenTheDeadlineIsStillAhead() {
+        LocalDate empezoHaceUnMes = LocalDate.now().minusMonths(1);
+        modelReplies("""
+                {"tasks":[{"title":"Modelar el esquema"}],
+                 "schedule":{"startDate":"%s","deadline":"%s"}}"""
+                .formatted(empezoHaceUnMes, ENTREGA));
+
+        var schedule = service.generate(7L, null, null).schedule();
+
+        assertThat(schedule).isNotNull();
+        assertThat(schedule.startDate()).isEqualTo(empezoHaceUnMes);
+        assertThat(schedule.deadline()).isEqualTo(ENTREGA);
+    }
+
+    @Test
+    @DisplayName("Una entrega anterior al inicio no describe ninguna ventana: se queda solo la entrega")
+    void dropsStartDateWhenItIsAfterTheDeadline() {
+        modelReplies("""
+                {"tasks":[{"title":"Modelar el esquema"}],
+                 "schedule":{"startDate":"%s","deadline":"%s"}}"""
+                .formatted(LocalDate.now().plusMonths(6), ENTREGA));
+
+        var schedule = service.generate(7L, null, null).schedule();
+
+        assertThat(schedule).isNotNull();
+        assertThat(schedule.startDate()).isNull();
+        assertThat(schedule.deadline()).isEqualTo(ENTREGA);
+    }
+
+    @Test
+    @DisplayName("Las fechas que se proponen son las mismas con las que se fechan las tareas")
+    void proposedScheduleAndTaskDatesAgree() {
+        modelReplies("""
+                {"tasks":[{"title":"A"},{"title":"B"},{"title":"C"}],
+                 "schedule":{"startDate":"%s","deadline":"%s","sprintDays":14}}"""
+                .formatted(INICIO, ENTREGA));
+
+        var response = service.generate(7L, null, null);
+
+        // Si divergieran, el usuario aplicaria al workspace una ventana en la que no
+        // cae ninguna de sus tareas y el plan saldria con sprints vacios de sobra.
+        assertThat(response.tasks()).allSatisfy(task -> assertThat(task.dueDate())
+                .isBetween(response.schedule().startDate(), response.schedule().deadline()));
     }
 
     @Test
@@ -310,17 +400,19 @@ class AiPlanServiceTest {
         // que ya tuviera guardado el proyecto (hoy + 30 dias, puesto en el setUp):
         // si las tareas caen aqui es porque se ha usado la fecha del documento, no
         // ninguna de esas dos.
+        LocalDate inicio = LocalDate.now().plusMonths(4);
+        LocalDate entrega = inicio.plusMonths(1);
         modelReplies("""
                 {"tasks":[{"title":"A"},{"title":"B"},{"title":"C"}],
-                 "schedule":{"startDate":"2027-01-01","deadline":"2027-01-31","sprintDays":14}}""");
+                 "schedule":{"startDate":"%s","deadline":"%s","sprintDays":14}}""".formatted(inicio, entrega));
 
         var response = service.generate(7L, null, null);
 
-        assertThat(response.schedule().startDate()).isEqualTo(LocalDate.of(2027, 1, 1));
+        assertThat(response.schedule().startDate()).isEqualTo(inicio);
         assertThat(response.tasks()).allSatisfy(task -> {
             assertThat(task.dueDate()).isNotNull();
-            assertThat(task.dueDate()).isAfterOrEqualTo(LocalDate.of(2027, 1, 1));
-            assertThat(task.dueDate()).isBeforeOrEqualTo(LocalDate.of(2027, 1, 31));
+            assertThat(task.dueDate()).isAfterOrEqualTo(inicio);
+            assertThat(task.dueDate()).isBeforeOrEqualTo(entrega);
         });
     }
 

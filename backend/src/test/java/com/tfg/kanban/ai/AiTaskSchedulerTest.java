@@ -11,9 +11,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * El modelo no elige fechas, las calcula este servicio: aqui se comprueba que cada
- * persona avanza por su propia ventana, que la ultima tarea de cada una cae en la
- * fecha de entrega y que una entrega ya pasada o un inicio ya pasado no cuelan.
+ * El modelo no elige fechas, las calcula este servicio: aqui se comprueba que las
+ * tareas caen siempre al final de un sprint, que cada persona recorre todos los
+ * sprints en vez de amontonar su trabajo contra la entrega, y que una entrega o
+ * un inicio ya pasados no cuelan.
  */
 class AiTaskSchedulerTest {
 
@@ -26,7 +27,7 @@ class AiTaskSchedulerTest {
     @Test
     @DisplayName("Una lista vacia se devuelve tal cual")
     void emptyListStaysEmpty() {
-        assertThat(scheduler.schedule(List.of(), null, null)).isEmpty();
+        assertThat(scheduler.schedule(List.of(), null, null, null)).isEmpty();
     }
 
     @Test
@@ -50,42 +51,99 @@ class AiTaskSchedulerTest {
         assertThat(window.end()).isEqualTo(LocalDate.now().plusDays(42));
     }
 
-    @Test
-    @DisplayName("Sin fecha de entrega, la unica tarea cae al final de la ventana por defecto (42 dias)")
-    void singleTaskWithoutDeadlineLandsOnDefaultWindowEnd() {
-        var result = scheduler.schedule(List.of(task("Unica", 1L)), null, null);
+    // ------------------------------------------------------------ sprints
 
-        assertThat(result).singleElement()
-                .extracting(ProposedTask::dueDate).isEqualTo(LocalDate.now().plusDays(42));
+    @Test
+    @DisplayName("La ventana se parte en sprints de la duracion pedida y el ultimo llega hasta la entrega")
+    void splitsTheWindowIntoSprints() {
+        var window = new AiTaskScheduler.Window(LocalDate.of(2026, 10, 13), LocalDate.of(2026, 12, 16));
+
+        var sprints = scheduler.sprintsOf(window, 21);
+
+        assertThat(sprints).hasSize(3);
+        assertThat(sprints.get(0).start()).isEqualTo(LocalDate.of(2026, 10, 13));
+        assertThat(sprints.get(0).end()).isEqualTo(LocalDate.of(2026, 11, 2));
+        assertThat(sprints.get(2).end()).isEqualTo(window.end());
     }
 
     @Test
-    @DisplayName("Varias tareas de la misma persona se reparten en orden y la ultima cae en la entrega")
-    void spreadsSamePersonTasksInOrder() {
-        LocalDate start = LocalDate.now().plusDays(5);
-        LocalDate deadline = LocalDate.now().plusDays(35);
+    @DisplayName("Un ultimo trozo demasiado corto se suma al sprint anterior en vez de ser un sprint de dos dias")
+    void aTinyLeftoverJoinsThePreviousSprint() {
+        // 30 dias con sprints de 14: el resto son 2 dias, que no dan para una iteracion.
+        var window = new AiTaskScheduler.Window(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 30));
+
+        var sprints = scheduler.sprintsOf(window, 14);
+
+        assertThat(sprints).hasSize(2);
+        assertThat(sprints.get(1).end()).isEqualTo(window.end());
+    }
+
+    @Test
+    @DisplayName("Sin duracion de sprint se asumen dos semanas, como en la pantalla de Plan")
+    void defaultsToTwoWeekSprints() {
+        var window = new AiTaskScheduler.Window(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 11));
+
+        assertThat(scheduler.sprintsOf(window, null)).hasSize(3);
+    }
+
+    // ------------------------------------------------------------ reparto
+
+    @Test
+    @DisplayName("Las tareas de una persona van de la primera iteracion a la ultima, no todas al final")
+    void spreadsSamePersonTasksAcrossSprints() {
+        LocalDate start = LocalDate.now().plusDays(1);
+        LocalDate deadline = start.plusDays(62);
 
         var result = scheduler.schedule(
-                List.of(task("Analisis", 1L), task("Implementacion", 1L), task("Pruebas", 1L)), start, deadline);
+                List.of(task("Analisis", 1L), task("Implementacion", 1L), task("Pruebas", 1L)),
+                start, deadline, 21);
 
+        var sprints = scheduler.sprintsOf(scheduler.resolveWindow(start, deadline), 21);
+        assertThat(sprints).hasSize(3);
         assertThat(result).extracting(ProposedTask::dueDate).containsExactly(
-                start.plusDays(10), start.plusDays(20), start.plusDays(30));
-        // La ultima tarea de la persona cae exactamente en la fecha de entrega.
-        assertThat(result.get(2).dueDate()).isEqualTo(deadline);
+                sprints.get(0).end(), sprints.get(1).end(), sprints.get(2).end());
     }
 
     @Test
-    @DisplayName("Cada persona avanza por su propia ventana: la carga de una no aprieta a la otra")
+    @DisplayName("Cada tarea cae al final de un sprint, nunca en una fecha suelta entre medias")
+    void everyTaskLandsOnASprintBoundary() {
+        LocalDate start = LocalDate.now().plusDays(1);
+        LocalDate deadline = start.plusDays(62);
+        var tasks = List.of(task("A", 1L), task("B", 1L), task("C", 2L), task("D", 2L), task("E", null));
+
+        var result = scheduler.schedule(tasks, start, deadline, 21);
+
+        var finales = scheduler.sprintsOf(scheduler.resolveWindow(start, deadline), 21).stream()
+                .map(AiTaskScheduler.Window::end).toList();
+        assertThat(result).allSatisfy(task -> assertThat(finales).contains(task.dueDate()));
+    }
+
+    @Test
+    @DisplayName("Con una sola tarea, esa persona entrega en el ultimo sprint")
+    void aSingleTaskLandsOnTheLastSprint() {
+        LocalDate start = LocalDate.now().plusDays(1);
+        LocalDate deadline = start.plusDays(62);
+
+        var result = scheduler.schedule(List.of(task("Unica", 1L)), start, deadline, 21);
+
+        assertThat(result).singleElement().extracting(ProposedTask::dueDate).isEqualTo(deadline);
+    }
+
+    @Test
+    @DisplayName("Cada persona avanza por su cuenta: que una tenga el triple de tareas no aprieta a la otra")
     void eachPersonHasItsOwnPace() {
+        LocalDate start = LocalDate.now().plusDays(1);
+        LocalDate deadline = start.plusDays(62);
+
         var result = scheduler.schedule(List.of(
                 task("Ana - unica", 1L),
-                task("Luis - una", 2L), task("Luis - dos", 2L), task("Luis - tres", 2L)), null, null);
+                task("Luis - una", 2L), task("Luis - dos", 2L), task("Luis - tres", 2L)),
+                start, deadline, 21);
 
-        LocalDate end = LocalDate.now().plusDays(42);
-        // El unico entregable de Ana y el ultimo de Luis comparten fecha de entrega, aunque
-        // Luis tenga el triple de tareas: cada persona llega al final por su cuenta.
-        assertThat(result.get(0).dueDate()).isEqualTo(end);
-        assertThat(result.get(3).dueDate()).isEqualTo(end);
+        // Ana entrega lo suyo al final, igual que Luis su ultima tarea, pero las de
+        // Luis empiezan en el primer sprint en vez de acumularse contra la entrega.
+        assertThat(result.get(0).dueDate()).isEqualTo(deadline);
+        assertThat(result.get(3).dueDate()).isEqualTo(deadline);
         assertThat(result.get(1).dueDate()).isBefore(result.get(2).dueDate());
         assertThat(result.get(2).dueDate()).isBefore(result.get(3).dueDate());
     }
@@ -93,7 +151,7 @@ class AiTaskSchedulerTest {
     @Test
     @DisplayName("Las tareas sin asignar tambien se reparten, agrupadas entre si")
     void unassignedTasksAreSpreadAsAGroup() {
-        var result = scheduler.schedule(List.of(task("Suelta 1", null), task("Suelta 2", null)), null, null);
+        var result = scheduler.schedule(List.of(task("Suelta 1", null), task("Suelta 2", null)), null, null, 14);
 
         assertThat(result).extracting(ProposedTask::dueDate).doesNotContainNull();
         assertThat(result.get(0).dueDate()).isBefore(result.get(1).dueDate());
@@ -103,7 +161,7 @@ class AiTaskSchedulerTest {
     @Test
     @DisplayName("Una entrega ya pasada no se usa: se cae en la ventana por defecto")
     void pastDeadlineFallsBackToDefaultWindow() {
-        var result = scheduler.schedule(List.of(task("Tarea", 1L)), null, LocalDate.now().minusDays(5));
+        var result = scheduler.schedule(List.of(task("Tarea", 1L)), null, LocalDate.now().minusDays(5), 14);
 
         assertThat(result).singleElement()
                 .extracting(ProposedTask::dueDate).isEqualTo(LocalDate.now().plusDays(42));
@@ -114,7 +172,7 @@ class AiTaskSchedulerTest {
     void pastStartDateFallsBackToToday() {
         LocalDate deadline = LocalDate.now().plusDays(20);
 
-        var result = scheduler.schedule(List.of(task("Tarea", 1L)), LocalDate.now().minusDays(10), deadline);
+        var result = scheduler.schedule(List.of(task("Tarea", 1L)), LocalDate.now().minusDays(10), deadline, 14);
 
         assertThat(result).singleElement().extracting(ProposedTask::dueDate).isEqualTo(deadline);
     }
@@ -126,7 +184,7 @@ class AiTaskSchedulerTest {
                 com.tfg.kanban.domain.model.TaskType.HISTORIA, TaskPriority.ALTA,
                 java.math.BigDecimal.valueOf(6), null, 2L, "Luis Perez");
 
-        var result = scheduler.schedule(List.of(original), null, null);
+        var result = scheduler.schedule(List.of(original), null, null, 14);
 
         assertThat(result).singleElement().satisfies(t -> {
             assertThat(t.title()).isEqualTo(original.title());

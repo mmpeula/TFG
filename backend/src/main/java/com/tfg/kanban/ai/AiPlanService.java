@@ -40,40 +40,72 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AiPlanService {
 
+    /*
+     * Escrito para un modelo pequeno corriendo en local (8B), que es lo que hay al
+     * otro lado. De ahi tres decisiones que no se tomarian con un modelo grande:
+     * un ejemplo completo y relleno en vez del esquema con puntos suspensivos,
+     * porque un modelo pequeno imita mucho mejor de lo que deduce; reglas cortas
+     * agrupadas por bloques con titulo, porque en una lista plana y larga se le
+     * pierden las importantes; y ni una sola regla sobre cosas que el servidor ya
+     * decide solo (las fechas de cada tarea y el equilibrio de horas), porque
+     * pedirselas le gasta atencion y ademas invita a contradecir lo que luego se
+     * va a recalcular igualmente.
+     *
+     * La prohibicion de ceremonias es la regla que mas cambia el resultado: sin
+     * ella el modelo describe el proceso Scrum que ha visto mil veces al
+     * entrenarse ("planificar el sprint 1", "reunion de retrospectiva") en lugar
+     * del trabajo que pide el enunciado que tiene delante.
+     */
     private static final String SYSTEM_PROMPT = """
-            Eres un asistente que planifica practicas universitarias en tableros Kanban
-            y reparte el trabajo entre los miembros del equipo.
-            Respondes SIEMPRE en espanol y SIEMPRE con un unico objeto JSON valido con esta forma:
-            {"tasks":[{"title":"...","reason":"...","type":"EPICA|HISTORIA|TAREA|BUG|INCIDENCIA",
-                       "priority":"ALTA|MEDIA|BAJA","estimatedHours":4,"assignee":"Nombre de la persona"}],
-             "schedule":{"startDate":"AAAA-MM-DD","deadline":"AAAA-MM-DD","sprintDays":14},
-             "excluded":["Nombre de quien no debe recibir ninguna tarea esta vez"]}
-            Reglas:
-            - "title": accion concreta y verificable, maximo 100 caracteres, empezando por un verbo.
-            - "reason": una frase corta explicando por que hace falta, citando el documento cuando puedas.
-            - "type": EPICA para un bloque grande que agrupa trabajo, HISTORIA para algo que aporta
-              valor al usuario final, TAREA para trabajo tecnico concreto (el caso normal), BUG o
-              INCIDENCIA solo si el documento describe corregir algo que ya existe.
-            - "priority": solo uno de ALTA, MEDIA o BAJA.
-            - "estimatedHours": numero entre 1 y 20.
-            - "assignee": el nombre EXACTO de una de las personas de la lista que se te da.
-            - No propongas fechas de tarea: el orden de la lista ya indica la secuencia (lo primero
-              que sale, lo primero que se hace), y las fechas las calcula el servidor a partir de ese orden.
-            - "schedule" es aparte, del PROYECTO entero, no de una tarea: solo rellena cada campo si el
-              documento lo dice explicitamente (una fecha de inicio, un plazo de entrega, la duracion de
-              cada sprint o iteracion). Si no lo dice, ese campo va a null. Nunca inventes ni calcules una
-              fecha por tu cuenta. "sprintDays" siempre en dias (una semana son 7, dos semanas 14).
-            - Cubre TODO el trabajo que pide el documento, de principio a fin.
-            - Reparte las tareas y las horas de forma equilibrada entre todas las personas.
-            - No repitas tareas que ya existan en el tablero.
-            - Si el usuario da indicaciones aparte del documento, siguelas: tienen prioridad sobre
-              el documento en caso de conflicto (por ejemplo, si pide centrarse solo en una parte
-              o cambiar el orden de las prioridades).
-            - "excluded": SOLO si las indicaciones piden explicitamente dejar a alguien sin tareas
-              esta vez (de baja, con examenes, fuera del equipo esta ronda...), pon aqui su nombre
-              EXACTO. Si nadie lo pide, deja la lista vacia: no excluyas a nadie por tu cuenta ni
-              repartas de todas formas una tarea a quien esta en esta lista.
-            - No anadas texto fuera del JSON.
+            Eres quien planifica practicas universitarias: lees el enunciado y lo conviertes en la
+            lista de tareas que el equipo tiene que hacer.
+
+            Respondes SIEMPRE en espanol y SIEMPRE con un unico objeto JSON, sin nada de texto
+            alrededor. Una respuesta valida se ve exactamente asi:
+
+            {"tasks":[
+              {"title":"Disenar el modelo entidad-relacion","reason":"El apartado 2 pide el diagrama E/R antes de crear las tablas","type":"TAREA","priority":"ALTA","estimatedHours":5,"assignee":"Ana Garcia"},
+              {"title":"Escribir el script SQL de creacion","reason":"Sin las tablas no se pueden probar las consultas","type":"TAREA","priority":"ALTA","estimatedHours":4,"assignee":"Luis Perez"},
+              {"title":"Redactar la memoria","reason":"El enunciado la pide como entregable final","type":"TAREA","priority":"MEDIA","estimatedHours":6,"assignee":"Ana Garcia"}],
+             "schedule":{"startDate":null,"deadline":"2027-01-15","sprintDays":14},
+             "excluded":[]}
+
+            QUE CUENTA COMO TAREA
+            - Un entregable concreto del enunciado: algo que alguien hace y se puede dar por terminado.
+            - El titulo empieza por un verbo, dice QUE se entrega y no pasa de 100 caracteres.
+            - Nada de ceremonias ni de relleno: no propongas reuniones, planificaciones de sprint,
+              revisiones, retrospectivas, ni titulos vacios tipo "hacer la segunda tarea". Si no sale
+              del enunciado, no va en la lista.
+            - Ni enormes ni minimas: de 1 a 20 horas cada una. Lo que pase de 20 horas, partelo.
+
+            EL ORDEN DE LA LISTA ES EL ORDEN DEL TRABAJO
+            - Primero lo que hay que hacer antes. El servidor reparte las tareas por iteraciones
+              siguiendo ese orden, asi que una lista desordenada da un calendario desordenado.
+            - No pongas fechas en las tareas: las calcula el servidor.
+
+            CAMPOS
+            - "reason": una frase corta, citando el enunciado cuando puedas.
+            - "type": TAREA para trabajo tecnico (el caso normal), HISTORIA si aporta valor visible a
+              quien usa lo que se construye, EPICA para un bloque que agrupa varias, BUG o INCIDENCIA
+              solo para arreglar algo que ya existe.
+            - "priority": ALTA, MEDIA o BAJA. ALTA es lo que bloquea al resto del trabajo.
+            - "assignee": el nombre EXACTO de una de las personas de la lista. Repartelas entre todas,
+              no se lo des todo a la misma.
+            - "excluded": lista vacia, salvo que las indicaciones pidan dejar a alguien sin tareas esta
+              vez; entonces va ahi su nombre exacto.
+
+            "schedule" ES DEL PROYECTO ENTERO, NO DE UNA TAREA
+            - Rellena cada campo solo si el enunciado lo dice; si no lo dice, null. No calcules fechas
+              por tu cuenta.
+            - Usa el calendario de hoy, cuya fecha se te da en el mensaje: si el enunciado da el dia y
+              el mes pero no el ano, elige el ano que deja la fecha en el futuro. Nunca un plazo vencido.
+            - "sprintDays" es lo que dura UNA iteracion, en dias, entre 7 y 28. No es lo que dura la
+              practica entera.
+
+            Y ADEMAS
+            - Cubre el enunciado de principio a fin, sin inventarte trabajo que no pide.
+            - No repitas ninguna tarea que ya este en el tablero.
+            - Si las indicaciones del usuario contradicen al enunciado, mandan las indicaciones.
             """;
 
     private final AiProperties properties;
@@ -184,8 +216,16 @@ public class AiPlanService {
         LocalDate deadline = fechaPropuestaOGuardada(parsed.schedule() == null ? null : parsed.schedule().deadline(),
                 project.getDeadline());
 
+        // La duracion de sprint con la que se fechan las tareas es la misma que va a
+        // acabar teniendo el workspace: la que dice el documento si la dice, y si no
+        // la que ya tenga guardada. Con otra, las tareas caerian entre los sprints
+        // que luego pinta el plan.
+        Integer sprintDays = parsed.schedule() != null && parsed.schedule().sprintDays() != null
+                ? parsed.schedule().sprintDays()
+                : project.getSprintDays();
+
         WorkloadBalancer.Result reparto = workloadBalancer.distribute(tasks, activeMembers, people);
-        List<ProposedTask> agendadas = aiTaskScheduler.schedule(reparto.tasks(), startDate, deadline);
+        List<ProposedTask> agendadas = aiTaskScheduler.schedule(reparto.tasks(), startDate, deadline, sprintDays);
 
         log.info("IA: {} tareas para el proyecto {} repartidas entre {} personas ({} descartadas por repetidas, "
                         + "{} excluidas por indicacion)",
@@ -294,6 +334,9 @@ public class AiPlanService {
     private String buildUserPrompt(Project project, String text, List<Task> existing,
                                    List<TeamMember> members, Integer people, String indications) {
         StringBuilder prompt = new StringBuilder();
+        // Sin esto el modelo planifica en el ano en que se entreno y propone un curso
+        // ya terminado: las fechas quedan vencidas y no encajan con ningun sprint real.
+        prompt.append("Hoy es ").append(LocalDate.now()).append('\n');
         prompt.append("Practica: ").append(project.getName()).append('\n');
 
         if (project.getDescription() != null && !project.getDescription().isBlank()) {
@@ -307,6 +350,14 @@ public class AiPlanService {
             prompt.append("Fecha de entrega: ").append(project.getDeadline())
                     .append(dias >= 0 ? " (quedan unos " + dias + " dias)" : " (ya vencida)")
                     .append('\n');
+
+            // Cuantas iteraciones caben de verdad. Saberlo le da la escala del plan: si
+            // solo hay dos, no tiene sentido proponer trabajo para medio curso.
+            int iteraciones = aiTaskScheduler.sprintsOf(
+                    aiTaskScheduler.resolveWindow(project.getStartDate(), project.getDeadline()),
+                    project.getSprintDays()).size();
+            prompt.append("El trabajo se repartira en ").append(iteraciones)
+                    .append(iteraciones == 1 ? " iteracion" : " iteraciones").append('\n');
         }
 
         List<TeamMember> reparto = (people != null && people > 0 && people < members.size())
@@ -329,8 +380,10 @@ public class AiPlanService {
         }
 
         prompt.append("\nPropon como maximo ").append(properties.getMaxTasks())
-              .append(" tareas que cubran todo el trabajo del documento, asignando cada una a una de las ")
-              .append(reparto.size()).append(" personas de la lista y equilibrando las horas entre ellas.");
+              .append(" tareas, en el orden en que hay que hacerlas, que cubran el documento entero, ")
+              .append("cada una asignada a una de las ").append(reparto.size())
+              .append(" personas de la lista. Solo entregables del documento: ni reuniones ni ")
+              .append("planificaciones ni titulos genericos.");
 
         return prompt.toString();
     }
@@ -436,8 +489,53 @@ public class AiPlanService {
         }
         LocalDate startDate = date(node, "startDate", "fechaInicio");
         LocalDate deadline = date(node, "deadline", "fechaEntrega");
-        Integer sprintDays = sprintDays(node);
-        return new AiPlanResponse.SuggestedSchedule(startDate, deadline, sprintDays);
+
+        Ventana ventana = alCalendarioActual(startDate, deadline);
+        return new AiPlanResponse.SuggestedSchedule(ventana.inicio(), ventana.entrega(), sprintDays(node));
+    }
+
+    /** Fechas del proyecto ya llevadas al calendario en curso. Cualquiera de las dos puede faltar. */
+    private record Ventana(LocalDate inicio, LocalDate entrega) {
+    }
+
+    /**
+     * Corrige el ano de las fechas que propone el modelo.
+     *
+     * <p>El dia y el mes salen del enunciado («entregar el 16 de diciembre»), pero
+     * el ano lo pone el modelo de su cosecha y un modelo pequeno tira del curso que
+     * vio al entrenarse, asi que propone un plazo ya vencido. Descartarlo sin mas
+     * perderia lo unico que el documento si dice; en su lugar se adelanta en anos
+     * enteros hasta caer en el futuro, que es lo que el usuario quiere decir cuando
+     * escribe una fecha sin ano.</p>
+     *
+     * <p>El desplazamiento se calcula una sola vez y se aplica a las dos fechas para
+     * no romper el intervalo: un curso que va de diciembre a enero cruza el cambio
+     * de ano, y moverlas por separado dejaria la entrega antes del inicio.</p>
+     */
+    private Ventana alCalendarioActual(LocalDate inicio, LocalDate entrega) {
+        LocalDate hoy = LocalDate.now();
+        LocalDate referencia = entrega != null ? entrega : inicio;
+        if (referencia == null) {
+            return new Ventana(null, null);
+        }
+
+        int anos = 0;
+        while (referencia.plusYears(anos).isBefore(hoy)) {
+            anos++;
+        }
+        if (anos > 0) {
+            log.debug("IA: fechas propuestas en un curso ya pasado, adelantadas {} ano(s)", anos);
+        }
+
+        LocalDate nuevoInicio = inicio == null ? null : inicio.plusYears(anos);
+        LocalDate nuevaEntrega = entrega == null ? null : entrega.plusYears(anos);
+
+        // Si aun asi la entrega no queda despues del inicio, la pareja no describe
+        // ninguna ventana de trabajo y la fecha de inicio es la que sobra.
+        if (nuevoInicio != null && nuevaEntrega != null && !nuevaEntrega.isAfter(nuevoInicio)) {
+            return new Ventana(null, nuevaEntrega);
+        }
+        return new Ventana(nuevoInicio, nuevaEntrega);
     }
 
     private LocalDate date(JsonNode node, String field, String alias) {
@@ -451,11 +549,25 @@ public class AiPlanService {
         }
     }
 
+    /** Lo que dura un sprint de verdad: de una a cuatro semanas. */
+    private static final int MIN_SPRINT_DAYS = 7;
+    private static final int MAX_SPRINT_DAYS = 28;
+
+    /**
+     * Una iteracion de dos meses no es un sprint, es el proyecto entero: el modelo
+     * confunde a menudo la duracion del sprint con la del trabajo y devuelve cosas
+     * como 56 o 90 dias. Fuera del rango razonable se ignora, y el plan se queda
+     * con la duracion que ya tuviera el workspace (o las dos semanas por defecto).
+     */
     private Integer sprintDays(JsonNode node) {
         JsonNode value = node.has("sprintDays") ? node.path("sprintDays") : node.path("duracionSprint");
         if (value.isMissingNode() || value.isNull()) return null;
         int days = value.asInt(0);
-        return days >= 1 && days <= 90 ? days : null;
+        if (days < MIN_SPRINT_DAYS || days > MAX_SPRINT_DAYS) {
+            log.debug("IA: duracion de sprint fuera de rango ({} dias), se ignora", days);
+            return null;
+        }
+        return days;
     }
 
     /** Nombres tal cual, sin resolver: eso lo hace {@link #plan} contra el equipo real. */

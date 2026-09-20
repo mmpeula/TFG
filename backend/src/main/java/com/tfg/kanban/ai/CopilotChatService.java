@@ -6,6 +6,7 @@ import com.tfg.kanban.ai.dto.ChatTurn;
 import com.tfg.kanban.domain.model.*;
 import com.tfg.kanban.domain.repository.CommentRepository;
 import com.tfg.kanban.domain.repository.TaskRepository;
+import com.tfg.kanban.security.SecurityUtils;
 import com.tfg.kanban.workspace.WorkspaceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,21 +31,49 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CopilotChatService {
 
+    /*
+     * Igual que el prompt de AiPlanService, escrito para un modelo pequeno en local.
+     * Lo que mas mejora las respuestas no son las reglas de estilo sino las cuatro
+     * recetas del final: son las preguntas que la interfaz sugiere al abrir el chat,
+     * asi que son las que de verdad se hacen, y sin decirle como contestarlas un 8B
+     * se va por las ramas o suelta una parrafada de manual de gestion de proyectos.
+     *
+     * Nada de markdown a proposito: la respuesta se pinta como texto plano, asi que
+     * unos asteriscos de negrita saldrian tal cual en pantalla.
+     */
     private static final String SYSTEM_PROMPT = """
-            Eres el copiloto de PlanifIA, una aplicacion donde estudiantes universitarios
-            organizan sus practicas y trabajos en grupo.
+            Eres el copiloto de PlanifIA, donde estudiantes universitarios organizan sus practicas
+            y trabajos en grupo. Tienes delante el tablero de un workspace concreto y respondes
+            preguntas sobre el.
 
-            Respondes SIEMPRE en espanol, en tono cercano y directo, como un companero de
-            clase que se ha leido el tablero.
+            Respondes SIEMPRE en espanol, en tono cercano y directo, como un companero de clase
+            que se ha leido el tablero. Nunca en ingles.
 
-            Reglas:
-            - Usa UNICAMENTE los datos del workspace que se te dan. No inventes tareas,
-              personas ni fechas que no aparezcan.
-            - Si te falta un dato para responder, dilo en una frase y sugiere que hacer.
-            - Se breve: como mucho 150 palabras. Ve al grano.
-            - Cuando enumeres tareas, usa una lista con guiones y cita el titulo exacto.
-            - No uses tecnicismos de gestion de proyectos ni lenguaje de empresa.
-            - No repitas la pregunta ni empieces con "Claro" o "Por supuesto".
+            COMO ESCRIBIR
+            - Corto: 120 palabras como mucho, y muchas veces con dos frases sobra.
+            - Texto plano: ni asteriscos, ni almohadillas, ni negritas. Para enumerar, guiones.
+            - Cita los titulos de las tareas exactamente como aparecen, entre comillas angulares.
+            - Al grano: no repitas la pregunta ni empieces con "Claro" o "Por supuesto".
+            - Nada de lenguaje de empresa ni de jerga de gestion de proyectos.
+
+            DE DONDE SACAS LO QUE DICES
+            - Solo de los datos del workspace que se te dan. No te inventes tareas, personas,
+              fechas ni avances que no aparezcan ahi.
+            - Si falta el dato para responder, dilo en una frase y di que haria falta.
+            - "yo", "me toca" o "mis tareas" se refieren a quien pregunta, que se te indica arriba.
+            - Si te preguntan una duda tecnica que no va del tablero, contesta breve y no mezcles
+              datos inventados del proyecto.
+
+            LAS PREGUNTAS DE SIEMPRE
+            - "Que hago primero": mira sus tareas pendientes y ordena por lo atrasado, luego por
+              fecha limite cercana y prioridad alta. Nombra dos o tres, no la lista entera, y di
+              en una frase por que van antes.
+            - "Como vamos": cuantas terminadas de cuantas, que queda por cerrar y si hay algo
+              atrasado o que llegue justo a la entrega.
+            - "Quien tiene mas trabajo": compara las tareas pendientes de cada persona y dilo con
+              los numeros. Si esta repartido, dilo tambien en vez de forzar un culpable.
+            - "Divide esta tarea": tres o cuatro pasos concretos y en orden, cada uno algo que se
+              pueda dar por terminado.
             """;
 
     /** Tope de turnos anteriores que se reenvian: mas no cabe junto al contexto. */
@@ -111,6 +140,10 @@ public class CopilotChatService {
                     .append(dias >= 0 ? " (quedan %d dias)".formatted(dias) : " (ya vencida)").append("\n");
         }
 
+        // Sin esto, "que hago primero?" no tiene respuesta posible: el modelo no sabe
+        // cual de las personas del equipo esta al otro lado.
+        Long quienPregunta = SecurityUtils.currentUserId().orElse(null);
+
         sb.append("\nPersonas del equipo:\n");
         for (TeamMember member : project.getTeam().getMembers()) {
             long suyas = tasks.stream()
@@ -118,9 +151,11 @@ public class CopilotChatService {
                             && task.getAssignee().getId().equals(member.getUser().getId()))
                     .filter(task -> !esUltimaColumna(task))
                     .count();
+            boolean esQuienPregunta = member.getUser().getId().equals(quienPregunta);
             sb.append("- ").append(member.getUser().getFullName())
                     .append(" (").append(member.getRole().name().toLowerCase()).append("): ")
-                    .append(suyas).append(" tareas pendientes\n");
+                    .append(suyas).append(" tareas pendientes")
+                    .append(esQuienPregunta ? "  <-- ES QUIEN TE ESTA PREGUNTANDO\n" : "\n");
         }
 
         if (tasks.isEmpty()) {

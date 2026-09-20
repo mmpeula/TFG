@@ -70,12 +70,12 @@ class AttachmentControllerIT extends AbstractApiIT {
     }
 
     @Test
-    @DisplayName("Un OBSERVADOR puede descargar pero no subir adjuntos")
+    @DisplayName("Un DOCENTE puede descargar pero no subir adjuntos")
     void observerCannotUpload() throws Exception {
         TestUser responsable = registerUser(Role.RESPONSABLE);
-        TestUser observador = registerUser(Role.OBSERVADOR);
+        TestUser observador = registerUser(Role.DOCENTE);
         Long teamId = createTeam(responsable, "Equipo adjuntos lectura");
-        addMember(responsable, teamId, observador, Role.OBSERVADOR);
+        addMember(responsable, teamId, observador, Role.DOCENTE);
         Long projectId = createProject(responsable, teamId, "Practica adjuntos lectura");
         Long boardId = createBoard(responsable, projectId, "Tablero adjuntos lectura");
         Long taskId = createTask(responsable, columnIds(responsable, boardId)[0], "Tarea adjuntos lectura");

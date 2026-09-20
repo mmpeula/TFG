@@ -107,12 +107,12 @@ class TaskControllerIT extends AbstractApiIT {
     }
 
     @Test
-    @DisplayName("Un OBSERVADOR puede leer el tablero pero no tocar las tareas")
+    @DisplayName("Un DOCENTE puede leer el tablero pero no tocar las tareas")
     void observerIsReadOnly() throws Exception {
         TestUser responsable = registerUser(Role.RESPONSABLE);
-        TestUser observador = registerUser(Role.OBSERVADOR);
+        TestUser observador = registerUser(Role.DOCENTE);
         Long teamId = createTeam(responsable, "Equipo observado");
-        addMember(responsable, teamId, observador, Role.OBSERVADOR);
+        addMember(responsable, teamId, observador, Role.DOCENTE);
         Long projectId = createProject(responsable, teamId, "Practica observada");
         Long boardId = createBoard(responsable, projectId, "Tablero observado");
         long[] columns = columnIds(responsable, boardId);
@@ -120,7 +120,7 @@ class TaskControllerIT extends AbstractApiIT {
 
         mockMvc.perform(authorized(get("/api/boards/{id}", boardId), observador))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.myRole").value("OBSERVADOR"));
+                .andExpect(jsonPath("$.myRole").value("DOCENTE"));
 
         mockMvc.perform(authorized(post("/api/columns/{id}/tasks", columns[0]), observador)
                         .contentType(MediaType.APPLICATION_JSON)
