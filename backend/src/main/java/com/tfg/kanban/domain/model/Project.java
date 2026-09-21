@@ -83,6 +83,22 @@ public class Project extends Auditable {
     @Builder.Default
     private ProjectStatus status = ProjectStatus.PLANIFICACION;
 
+    /**
+     * Si el workspace esta operativo. Lo suspende y lo reactiva quien administra
+     * la plataforma, para poder parar un workspace sin borrarlo.
+     *
+     * <p>Es un campo aparte de {@link #status} a proposito: ese lo lleva el propio
+     * equipo (planificacion, en curso, entregado, archivado) y dice en que punto
+     * esta su trabajo; este lo lleva soporte y dice si se puede trabajar. Si
+     * fueran lo mismo, el equipo podria levantarse la suspension solo.</p>
+     *
+     * <p>Suspendido no es borrado: no se pierde nada y basta con reactivarlo para
+     * que todo vuelva a estar donde estaba.</p>
+     */
+    @Column(name = "ENABLED", nullable = false)
+    @Builder.Default
+    private boolean enabled = true;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "TEAM_ID", nullable = false, foreignKey = @ForeignKey(name = "FK_PROJECTS_TEAM"))
     private Team team;

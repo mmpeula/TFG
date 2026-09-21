@@ -36,6 +36,9 @@ public record WorkspaceResponse(
         @Schema(description = "Inicio del trabajo; con la entrega define la ventana de sprints") LocalDate startDate,
         LocalDate deadline,
         @Schema(description = "Duracion del sprint en dias, la misma para todo el plan") Integer sprintDays,
-        @Schema(description = "Ultimo movimiento registrado en el workspace") Instant lastActivityAt
+        @Schema(description = "Ultimo movimiento registrado en el workspace") Instant lastActivityAt,
+        @Schema(description = "False si soporte lo tiene suspendido: sigue en la lista, pero no se "
+                + "puede abrir ni tocar nada suyo hasta que lo reactiven")
+        boolean enabled
 ) {
 }

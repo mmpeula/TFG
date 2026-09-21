@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Bot, CalendarRange, Columns3, LogOut, Settings, Users } from 'lucide-react'
+import { ArrowLeft, Bot, CalendarRange, Columns3, LogOut, PauseCircle, Settings, Users } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Tooltip } from '@/components/ui/Controls'
 import { HelpChat } from '@/components/copilot/HelpChat'
 import { ShortcutsDialog } from './ShortcutsDialog'
@@ -9,6 +10,7 @@ import { useShortcuts } from '@/hooks/useShortcuts'
 import styles from './WorkspaceShell.module.css'
 import { ROUTES } from '@/app/routes'
 import { useAuth } from '@/state/context'
+import { useWorkspaces } from '@/hooks/useData'
 import { colorOf, iconOf } from '@/lib/workspace'
 import { canManage } from '@/lib/roles'
 import type { WorkspaceResponse } from '@/types/api'
@@ -42,6 +44,12 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
   // preguntarle algo (ver HelpChat) sigue abierto a cualquiera que no sea
   // el docente, que solo observa.
   const puedeAutomatizar = canManage(workspace?.myRole)
+
+  // Suspendido: el servidor deja de servir su contenido, asi que sin esto la
+  // pantalla se queda cargando para siempre sin decir por que. El dato sale de
+  // la lista, que si lo sigue devolviendo precisamente para poder explicarlo.
+  const { data: misWorkspaces } = useWorkspaces()
+  const suspendido = misWorkspaces?.find((item) => item.id === workspaceId)?.enabled === false
 
   useShortcuts(
     useMemo(
@@ -107,6 +115,7 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
         </div>
       </header>
 
+      {!suspendido && (
       <nav className={styles.tabs} aria-label="Secciones del workspace">
         {tabs.map((tab) => (
           <button
@@ -120,8 +129,19 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
           </button>
         ))}
       </nav>
+      )}
 
-      <main className={styles.content}>{children}</main>
+      <main className={styles.content}>
+        {suspendido ? (
+          <EmptyState
+            icon={<PauseCircle size={22} strokeWidth={2.75} />}
+            title="Este workspace está suspendido"
+            body="Lo ha parado quien administra la plataforma. No se ha perdido nada: el tablero, las tareas y los ficheros siguen ahí y volverán en cuanto lo reactiven."
+          />
+        ) : (
+          children
+        )}
+      </main>
 
       {/* Flotante sobre cualquier seccion del workspace: preguntar «que hago
           primero?» se hace mirando el tablero, no yendose a otra pantalla. El

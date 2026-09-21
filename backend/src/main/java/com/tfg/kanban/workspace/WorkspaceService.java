@@ -251,7 +251,8 @@ public class WorkspaceService {
                 project.getTeam().getId(), boardId, role,
                 total, done, total - done,
                 total == 0 ? 0 : Math.round(done * 100f / total),
-                memberCount, project.getStartDate(), project.getDeadline(), project.getSprintDays(), last);
+                memberCount, project.getStartDate(), project.getDeadline(), project.getSprintDays(), last,
+                project.isEnabled());
     }
 
     public Project getProject(Long workspaceId) {

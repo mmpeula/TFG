@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/api-client'
 import type {
-  ActivityLogResponse, AiPlanResponse, AttachmentResponse, AuthResponse, BoardResponse,
+  ActivityLogResponse, AdminWorkspaceResponse, AiPlanResponse, AttachmentResponse, AuthResponse, BoardResponse,
   ChatResponse, ChatTurn, ColumnResponse, CommentResponse, PageResponse,
   InvitationResponse, MyInvitationResponse,
   ProjectResponse, ProjectStatus, Role, ProposedTask, TaskPriority, TaskResponse, TaskType, TeamMemberResponse,
@@ -85,6 +85,23 @@ export const teams = {
     apiClient.get<InvitationResponse[]>(`/teams/${teamId}/invitations`).then((r) => r.data),
   cancelInvitation: (teamId: number, invitationId: number) =>
     apiClient.delete(`/teams/${teamId}/invitations/${invitationId}`).then(() => undefined),
+}
+
+/**
+ * Soporte sobre los workspaces de toda la plataforma. Solo para rol ADMIN.
+ * No hay forma de leer el tablero desde aqui: el backend tampoco la ofrece.
+ */
+export const adminWorkspaces = {
+  list: () => apiClient.get<AdminWorkspaceResponse[]>('/admin/workspaces').then((r) => r.data),
+  cambiarRol: (workspaceId: number, userId: number, role: Role) =>
+    apiClient
+      .put(`/admin/workspaces/${workspaceId}/members/${userId}/role`, { role })
+      .then(() => undefined),
+  /** Suspender o reactivar. Suspender no borra nada: se puede deshacer. */
+  setEnabled: (workspaceId: number, enabled: boolean) =>
+    apiClient.put(`/admin/workspaces/${workspaceId}/enabled`, { enabled }).then(() => undefined),
+  remove: (workspaceId: number) =>
+    apiClient.delete(`/admin/workspaces/${workspaceId}`).then(() => undefined),
 }
 
 /** Las invitaciones desde el lado de quien las recibe. */

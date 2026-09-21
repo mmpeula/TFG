@@ -66,6 +66,30 @@ export interface TeamResponse {
   createdAt: string
 }
 
+/** Un workspace visto desde administracion: diagnostico, sin contenido del tablero. */
+export interface AdminWorkspaceResponse {
+  id: number
+  name: string
+  teamId: number
+  ownerName?: string
+  taskCount: number
+  /** False si soporte lo tiene suspendido: el equipo no puede abrirlo, pero no se pierde nada. */
+  enabled: boolean
+  /** Sin nadie responsable con la cuenta activa: nadie puede administrarlo. */
+  blocked: boolean
+  createdAt: string
+  lastActivityAt?: string
+  members: AdminWorkspaceMember[]
+}
+
+export interface AdminWorkspaceMember {
+  id: number
+  fullName: string
+  email: string
+  role: Role
+  enabled: boolean
+}
+
 export type InvitationStatus = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA' | 'CANCELADA'
 
 /** Una invitacion vista desde el equipo: quien esta pendiente de responder. */
@@ -255,6 +279,8 @@ export interface WorkspaceResponse {
   /** Duracion del sprint en dias, la misma para todo el plan; se fija al crear el workspace. */
   sprintDays?: number
   lastActivityAt?: string
+  /** False si soporte lo tiene suspendido: sigue en la lista, pero no se puede abrir. */
+  enabled: boolean
 }
 
 export interface ChatTurn {

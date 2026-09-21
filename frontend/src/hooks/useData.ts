@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  boards, comments, attachments, invitations, projects, tasks, teams, users, workspaces,
+  adminWorkspaces, boards, comments, attachments, invitations, projects, tasks, teams, users, workspaces,
   type TaskPayload, type WorkspacePayload,
 } from '@/api/endpoints'
 import { toErrorMessage } from '@/lib/api-client'
@@ -20,6 +20,7 @@ export const keys = {
   comments: (taskId: number) => ['tasks', taskId, 'comments'] as const,
   attachments: (taskId: number) => ['tasks', taskId, 'attachments'] as const,
   adminUsers: ['admin', 'users'] as const,
+  adminWorkspaces: ['admin', 'workspaces'] as const,
 }
 
 const enabled = (id?: number) => typeof id === 'number' && Number.isFinite(id)
@@ -156,6 +157,47 @@ export function useInvitationMutations(teamId?: number) {
     reject: useMutation({
       mutationFn: (token: string) => invitations.reject(token),
       onSuccess: () => { refrescarMias(); pushToast('Invitacion rechazada') },
+      onError,
+    }),
+  }
+}
+
+/** Todos los workspaces de la plataforma, para el panel de soporte. */
+export const useAdminWorkspaces = () =>
+  useQuery({ queryKey: keys.adminWorkspaces, queryFn: adminWorkspaces.list })
+
+/**
+ * Las acciones de soporte sobre un workspace ajeno. Existen para desatascar o
+ * parar, no para participar: ni escriben en el tablero ni meten a nadie nuevo
+ * en el equipo.
+ */
+export function useAdminWorkspaceMutations() {
+  const queryClient = useQueryClient()
+  const { pushToast } = useUi()
+  const onError = useOnError()
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: keys.adminWorkspaces })
+
+  return {
+    cambiarRol: useMutation({
+      mutationFn: ({ workspaceId, userId, role }: { workspaceId: number; userId: number; role: Role }) =>
+        adminWorkspaces.cambiarRol(workspaceId, userId, role),
+      onSuccess: () => { invalidate(); pushToast('Rol actualizado') },
+      onError,
+    }),
+    setEnabled: useMutation({
+      mutationFn: ({ workspaceId, enabled }: { workspaceId: number; enabled: boolean }) =>
+        adminWorkspaces.setEnabled(workspaceId, enabled),
+      onSuccess: (_data, { enabled }) => {
+        invalidate()
+        // La lista del equipo tambien cambia: el workspace pasa a verse suspendido.
+        queryClient.invalidateQueries({ queryKey: keys.workspaces })
+        pushToast(enabled ? 'Workspace reactivado' : 'Workspace suspendido')
+      },
+      onError,
+    }),
+    remove: useMutation({
+      mutationFn: (workspaceId: number) => adminWorkspaces.remove(workspaceId),
+      onSuccess: () => { invalidate(); pushToast('Workspace borrado') },
       onError,
     }),
   }

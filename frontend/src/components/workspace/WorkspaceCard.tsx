@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { CheckCircle2, Clock, Users } from 'lucide-react'
+import { CheckCircle2, Clock, PauseCircle, Users } from 'lucide-react'
 import { ProgressBar } from '@/components/ui/ProgressBar'
+import { Tag } from '@/components/ui/Tag'
 import styles from './WorkspaceCard.module.css'
 import { colorOf, iconOf, lastActivityLabel } from '@/lib/workspace'
 import type { WorkspaceResponse } from '@/types/api'
@@ -32,7 +33,11 @@ export function WorkspaceCard({
   return (
     <div className={styles.wrap}>
       {actions && <div className={styles.actions}>{actions}</div>}
-      <button className={styles.card} onClick={() => onOpen(workspace)}>
+      <button
+        className={styles.card}
+        onClick={() => onOpen(workspace)}
+        disabled={workspace.enabled === false}
+      >
         <span className={styles.rail} style={{ background: color }} aria-hidden="true" />
 
         <div className={styles.head}>
@@ -41,6 +46,16 @@ export function WorkspaceCard({
           </span>
           <span className={styles.title}>{workspace.name}</span>
         </div>
+
+        {workspace.enabled === false && (
+          <span className={styles.suspended}>
+            <Tag variant="neutral" small>
+              <PauseCircle size={11} strokeWidth={2.75} />
+              Suspendido
+            </Tag>
+            Lo ha parado quien administra la plataforma. No se ha perdido nada.
+          </span>
+        )}
 
         {workspace.description && <p className={styles.description}>{workspace.description}</p>}
 

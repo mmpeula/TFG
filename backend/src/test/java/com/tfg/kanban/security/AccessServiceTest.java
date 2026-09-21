@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -206,14 +207,22 @@ class AccessServiceTest {
     @Test
     @DisplayName("isTeamMember refleja la pertenencia al equipo")
     void teamMembershipIsChecked() {
-        Team team = Team.builder().id(3L).name("Equipo").build();
-        User user = User.builder().id(1L).email("ana@uni.es").build();
-        when(teamMemberRepository.findByTeam_IdAndUser_Id(3L, 1L))
-                .thenReturn(Optional.of(TeamMember.builder().team(team).user(user).role(Role.MIEMBRO).build()));
-        when(teamMemberRepository.findByTeam_IdAndUser_Id(4L, 1L)).thenReturn(Optional.empty());
+        when(teamMemberRepository.findActiveRoleInTeam(3L, 1L)).thenReturn(List.of(Role.MIEMBRO));
+        when(teamMemberRepository.findActiveRoleInTeam(4L, 1L)).thenReturn(List.of());
 
         assertThat(accessService.isTeamMember(3L)).isTrue();
         assertThat(accessService.canManageTeam(3L)).isFalse();
         assertThat(accessService.isTeamMember(4L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Con el workspace suspendido, su equipo deja de tener permisos")
+    void aSuspendedWorkspaceFreezesItsTeam() {
+        // La consulta ya no devuelve rol: para los permisos es como no pertenecer
+        // al equipo, y asi se congela de una vez todo lo que cuelga de el.
+        when(teamMemberRepository.findActiveRoleInTeam(3L, 1L)).thenReturn(List.of());
+
+        assertThat(accessService.isTeamMember(3L)).isFalse();
+        assertThat(accessService.canManageTeam(3L)).isFalse();
     }
 }

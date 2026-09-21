@@ -1,0 +1,182 @@
+/* Estilos comunes a los dos paneles de administracion (cuentas y workspaces),
+   para que las dos listas se lean igual: una sola caja con filas separadas por
+   una linea, en vez de cuarenta tarjetas sueltas con su borde y su sombra. */
+
+.panel { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* ------------------------------------------------------------- herramientas */
+
+.toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-4); flex-wrap: wrap;
+}
+
+.searchBox {
+  display: flex; align-items: center; gap: var(--space-2);
+  flex: 1; min-width: 220px; max-width: 360px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-sm);
+  padding: 0 11px;
+  color: var(--color-neutral-500);
+  transition: var(--transition);
+}
+.searchBox:focus-within { border-color: var(--color-neutral-900); color: var(--color-neutral-700); }
+.searchInput {
+  flex: 1; min-width: 0;
+  font-family: inherit; font-size: 13.5px; color: var(--color-text);
+  background: transparent; border: none;
+  padding: 9px 0;
+}
+.searchInput:focus { outline: none; }
+
+.filters { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+
+.summary { font-size: 12px; color: var(--color-neutral-600); }
+
+/* ------------------------------------------------------------------- filas */
+
+/* Una caja para toda la lista: las filas se separan con una linea, no cada una
+   con su propio borde. Asi cuarenta cuentas se leen como una tabla y no como
+   cuarenta tarjetas. */
+.rows {
+  display: flex; flex-direction: column;
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.row {
+  display: grid; align-items: center;
+  gap: var(--space-3);
+  padding: 9px var(--space-4);
+  border-top: 1px solid var(--color-divider);
+  transition: var(--transition);
+}
+.row:first-child { border-top: none; }
+.row:hover { background: var(--color-neutral-100); }
+
+/* Columnas fijas: con nombres y correos de largo distinto, dejar que cada fila
+   se acomode sola es lo que hacia que nada quedara alineado. */
+.rowAccount { grid-template-columns: 30px minmax(0, 1fr) minmax(0, 1.2fr) 118px 40px; }
+/* La fila de workspace es un boton entero: la lista solo sirve para elegir cual
+   mirar, y todo lo demas esta dentro. */
+.rowButton {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; text-align: left;
+  padding: 11px var(--space-4);
+  border-top: 1px solid var(--color-divider);
+  transition: var(--transition);
+}
+.rows > li:first-child .rowButton { border-top: none; }
+.rowButton:hover { background: var(--color-neutral-100); }
+.rowButton:hover .chevron { color: var(--color-neutral-700); }
+.chevron { margin-left: auto; flex: none; color: var(--color-neutral-400); transition: var(--transition); }
+
+/* Deshabilitada o bloqueado: se apaga la fila, sin recurrir al color. */
+.rowOff { color: var(--color-neutral-500); }
+.rowOff .cellName { color: var(--color-neutral-500); }
+
+.cellName {
+  display: flex; align-items: center; gap: var(--space-2); min-width: 0;
+  font-size: 13.5px; font-weight: 600; color: var(--color-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cellMuted {
+  min-width: 0;
+  font-size: 12.5px; color: var(--color-neutral-600);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cellActions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-1); }
+
+.you {
+  font-size: 11px; font-weight: 500; color: var(--color-neutral-500);
+  border: 1px solid var(--color-neutral-300); border-radius: var(--radius-sm);
+  padding: 0 5px;
+}
+
+.roleButton {
+  font-size: 12.5px; font-weight: 600; text-align: left;
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  width: 100%;
+  transition: var(--transition);
+}
+.roleButton:hover { border-color: var(--color-neutral-500); }
+
+.help { font-size: 12px; color: var(--color-neutral-600); line-height: 1.5; }
+
+/* -------------------------------------------------------------- workspaces */
+
+.wsName { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wsTitle {
+  display: flex; align-items: center; gap: var(--space-2); min-width: 0;
+  font-size: 13.5px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wsOwner { font-size: 11.5px; color: var(--color-neutral-600); }
+
+.wsNobody { font-size: 11.5px; color: var(--color-neutral-500); font-style: italic; }
+
+@media (max-width: 860px) {
+  .rowAccount { grid-template-columns: 30px minmax(0, 1fr) 110px 40px; }
+  .rowAccount .cellMuted { display: none; }
+}
+
+/* ---------------------------------------------------------------- detalle */
+
+.detail { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.detailWarning {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  font-size: 12.5px; line-height: 1.5; color: var(--color-neutral-700);
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+.detailWarning svg { flex: none; margin-top: 1px; }
+
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.facts dt { font-size: 11px; color: var(--color-neutral-500); margin-bottom: 2px; }
+.facts dd { font-size: 13px; font-weight: 600; }
+
+.detailTitle {
+  font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--color-neutral-500); margin-bottom: var(--space-2);
+}
+
+.team {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.teamRow {
+  display: grid; align-items: center; gap: var(--space-3);
+  grid-template-columns: minmax(130px, 1.1fr) minmax(0, 1fr) auto auto;
+  padding: 8px var(--space-3);
+  border-top: 1px solid var(--color-divider);
+}
+.teamRow:first-child { border-top: none; }
+.teamName {
+  font-size: 13px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.teamRole { font-size: 11.5px; color: var(--color-neutral-600); }
+
+/* Borrar se queda abajo y separado del resto: no es una accion mas de la lista. */
+.detailDanger {
+  display: flex; justify-content: flex-end; gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-divider);
+}
+
+@media (max-width: 620px) {
+  .facts { grid-template-columns: minmax(0, 1fr); }
+  .teamRow { grid-template-columns: minmax(0, 1fr) auto; }
+  .teamRow .cellMuted { display: none; }
+}

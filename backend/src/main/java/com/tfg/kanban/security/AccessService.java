@@ -37,10 +37,17 @@ public class AccessService {
     private final CommentRepository commentRepository;
     private final AttachmentRepository attachmentRepository;
 
+    /**
+     * Rol en el equipo, vacio si el workspace esta suspendido.
+     *
+     * <p>Un equipo con su workspace parado se comporta como si no se perteneciera
+     * a el: ni se ve, ni se invita, ni se cambian roles. Se filtra aqui, en la
+     * consulta, y no en cada endpoint, porque es el unico sitio por el que pasan
+     * todos los permisos y asi no queda ninguno sin cubrir.</p>
+     */
     public Optional<Role> roleInTeam(Long teamId) {
         return SecurityUtils.currentUserId()
-                .flatMap(userId -> teamMemberRepository.findByTeam_IdAndUser_Id(teamId, userId))
-                .map(com.tfg.kanban.domain.model.TeamMember::getRole);
+                .flatMap(userId -> teamMemberRepository.findActiveRoleInTeam(teamId, userId).stream().findFirst());
     }
 
     public Optional<Role> roleInProject(Long projectId) {
