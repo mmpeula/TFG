@@ -29,6 +29,9 @@ export const ROUTES = {
   configuracion: '/configuracion',
   administracion: '/administracion',
   docente: '/docente',
+  /** Donde aterriza el enlace del correo de invitacion. */
+  invitacion: '/invitacion/:token',
+  invitacionByToken: (token: string) => `/invitacion/${token}`,
 
   legacyEquipos: '/equipos',
   legacyEquipo: '/equipos/:teamId',

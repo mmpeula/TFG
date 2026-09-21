@@ -5,6 +5,7 @@ import { HomeShell } from '@/components/shell/HomeShell'
 import { WorkspaceCard } from '@/components/workspace/WorkspaceCard'
 import { WorkspaceCardActions } from '@/components/workspace/WorkspaceCardActions'
 import { PanelCard } from '@/components/workspace/PanelCard'
+import { InvitationsBanner } from '@/components/workspace/InvitationsBanner'
 import { WorkspaceFormModal } from '@/components/workspace/WorkspaceFormModal'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -73,6 +74,8 @@ export function WorkspacesScreen() {
           Nuevo workspace
         </Button>
       </header>
+
+      <InvitationsBanner />
 
       {isPending ? (
         <Skeleton label="Cargando tus workspaces…" lines={3} />

@@ -13,6 +13,7 @@ import { PulseScreen } from './screens/PulseScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { AdminScreen } from './screens/AdminScreen'
 import { TeacherScreen } from './screens/TeacherScreen'
+import { InvitationScreen } from './screens/InvitationScreen'
 import { useAuth } from './state/context'
 
 /**
@@ -38,6 +39,13 @@ export function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route path={ROUTES.home} element={<RoleHomeRedirect />} />
+
+        {/* Fuera del area por rol a proposito: responder a una invitacion no es
+            entrar en el espacio de nadie, y la reciben tanto estudiantes como
+            docentes. Lo que si hace falta es tener sesion, para saber de quien
+            es la invitacion. */}
+        <Route path={ROUTES.invitacion} element={<InvitationScreen />} />
+
         <Route element={<RoleAreaRoute />}>
           <Route path={ROUTES.workspaces} element={<WorkspacesScreen />} />
 

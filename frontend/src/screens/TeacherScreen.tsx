@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { AlertTriangle, GraduationCap } from 'lucide-react'
 import { HomeShell } from '@/components/shell/HomeShell'
 import { WorkspaceCard } from '@/components/workspace/WorkspaceCard'
+import { InvitationsBanner } from '@/components/workspace/InvitationsBanner'
 import { Tag } from '@/components/ui/Tag'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -44,6 +45,9 @@ export function TeacherScreen() {
           <p className={styles.subtitle}>Los equipos que sigues como docente, de un vistazo.</p>
         </div>
       </header>
+
+      {/* Al docente tambien se le invita, y su panel es el unico sitio donde entra. */}
+      <InvitationsBanner />
 
       {isPending ? (
         <Skeleton label="Cargando los equipos…" lines={3} />

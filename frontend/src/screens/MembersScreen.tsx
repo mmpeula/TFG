@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { UserMinus, UserPlus, Users } from 'lucide-react'
+import { Clock3, UserMinus, UserPlus, Users, X } from 'lucide-react'
 import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
@@ -10,7 +10,9 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import styles from './MembersScreen.module.css'
-import { useMemberMutations, useTeamMembers, useWorkspace } from '@/hooks/useData'
+import {
+  useInvitationMutations, useMemberMutations, useTeamInvitations, useTeamMembers, useWorkspace,
+} from '@/hooks/useData'
 import { useAuth } from '@/state/context'
 import { canManage, ROLE_LABELS } from '@/lib/roles'
 import { relativeTime } from '@/lib/format'
@@ -33,7 +35,9 @@ export function MembersScreen() {
 
   const { data: workspace, isPending } = useWorkspace(workspaceId)
   const { data: members } = useTeamMembers(workspace?.teamId)
+  const { data: pendientes } = useTeamInvitations(workspace?.teamId)
   const mutations = useMemberMutations(workspace?.teamId)
+  const invitaciones = useInvitationMutations(workspace?.teamId)
 
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Role>('MIEMBRO')
@@ -51,7 +55,8 @@ export function MembersScreen() {
               className={styles.invite}
               onSubmit={async (event) => {
                 event.preventDefault()
-                await mutations.addMember.mutateAsync({ email: email.trim(), role })
+                // Invitar, no anadir: no entra en el equipo hasta que acepte.
+                await invitaciones.invite.mutateAsync({ email: email.trim(), role })
                 setEmail('')
               }}
             >
@@ -99,9 +104,9 @@ export function MembersScreen() {
                 </Dropdown>
               </div>
 
-              <Button type="submit" disabled={mutations.addMember.isPending || !email.trim()}>
+              <Button type="submit" disabled={invitaciones.invite.isPending || !email.trim()}>
                 <UserPlus size={14} strokeWidth={2.75} />
-                Anadir
+                {invitaciones.invite.isPending ? 'Enviando…' : 'Invitar'}
               </Button>
             </form>
           )}
@@ -186,9 +191,49 @@ export function MembersScreen() {
             </ul>
           )}
 
+          {pendientes && pendientes.length > 0 && (
+            <section className={styles.pending}>
+              <h2 className={styles.pendingTitle}>
+                <Clock3 size={13} strokeWidth={2.75} />
+                Pendientes de aceptar
+              </h2>
+              <ul className={styles.members}>
+                {pendientes.map((invitacion) => (
+                  <li key={invitacion.id} className={styles.member}>
+                    <Avatar user={invitacion.invited} size={34} />
+                    <div className={styles.identity}>
+                      <div className={styles.name}>{invitacion.invited.fullName}</div>
+                      <div className={styles.mail}>{invitacion.invited.email}</div>
+                    </div>
+
+                    <Tag variant="neutral">{ROLE_LABELS[invitacion.role]}</Tag>
+                    <span className={styles.joined}>
+                      {invitacion.emailSent ? 'Invitacion enviada' : 'Sin avisar por correo'}
+                      {' · '}
+                      {relativeTime(invitacion.createdAt)}
+                    </span>
+
+                    {manageable && (
+                      <Button
+                        variant="ghost"
+                        small
+                        aria-label={`Cancelar la invitacion de ${invitacion.invited.fullName}`}
+                        disabled={invitaciones.cancel.isPending}
+                        onClick={() => invitaciones.cancel.mutate(invitacion.id)}
+                      >
+                        <X size={14} strokeWidth={2.75} />
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <p className={styles.help}>
             <b>Responsable</b> administra el workspace y lanza el copiloto. <b>Miembro</b> crea y mueve
-            tareas. <b>Docente</b> solo sigue el progreso.
+            tareas. <b>Docente</b> solo sigue el progreso. Quien recibe una invitacion no entra en el
+            equipo hasta que la acepta.
           </p>
         </div>
       )}

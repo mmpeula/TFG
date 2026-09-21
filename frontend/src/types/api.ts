@@ -66,6 +66,30 @@ export interface TeamResponse {
   createdAt: string
 }
 
+export type InvitationStatus = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA' | 'CANCELADA'
+
+/** Una invitacion vista desde el equipo: quien esta pendiente de responder. */
+export interface InvitationResponse {
+  id: number
+  invited: UserSummary
+  role: Role
+  status: InvitationStatus
+  invitedByName?: string
+  /** Si el aviso por correo llego a salir; la invitacion vale igual si no. */
+  emailSent: boolean
+  createdAt: string
+}
+
+/** Una invitacion vista por quien la recibe. */
+export interface MyInvitationResponse {
+  token: string
+  teamId: number
+  teamName: string
+  role: Role
+  invitedByName?: string
+  createdAt: string
+}
+
 export interface TeamMemberResponse {
   id: number
   user: UserSummary

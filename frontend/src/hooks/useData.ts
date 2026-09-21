@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  boards, comments, attachments, projects, tasks, teams, users, workspaces,
+  boards, comments, attachments, invitations, projects, tasks, teams, users, workspaces,
   type TaskPayload, type WorkspacePayload,
 } from '@/api/endpoints'
 import { toErrorMessage } from '@/lib/api-client'
@@ -11,6 +11,8 @@ export const keys = {
   workspaces: ['workspaces'] as const,
   workspace: (id: number) => ['workspaces', id] as const,
   members: (id: number) => ['teams', id, 'members'] as const,
+  invitations: (id: number) => ['teams', id, 'invitations'] as const,
+  myInvitations: ['invitations', 'mine'] as const,
   project: (id: number) => ['projects', 'detalle', id] as const,
   activity: (id: number) => ['projects', 'detalle', id, 'activity'] as const,
   boards: (projectId: number) => ['projects', 'detalle', projectId, 'boards'] as const,
@@ -33,6 +35,18 @@ export const useWorkspace = (workspaceId?: number) =>
 
 export const useTeamMembers = (teamId?: number) =>
   useQuery({ queryKey: keys.members(teamId!), queryFn: () => teams.members(teamId!), enabled: enabled(teamId) })
+
+/** Quien esta invitado y todavia no ha contestado, para la pantalla de miembros. */
+export const useTeamInvitations = (teamId?: number) =>
+  useQuery({
+    queryKey: keys.invitations(teamId!),
+    queryFn: () => teams.invitations(teamId!),
+    enabled: enabled(teamId),
+  })
+
+/** Las invitaciones que esperan respuesta del usuario que esta mirando. */
+export const useMyInvitations = () =>
+  useQuery({ queryKey: keys.myInvitations, queryFn: invitations.mine })
 
 export const useProject = (projectId?: number) =>
   useQuery({ queryKey: keys.project(projectId!), queryFn: () => projects.get(projectId!), enabled: enabled(projectId) })
@@ -95,6 +109,58 @@ export function useWorkspaceMutations(workspaceId?: number) {
  * las llamadas; lo que cambia es que ya no hay pantalla de equipos donde crearlos
  * o borrarlos: eso lo hace el workspace.
  */
+/**
+ * Invitar, cancelar y responder.
+ *
+ * Invitar refresca las invitaciones pero no los miembros: por definicion no
+ * entra nadie hasta que acepta. Responder si refresca las dos cosas, y ademas
+ * los workspaces, porque al aceptar aparece uno nuevo en la lista.
+ */
+export function useInvitationMutations(teamId?: number) {
+  const queryClient = useQueryClient()
+  const { pushToast } = useUi()
+  const onError = useOnError()
+
+  const refrescarEquipo = () => {
+    if (teamId) {
+      queryClient.invalidateQueries({ queryKey: keys.invitations(teamId) })
+      queryClient.invalidateQueries({ queryKey: keys.members(teamId) })
+    }
+  }
+  const refrescarMias = () => {
+    queryClient.invalidateQueries({ queryKey: keys.myInvitations })
+    queryClient.invalidateQueries({ queryKey: keys.workspaces })
+  }
+
+  return {
+    invite: useMutation({
+      mutationFn: (payload: { email: string; role: Role }) => teams.invite(teamId!, payload),
+      onSuccess: (invitation) => {
+        if (teamId) queryClient.invalidateQueries({ queryKey: keys.invitations(teamId) })
+        pushToast(invitation.emailSent
+          ? `Invitacion enviada a ${invitation.invited.email}`
+          : `Invitacion creada para ${invitation.invited.email}, pero el correo no ha podido salir`)
+      },
+      onError,
+    }),
+    cancel: useMutation({
+      mutationFn: (invitationId: number) => teams.cancelInvitation(teamId!, invitationId),
+      onSuccess: () => { refrescarEquipo(); pushToast('Invitacion cancelada') },
+      onError,
+    }),
+    accept: useMutation({
+      mutationFn: (token: string) => invitations.accept(token),
+      onSuccess: () => { refrescarEquipo(); refrescarMias(); pushToast('Ya estas en el equipo') },
+      onError,
+    }),
+    reject: useMutation({
+      mutationFn: (token: string) => invitations.reject(token),
+      onSuccess: () => { refrescarMias(); pushToast('Invitacion rechazada') },
+      onError,
+    }),
+  }
+}
+
 export function useMemberMutations(teamId?: number) {
   const queryClient = useQueryClient()
   const { pushToast } = useUi()

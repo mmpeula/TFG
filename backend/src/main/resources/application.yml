@@ -6,6 +6,20 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
+  mail:
+    # Sin MAIL_HOST no se crea el JavaMailSender y los correos solo se escriben en
+    # el log (vease MailService): la aplicacion arranca igual sin servidor SMTP.
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -62,6 +76,12 @@ app:
     # AdminBootstrapRunner). Cambia estos valores antes de desplegar de verdad.
     email: ${ADMIN_EMAIL:admin@planifia.local}
     password: ${ADMIN_PASSWORD:admin123}
+  mail:
+    # Los avisos de invitacion a un equipo. Con enabled=false no sale ninguno.
+    enabled: ${MAIL_ENABLED:true}
+    from: ${MAIL_FROM:no-reply@planifia.local}
+    # Donde vive la interfaz: con esto se compone el enlace de la invitacion.
+    base-url: ${APP_BASE_URL:http://localhost:3000}
   ai:
     # Planificacion automatica con un modelo que corre en local (Ollama).
     # Nada sale de la maquina: no hay servicios externos ni claves de API.

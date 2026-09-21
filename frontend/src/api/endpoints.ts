@@ -2,6 +2,7 @@ import { apiClient } from '@/lib/api-client'
 import type {
   ActivityLogResponse, AiPlanResponse, AttachmentResponse, AuthResponse, BoardResponse,
   ChatResponse, ChatTurn, ColumnResponse, CommentResponse, PageResponse,
+  InvitationResponse, MyInvitationResponse,
   ProjectResponse, ProjectStatus, Role, ProposedTask, TaskPriority, TaskResponse, TaskType, TeamMemberResponse,
   TeamResponse, UserResponse, WorkspaceResponse,
 } from '@/types/api'
@@ -76,6 +77,23 @@ export const teams = {
     apiClient.patch<TeamMemberResponse>(`/teams/${teamId}/members/${userId}`, { role }).then((r) => r.data),
   removeMember: (teamId: number, userId: number) =>
     apiClient.delete(`/teams/${teamId}/members/${userId}`).then(() => undefined),
+
+  /** Invitar no mete a nadie: deja la invitacion pendiente y manda el correo. */
+  invite: (teamId: number, payload: { email: string; role: Role }) =>
+    apiClient.post<InvitationResponse>(`/teams/${teamId}/invitations`, payload).then((r) => r.data),
+  invitations: (teamId: number) =>
+    apiClient.get<InvitationResponse[]>(`/teams/${teamId}/invitations`).then((r) => r.data),
+  cancelInvitation: (teamId: number, invitationId: number) =>
+    apiClient.delete(`/teams/${teamId}/invitations/${invitationId}`).then(() => undefined),
+}
+
+/** Las invitaciones desde el lado de quien las recibe. */
+export const invitations = {
+  mine: () => apiClient.get<MyInvitationResponse[]>('/invitations/mine').then((r) => r.data),
+  accept: (token: string) =>
+    apiClient.post<TeamMemberResponse>(`/invitations/${token}/accept`).then((r) => r.data),
+  reject: (token: string) =>
+    apiClient.post(`/invitations/${token}/reject`).then(() => undefined),
 }
 
 export const projects = {
