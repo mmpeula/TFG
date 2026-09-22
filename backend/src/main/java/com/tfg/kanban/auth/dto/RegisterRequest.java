@@ -1,12 +1,13 @@
 package com.tfg.kanban.auth.dto;
 
+import com.tfg.kanban.domain.model.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 @Schema(description = "Alta de un usuario nuevo", example = """
-        {"email":"ana@uni.es","password":"claveSegura1","fullName":"Ana Garcia"}
+        {"email":"ana@uni.es","password":"claveSegura1","fullName":"Ana Garcia","role":"MIEMBRO"}
         """)
 public record RegisterRequest(
 
@@ -21,6 +22,10 @@ public record RegisterRequest(
 
         @NotBlank(message = "el nombre es obligatorio")
         @Size(max = 150)
-        String fullName
+        String fullName,
+
+        @Schema(description = "Alumno o Docente. Si se omite, Alumno. ADMIN nunca se puede pedir aqui: "
+                + "eso lo concede otro administrador.")
+        Role role
 ) {
 }

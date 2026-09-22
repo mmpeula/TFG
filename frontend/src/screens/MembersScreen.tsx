@@ -231,7 +231,7 @@ export function MembersScreen() {
           )}
 
           <p className={styles.help}>
-            <b>Responsable</b> administra el workspace y lanza el copiloto. <b>Miembro</b> crea y mueve
+            <b>Responsable</b> administra el workspace y lanza el copiloto. <b>Alumno</b> crea y mueve
             tareas. <b>Docente</b> solo sigue el progreso. Quien recibe una invitacion no entra en el
             equipo hasta que la acepta.
           </p>

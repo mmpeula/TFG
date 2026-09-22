@@ -10,7 +10,7 @@ import type {
 export const auth = {
   login: (payload: { email: string; password: string }) =>
     apiClient.post<AuthResponse>('/auth/login', payload).then((r) => r.data),
-  register: (payload: { email: string; password: string; fullName: string }) =>
+  register: (payload: { email: string; password: string; fullName: string; role: 'MIEMBRO' | 'DOCENTE' }) =>
     apiClient.post<AuthResponse>('/auth/register', payload).then((r) => r.data),
   me: () => apiClient.get<UserResponse>('/auth/me').then((r) => r.data),
 }

@@ -42,17 +42,30 @@ public class AuthService {
                 .email(email)
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .fullName(request.fullName().trim())
-                // El rol global NUNCA lo elige quien se registra: solo lo cambia despues un
-                // RESPONSABLE global desde PATCH /api/users/{id}/role. Aceptarlo aqui dejaba
-                // que cualquiera se diera de alta como RESPONSABLE y, con ese token, cambiara
-                // el rol o la contrasena de cualquier otra cuenta.
-                .role(Role.MIEMBRO)
+                // Alumno o Docente si se elige; nunca ADMIN. A diferencia del antiguo
+                // RESPONSABLE global (que daba permiso para tocar cualquier cuenta),
+                // DOCENTE no administra nada de la plataforma: solo cambia el panel con
+                // el que se entra y que en un equipo se sigue en modo lectura, asi que
+                // dejarlo elegir aqui no abre ninguna puerta que no estuviera ya.
+                .role(roleForRegistration(request.role()))
                 .enabled(true)
                 .build();
 
         User saved = userRepository.save(user);
         log.info("Usuario registrado: {} ({})", saved.getEmail(), saved.getRole());
         return buildResponse(saved);
+    }
+
+    /** Alumno por defecto si no se elige nada; ADMIN queda fuera pase lo que pase. */
+    private Role roleForRegistration(Role requested) {
+        if (requested == null) {
+            return Role.MIEMBRO;
+        }
+        if (requested != Role.MIEMBRO && requested != Role.DOCENTE) {
+            throw new BusinessRuleException(
+                    "Solo se puede elegir Alumno o Docente al registrarse");
+        }
+        return requested;
     }
 
     @Transactional(readOnly = true)

@@ -35,7 +35,9 @@
   transition: var(--transition);
 }
 .control:focus { border-color: var(--color-neutral-900); }
+.control[aria-invalid="true"] { border-color: #c94f3f; }
 .hint { font-size: 11px; color: var(--color-neutral-600); margin-top: 4px; }
+.fieldError { font-size: 11px; color: #922018; margin-top: 4px; }
 .error {
   background: #fdf3f2;
   border: 1px solid #f1cfcb;

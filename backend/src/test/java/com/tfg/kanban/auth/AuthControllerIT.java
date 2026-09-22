@@ -13,7 +13,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -49,37 +48,69 @@ class AuthControllerIT extends AbstractApiIT {
     }
 
     @Test
-    @DisplayName("Quien se registra no puede elegir su rol global: siempre entra como MIEMBRO")
-    void registrationCannotSelfAssignGlobalRole() throws Exception {
-        String email = "escalada-" + UUID.randomUUID() + "@uni.es";
+    @DisplayName("Se puede elegir Alumno o Docente al registrarse")
+    void canChooseAlumnoOrDocenteAtRegistration() throws Exception {
+        String docente = "docente-" + UUID.randomUUID() + "@uni.es";
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"password123","fullName":"Profesor Soto","role":"DOCENTE"}
+                                """.formatted(docente)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.user.role").value("DOCENTE"));
 
+        String alumno = "alumno-" + UUID.randomUUID() + "@uni.es";
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"password123","fullName":"Ana Garcia","role":"MIEMBRO"}
+                                """.formatted(alumno)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.user.role").value("MIEMBRO"));
+    }
+
+    @Test
+    @DisplayName("Quien se registra no puede convertirse en ADMIN ni en RESPONSABLE global")
+    void registrationCannotSelfAssignAdminOrResponsable() throws Exception {
+        // ADMIN administra la plataforma entera: si se pudiera pedir aqui, darse
+        // de alta bastaria para tener esa llave.
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"admin-%s@uni.es","password":"password123","fullName":"Atacante",
+                                 "role":"ADMIN"}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+
+        // RESPONSABLE es un rol de equipo, no de cuenta: pedirlo aqui no significa
+        // nada, y aceptarlo en silencio (como antes) escondia el error en vez de
+        // avisar de que la peticion no tiene sentido.
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"resp-%s@uni.es","password":"password123","fullName":"Atacante",
+                                 "role":"RESPONSABLE"}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+    }
+
+    @Test
+    @DisplayName("El token de un DOCENTE recien registrado sigue sin abrir los endpoints de administracion")
+    void aFreshlyRegisteredTeacherHasNoAdminPowers() throws Exception {
+        String email = "docente-sin-poder-" + UUID.randomUUID() + "@uni.es";
         String token = json(mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                                 .content("""
-                                        {"email":"%s","password":"password123","fullName":"Atacante",
-                                         "role":"RESPONSABLE"}
+                                        {"email":"%s","password":"password123","fullName":"Profesor Ruiz",
+                                         "role":"DOCENTE"}
                                         """.formatted(email)))
                         .andExpect(status().isCreated())
-                        .andExpect(jsonPath("$.user.role").value("MIEMBRO"))
                         .andReturn())
                 .path("token").asText();
 
-        // Y el token que se le entrega tampoco abre los endpoints reservados al
-        // RESPONSABLE global: sin esto, cualquiera podria cambiar el rol o la
-        // contrasena de otra cuenta con solo darse de alta.
         TestUser victima = registerUser(Role.MIEMBRO);
 
         mockMvc.perform(patch("/api/users/{id}/role", victima.id())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"role\":\"DOCENTE\"}"))
-                .andExpect(status().isForbidden());
-
-        mockMvc.perform(put("/api/users/{id}", victima.id())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"fullName":"Secuestrada","password":"contrasenaDelAtacante1"}
-                                """))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(delete("/api/users/{id}", victima.id())

@@ -26,9 +26,16 @@ export function isTeacher(role: Role | null | undefined): boolean {
   return role === 'DOCENTE'
 }
 
+/**
+ * MIEMBRO se muestra como «Alumno»: es el nombre que entiende quien usa la
+ * aplicacion de verdad. El identificador interno se queda como esta —en la
+ * base de datos, en el token y en la API— porque cambiarlo no le aporta nada a
+ * nadie y solo anadiria riesgo (constraints, migraciones, tests); aqui, en el
+ * unico sitio por el que pasa el texto que se ve, basta con esto.
+ */
 export const ROLE_LABELS: Record<Role, string> = {
   RESPONSABLE: 'Responsable',
-  MIEMBRO: 'Miembro',
+  MIEMBRO: 'Alumno',
   DOCENTE: 'Docente',
   ADMIN: 'Administrador',
 }
