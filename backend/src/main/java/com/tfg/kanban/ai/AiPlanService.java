@@ -24,9 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Planificacion automatica a partir del guion de la practica.
@@ -254,7 +257,7 @@ public class AiPlanService {
         // Solo se asigna a gente que pertenezca al equipo del proyecto.
         Set<Long> allowed = project.getTeam().getMembers().stream()
                 .map(member -> member.getUser().getId())
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
 
         List<Task> created = new ArrayList<>();
         for (ProposedTask proposed : request.tasks()) {
@@ -299,11 +302,11 @@ public class AiPlanService {
      * menudo: la comprobacion se hace tambien aqui, que es determinista.
      */
     private List<ProposedTask> withoutDuplicates(List<ProposedTask> proposed, List<Task> existing) {
-        List<String> known = existing.stream().map(task -> normalize(task.getTitle())).toList();
+        List<String> known = existing.stream().map(task -> TextNormalizer.keywords(task.getTitle())).toList();
 
         List<ProposedTask> result = new ArrayList<>();
         for (ProposedTask task : proposed) {
-            String candidate = normalize(task.title());
+            String candidate = TextNormalizer.keywords(task.title());
             boolean repeated = known.stream()
                     .anyMatch(title -> title.equals(candidate)
                             || (title.length() > 12 && (title.contains(candidate) || candidate.contains(title))));
@@ -314,20 +317,6 @@ public class AiPlanService {
             result.add(task);
         }
         return result;
-    }
-
-    /** Sin tildes, sin mayusculas y sin palabras vacias, para comparar titulos. */
-    private String normalize(String value) {
-        String plain = java.text.Normalizer.normalize(value == null ? "" : value, java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .toLowerCase()
-                .replaceAll("[^a-z0-9 ]", " ");
-        return java.util.Arrays.stream(plain.split("\\s+"))
-                .filter(word -> word.length() > 2)
-                .filter(word -> !List.of("del", "las", "los", "una", "para", "con", "que").contains(word))
-                .reduce((a, b) -> a + " " + b)
-                .orElse("")
-                .trim();
     }
 
     /** Contexto real: documento, fecha, personas concretas y lo que ya hay en el tablero. */
@@ -346,7 +335,7 @@ public class AiPlanService {
             // ChronoUnit y no Period: el componente getDays() de un Period solo lleva el
             // resto de dias del ultimo mes e ignora los anos, asi que una entrega a mas
             // de un ano vista le llegaba al modelo con un plazo mucho mas corto del real.
-            long dias = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), project.getDeadline());
+            long dias = ChronoUnit.DAYS.between(LocalDate.now(), project.getDeadline());
             prompt.append("Fecha de entrega: ").append(project.getDeadline())
                     .append(dias >= 0 ? " (quedan unos " + dias + " dias)" : " (ya vencida)")
                     .append('\n');
@@ -543,7 +532,7 @@ public class AiPlanService {
         if (raw.isBlank()) return null;
         try {
             return LocalDate.parse(raw);
-        } catch (java.time.format.DateTimeParseException ex) {
+        } catch (DateTimeParseException ex) {
             log.debug("IA: fecha de planificacion no interpretable, se ignora: {}", raw);
             return null;
         }

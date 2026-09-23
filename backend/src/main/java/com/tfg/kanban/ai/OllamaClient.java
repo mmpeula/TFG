@@ -28,6 +28,9 @@ public class OllamaClient {
     /** En el chat interesa algo mas de soltura que al generar JSON, pero sin inventar. */
     private static final double CHAT_TEMPERATURE = 0.4;
 
+    /** Lo que se espera a que el servidor local coja el telefono, no a que conteste. */
+    private static final int CONNECT_TIMEOUT_MILLIS = 5_000;
+
     private final AiProperties properties;
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
@@ -36,9 +39,11 @@ public class OllamaClient {
         this.properties = properties;
         this.objectMapper = objectMapper;
 
-        // Un modelo de 8B en CPU tarda bastante; el tiempo de espera lo fija la configuracion.
+        // Conectar con un servidor local es inmediato o no va a pasar; lo que tarda
+        // es la respuesta, porque un modelo de 8B en CPU se lo toma con calma. De
+        // ahi los dos tiempos de espera tan distintos.
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout((int) Math.min(Integer.MAX_VALUE, 5_000));
+        factory.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
         factory.setReadTimeout((int) Math.min(Integer.MAX_VALUE, properties.getTimeout().toMillis()));
 
         this.restClient = RestClient.builder()

@@ -101,20 +101,33 @@ function EditProfileModal({
 
 function EditProfileForm({ user, onClose }: { user: UserResponse; onClose: () => void }) {
   const [fullName, setFullName] = useState(user.fullName)
+  const [currentPassword, setCurrentPassword] = useState('')
   const [password, setPassword] = useState('')
   const mutations = useUserMutations(user.id)
 
+  // Solo se piden las contrasenas si se esta cambiando la contrasena; quien entra
+  // aqui a corregirse una tilde del nombre no tiene por que escribir nada mas.
+  const cambiaPassword = password.length > 0
+
   const nombreValido = fullName.trim().length > 0
-  const passwordValida = password.length === 0 || password.length >= 8
-  const valido = nombreValido && passwordValida
+  const passwordValida = !cambiaPassword || password.length >= 8
+  const actualValida = !cambiaPassword || currentPassword.length > 0
+  const valido = nombreValido && passwordValida && actualValida
 
   async function submit() {
     if (!valido || mutations.update.isPending) return
-    await mutations.update.mutateAsync({
-      fullName: fullName.trim(),
-      password: password || undefined,
-    })
-    onClose()
+    try {
+      await mutations.update.mutateAsync({
+        fullName: fullName.trim(),
+        currentPassword: cambiaPassword ? currentPassword : undefined,
+        password: cambiaPassword ? password : undefined,
+      })
+      onClose()
+    } catch {
+      // Equivocarse con la contrasena actual es un final normal, no un fallo: el
+      // aviso ya sale por el toast de la mutacion y el dialogo se queda abierto
+      // con lo escrito para poder corregirlo.
+    }
   }
 
   return (
@@ -149,6 +162,7 @@ function EditProfileForm({ user, onClose }: { user: UserResponse; onClose: () =>
           Nueva contrasena <span className={styles.optional}>opcional</span>
           <input
             type="password"
+            autoComplete="new-password"
             className={styles.control}
             value={password}
             placeholder="Dejar en blanco para no cambiarla"
@@ -156,6 +170,23 @@ function EditProfileForm({ user, onClose }: { user: UserResponse; onClose: () =>
           />
           {!passwordValida && <span className={styles.error}>Al menos 8 caracteres.</span>}
         </label>
+
+        {cambiaPassword && (
+          <label className={styles.label}>
+            Contrasena actual
+            <input
+              type="password"
+              autoComplete="current-password"
+              className={styles.control}
+              value={currentPassword}
+              placeholder="La que usas ahora"
+              onChange={(event) => setCurrentPassword(event.target.value)}
+            />
+            <span className={styles.optional}>
+              Se pide para que una sesion abierta y sin vigilancia no baste para cambiarla.
+            </span>
+          </label>
+        )}
       </div>
     </Modal>
   )

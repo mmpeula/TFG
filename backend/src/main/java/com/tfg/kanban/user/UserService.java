@@ -42,9 +42,34 @@ public class UserService {
         User user = getUser(id);
         user.setFullName(request.fullName().trim());
         if (StringUtils.hasText(request.password())) {
+            ensureMayChangePassword(user, request.currentPassword());
             user.setPasswordHash(passwordEncoder.encode(request.password()));
         }
         return UserResponse.from(user);
+    }
+
+    /**
+     * Para cambiarse uno mismo la contrasena hay que saber la de ahora.
+     *
+     * <p>Sin esto bastaba con una sesion abierta y sin vigilancia —un portatil de
+     * la biblioteca -- para dejar a su dueno fuera de su propia cuenta: la nueva
+     * contrasena la elige quien esta sentado delante y el dueno ya no la sabe.</p>
+     *
+     * <p>Al administrador que restablece la de otra persona no se le pide, porque
+     * no la tiene: eso es precisamente para lo que existe el restablecimiento. La
+     * suya propia si la tiene que saber, como todo el mundo.</p>
+     */
+    private void ensureMayChangePassword(User user, String currentPassword) {
+        boolean esSuPropiaCuenta = SecurityUtils.currentUserId()
+                .filter(userId -> userId.equals(user.getId()))
+                .isPresent();
+        if (!esSuPropiaCuenta) {
+            return;
+        }
+        if (!StringUtils.hasText(currentPassword)
+                || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new BusinessRuleException("La contrasena actual no es correcta");
+        }
     }
 
     @Transactional

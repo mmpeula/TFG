@@ -29,7 +29,7 @@ public class ProjectService {
     private final ActivityService activityService;
 
     public PageResponse<ProjectResponse> findVisible(Long teamId, ProjectStatus status, Pageable pageable) {
-        Long userId = currentUserId();
+        Long userId = SecurityUtils.requireCurrentUserId();
         return PageResponse.of(
                 projectRepository.findAll(ProjectSpecifications.visibleTo(userId, teamId, status), pageable),
                 project -> ProjectResponse.from(project, roleIn(project)));
@@ -95,11 +95,7 @@ public class ProjectService {
     }
 
     private Role roleIn(Project project) {
-        return teamMemberRepository.findRoleByProject(project.getId(), currentUserId()).orElse(null);
+        return teamMemberRepository.findRoleByProject(project.getId(), SecurityUtils.requireCurrentUserId()).orElse(null);
     }
 
-    private Long currentUserId() {
-        return SecurityUtils.currentUserId()
-                .orElseThrow(() -> new BusinessRuleException("No hay usuario autenticado"));
-    }
 }

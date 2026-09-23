@@ -3,8 +3,8 @@ import type {
   ActivityLogResponse, AdminWorkspaceResponse, AiPlanResponse, AttachmentResponse, AuthResponse, BoardResponse,
   ChatResponse, ChatTurn, ColumnResponse, CommentResponse, PageResponse,
   InvitationResponse, MyInvitationResponse,
-  ProjectResponse, ProjectStatus, Role, ProposedTask, TaskPriority, TaskResponse, TaskType, TeamMemberResponse,
-  TeamResponse, UserResponse, WorkspaceResponse,
+  ProjectResponse, Role, ProposedTask, TaskPriority, TaskResponse, TaskType, TeamMemberResponse,
+  UserResponse, WorkspaceResponse,
 } from '@/types/api'
 
 export const auth = {
@@ -60,19 +60,14 @@ export const workspaces = {
       .then((r) => r.data),
 }
 
+/**
+ * El equipo de un workspace. No hay equipos sueltos que crear, renombrar o
+ * borrar: el workspace los crea y los borra con el (ver `workspaces`), asi que
+ * aqui solo esta lo que de verdad se usa, que es quien esta dentro y con que rol.
+ */
 export const teams = {
-  list: () =>
-    apiClient.get<PageResponse<TeamResponse>>('/teams', { params: { size: 100 } }).then((r) => r.data),
-  get: (teamId: number) => apiClient.get<TeamResponse>(`/teams/${teamId}`).then((r) => r.data),
-  create: (payload: { name: string; description?: string }) =>
-    apiClient.post<TeamResponse>('/teams', payload).then((r) => r.data),
-  update: (teamId: number, payload: { name: string; description?: string }) =>
-    apiClient.put<TeamResponse>(`/teams/${teamId}`, payload).then((r) => r.data),
-  remove: (teamId: number) => apiClient.delete(`/teams/${teamId}`).then(() => undefined),
   members: (teamId: number) =>
     apiClient.get<TeamMemberResponse[]>(`/teams/${teamId}/members`).then((r) => r.data),
-  addMember: (teamId: number, payload: { email: string; role: Role }) =>
-    apiClient.post<TeamMemberResponse>(`/teams/${teamId}/members`, payload).then((r) => r.data),
   updateMemberRole: (teamId: number, userId: number, role: Role) =>
     apiClient.patch<TeamMemberResponse>(`/teams/${teamId}/members/${userId}`, { role }).then((r) => r.data),
   removeMember: (teamId: number, userId: number) =>
@@ -113,19 +108,14 @@ export const invitations = {
     apiClient.post(`/invitations/${token}/reject`).then(() => undefined),
 }
 
+/**
+ * El proyecto que hay debajo del workspace. Crearlo, renombrarlo y borrarlo se
+ * hace desde `workspaces`, que lleva de una vez el equipo, el proyecto y el
+ * tablero; aqui queda lo que no cabe en esa fachada: leerlo, su historial y el
+ * modulo de IA, que trabaja sobre el guion de la practica.
+ */
 export const projects = {
-  list: (filters: { teamId?: number; status?: ProjectStatus } = {}) =>
-    apiClient
-      .get<PageResponse<ProjectResponse>>('/projects', { params: { ...filters, size: 100 } })
-      .then((r) => r.data),
   get: (projectId: number) => apiClient.get<ProjectResponse>(`/projects/${projectId}`).then((r) => r.data),
-  create: (payload: {
-    teamId: number; name: string; description?: string; briefing?: string; deadline?: string | null
-  }) => apiClient.post<ProjectResponse>('/projects', payload).then((r) => r.data),
-  update: (projectId: number, payload: {
-    name: string; description?: string; briefing?: string; deadline?: string | null; status?: ProjectStatus
-  }) => apiClient.put<ProjectResponse>(`/projects/${projectId}`, payload).then((r) => r.data),
-  remove: (projectId: number) => apiClient.delete(`/projects/${projectId}`).then(() => undefined),
   activity: (projectId: number) =>
     apiClient
       .get<PageResponse<ActivityLogResponse>>(`/projects/${projectId}/activity`, { params: { size: 30 } })
@@ -163,15 +153,11 @@ export const boards = {
   byProject: (projectId: number) =>
     apiClient.get<BoardResponse[]>(`/projects/${projectId}/boards`).then((r) => r.data),
   get: (boardId: number) => apiClient.get<BoardResponse>(`/boards/${boardId}`).then((r) => r.data),
-  create: (projectId: number, payload: { name: string; description?: string }) =>
-    apiClient.post<BoardResponse>(`/projects/${projectId}/boards`, payload).then((r) => r.data),
   remove: (boardId: number) => apiClient.delete(`/boards/${boardId}`).then(() => undefined),
   createColumn: (boardId: number, payload: { name: string; wipLimit?: number | null }) =>
     apiClient.post<ColumnResponse>(`/boards/${boardId}/columns`, payload).then((r) => r.data),
   updateColumn: (columnId: number, payload: { name: string; wipLimit?: number | null }) =>
     apiClient.put<ColumnResponse>(`/columns/${columnId}`, payload).then((r) => r.data),
-  moveColumn: (columnId: number, position: number) =>
-    apiClient.patch<ColumnResponse[]>(`/columns/${columnId}/move`, { position }).then((r) => r.data),
   removeColumn: (columnId: number) => apiClient.delete(`/columns/${columnId}`).then(() => undefined),
 }
 
@@ -240,14 +226,14 @@ export const attachments = {
 }
 
 export const users = {
-  search: (search: string) =>
-    apiClient
-      .get<PageResponse<UserResponse>>('/users', { params: { search, size: 10 } })
-      .then((r) => r.data),
-  /** Nombre siempre; contrasena solo si se quiere cambiar. */
-  update: (userId: number, payload: { fullName: string; password?: string }) =>
+  /**
+   * Nombre siempre; contrasena solo si se quiere cambiar, y entonces hace falta
+   * la actual. El backend no se la pide al administrador que restablece la de
+   * otra persona, porque no la tiene.
+   */
+  update: (userId: number, payload: { fullName: string; currentPassword?: string; password?: string }) =>
     apiClient.put<UserResponse>(`/users/${userId}`, payload).then((r) => r.data),
-  /** Listado del panel de administracion: sin filtro trae toda la plataforma. */
+  /** Listado del panel de administracion: sin filtro trae toda la plataforma. Solo ADMIN. */
   list: (search: string) =>
     apiClient
       .get<PageResponse<UserResponse>>('/users', { params: { search, size: 200 } })

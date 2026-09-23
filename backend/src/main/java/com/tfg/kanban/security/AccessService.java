@@ -47,7 +47,7 @@ public class AccessService {
      */
     public Optional<Role> roleInTeam(Long teamId) {
         return SecurityUtils.currentUserId()
-                .flatMap(userId -> teamMemberRepository.findActiveRoleInTeam(teamId, userId).stream().findFirst());
+                .flatMap(userId -> teamMemberRepository.findActiveRoleInTeam(teamId, userId));
     }
 
     public Optional<Role> roleInProject(Long projectId) {
@@ -94,16 +94,8 @@ public class AccessService {
         return roleInBoard(boardId).isPresent();
     }
 
-    public boolean canWriteBoard(Long boardId) {
-        return roleInBoard(boardId).filter(WRITERS::contains).isPresent();
-    }
-
     public boolean canManageBoard(Long boardId) {
         return roleInBoard(boardId).filter(Role.RESPONSABLE::equals).isPresent();
-    }
-
-    public boolean canReadColumn(Long columnId) {
-        return roleInColumn(columnId).isPresent();
     }
 
     public boolean canWriteColumn(Long columnId) {
@@ -122,10 +114,6 @@ public class AccessService {
         return roleInTask(taskId).filter(WRITERS::contains).isPresent();
     }
 
-    public boolean canManageTask(Long taskId) {
-        return roleInTask(taskId).filter(Role.RESPONSABLE::equals).isPresent();
-    }
-
     /** El autor puede editar/borrar su comentario; el RESPONSABLE del equipo, cualquiera. */
     public boolean canModifyComment(Long commentId) {
         Long userId = SecurityUtils.currentUserId().orElse(null);
@@ -135,12 +123,6 @@ public class AccessService {
         return commentRepository.findById(commentId)
                 .map(comment -> comment.getAuthor().getId().equals(userId)
                         || roleInTask(comment.getTask().getId()).filter(Role.RESPONSABLE::equals).isPresent())
-                .orElse(false);
-    }
-
-    public boolean canReadComment(Long commentId) {
-        return commentRepository.findById(commentId)
-                .map(comment -> canReadTask(comment.getTask().getId()))
                 .orElse(false);
     }
 

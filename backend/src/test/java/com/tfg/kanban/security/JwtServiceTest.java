@@ -44,7 +44,7 @@ class JwtServiceTest {
     void rejectsTamperedToken() {
         String token = jwtService.generateToken("alumno@uni.es", 1L, "RESPONSABLE");
 
-        assertThat(jwtService.isValid(token + "x")).isFalse();
-        assertThat(jwtService.isValid("esto.no.es.un.jwt")).isFalse();
+        assertThat(jwtService.parse(token + "x")).isEmpty();
+        assertThat(jwtService.parse("esto.no.es.un.jwt")).isEmpty();
     }
 }

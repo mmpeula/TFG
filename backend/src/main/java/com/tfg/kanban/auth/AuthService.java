@@ -88,7 +88,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public UserResponse currentUser() {
         Long userId = SecurityUtils.currentUserId()
-                .orElseThrow(() -> new InvalidCredentialsException());
+                .orElseThrow(InvalidCredentialsException::new);
         return userRepository.findById(userId)
                 .map(UserResponse::from)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));

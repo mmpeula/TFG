@@ -2,7 +2,6 @@ package com.tfg.kanban.attachment;
 
 import com.tfg.kanban.activity.ActivityService;
 import com.tfg.kanban.attachment.dto.AttachmentResponse;
-import com.tfg.kanban.common.BusinessRuleException;
 import com.tfg.kanban.common.ResourceNotFoundException;
 import com.tfg.kanban.domain.model.ActivityAction;
 import com.tfg.kanban.domain.model.Attachment;
@@ -41,8 +40,9 @@ public class AttachmentService {
     @Transactional
     public AttachmentResponse upload(Long taskId, MultipartFile file) {
         Task task = taskService.getTask(taskId);
-        User uploader = userRepository.findById(currentUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario", currentUserId()));
+        Long userId = SecurityUtils.requireCurrentUserId();
+        User uploader = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
 
         String storedName = fileStorageService.store(file);
         String filename = FileStorageService.cleanFilename(file.getOriginalFilename());
@@ -85,8 +85,4 @@ public class AttachmentService {
         fileStorageService.delete(attachment.getStoredName());
     }
 
-    private Long currentUserId() {
-        return SecurityUtils.currentUserId()
-                .orElseThrow(() -> new BusinessRuleException("No hay usuario autenticado"));
-    }
 }

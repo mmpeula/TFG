@@ -64,10 +64,6 @@ public class JwtService {
         }
     }
 
-    public boolean isValid(String token) {
-        return parse(token).isPresent();
-    }
-
     public long getExpirationMinutes() {
         return properties.getExpirationMinutes();
     }

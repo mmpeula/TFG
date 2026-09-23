@@ -6,6 +6,7 @@ import com.tfg.kanban.domain.model.Role;
 import com.tfg.kanban.domain.model.User;
 import com.tfg.kanban.domain.repository.UserRepository;
 import com.tfg.kanban.user.dto.UpdateGlobalRoleRequest;
+import com.tfg.kanban.user.dto.UpdateUserRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -100,6 +101,67 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.disable(1L))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("al menos un administrador");
+    }
+
+    @Test
+    @DisplayName("Cambiarse la contrasena propia exige acertar la actual")
+    void changingOwnPasswordNeedsTheCurrentOne() {
+        TestSecurity.authenticateAs(2L, "MIEMBRO");
+        User user = User.builder().id(2L).email("luis@uni.es").passwordHash("hash-de-ahora").build();
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("noEsLaSuya", "hash-de-ahora")).thenReturn(false);
+
+        assertThatThrownBy(() -> userService.update(2L,
+                new UpdateUserRequest("Luis", null, "nuevaClave456")))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("contrasena actual");
+
+        assertThatThrownBy(() -> userService.update(2L,
+                new UpdateUserRequest("Luis", "noEsLaSuya", "nuevaClave456")))
+                .isInstanceOf(BusinessRuleException.class);
+
+        assertThat(user.getPasswordHash()).isEqualTo("hash-de-ahora");
+    }
+
+    @Test
+    @DisplayName("Con la contrasena actual correcta, el cambio se aplica")
+    void changingOwnPasswordWorksWithTheCurrentOne() {
+        TestSecurity.authenticateAs(2L, "MIEMBRO");
+        User user = User.builder().id(2L).email("luis@uni.es").passwordHash("hash-de-ahora").build();
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("laDeAhora", "hash-de-ahora")).thenReturn(true);
+        when(passwordEncoder.encode("nuevaClave456")).thenReturn("hash-nuevo");
+
+        userService.update(2L, new UpdateUserRequest("Luis", "laDeAhora", "nuevaClave456"));
+
+        assertThat(user.getPasswordHash()).isEqualTo("hash-nuevo");
+    }
+
+    @Test
+    @DisplayName("El administrador restablece la de otra persona sin saber la suya")
+    void adminResetsSomeoneElsesPasswordWithoutKnowingIt() {
+        // No se le pide porque no la tiene: para eso existe el restablecimiento.
+        TestSecurity.authenticateAs(9L, "ADMIN");
+        User user = User.builder().id(2L).email("luis@uni.es").passwordHash("hash-de-ahora").build();
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("claveRestablecida9")).thenReturn("hash-restablecido");
+
+        userService.update(2L, new UpdateUserRequest("Luis", null, "claveRestablecida9"));
+
+        assertThat(user.getPasswordHash()).isEqualTo("hash-restablecido");
+    }
+
+    @Test
+    @DisplayName("Editar solo el nombre no pide ninguna contrasena")
+    void renamingNeedsNoPassword() {
+        TestSecurity.authenticateAs(2L, "MIEMBRO");
+        User user = User.builder().id(2L).email("luis@uni.es").passwordHash("hash-de-ahora").build();
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+
+        var response = userService.update(2L, new UpdateUserRequest("Luis Perez", null, null));
+
+        assertThat(response.fullName()).isEqualTo("Luis Perez");
+        assertThat(user.getPasswordHash()).isEqualTo("hash-de-ahora");
     }
 
     @Test

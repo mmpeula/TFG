@@ -73,8 +73,13 @@ public class HealthController {
             return new HealthResponse.DatabaseStatus(
                     "UP", metaData.getDatabaseProductName(), metaData.getDatabaseProductVersion(), null);
         } catch (SQLException ex) {
-            log.warn("Health check: la base de datos no responde ({})", ex.getMessage());
-            return new HealthResponse.DatabaseStatus("DOWN", null, null, ex.getMessage());
+            // El detalle va al log y no a la respuesta: este endpoint es publico y el
+            // mensaje de un SQLException suele llevar host, puerto y nombre del
+            // servicio ("ORA-12541: TNS:no listener" y companeros). Quien tiene que
+            // arreglarlo mira el log; a quien solo pregunta desde fuera le basta con
+            // saber que la base de datos no responde.
+            log.warn("Health check: la base de datos no responde", ex);
+            return new HealthResponse.DatabaseStatus("DOWN", null, null, "La base de datos no responde");
         }
     }
 

@@ -43,7 +43,7 @@ public class TaskService {
 
     public PageResponse<TaskResponse> search(Long projectId, Long boardId, Long columnId,
                                              Long assigneeId, TaskPriority priority, Pageable pageable) {
-        Long userId = currentUserId();
+        Long userId = SecurityUtils.requireCurrentUserId();
         return PageResponse.of(
                 taskRepository.findAll(
                         TaskSpecifications.search(userId, projectId, boardId, columnId, assigneeId, priority),
@@ -58,10 +58,14 @@ public class TaskService {
     @Transactional
     public TaskResponse create(Long columnId, TaskRequest request) {
         BoardColumn column = boardService.getColumn(columnId);
-        checkWipLimit(column, taskRepository.countByBoardColumn_Id(columnId) + 1);
+        // Cuantas hay ahora: decide si cabe una mas y, si cabe, en que posicion entra
+        // (la ultima). Es el mismo numero, asi que se cuenta una sola vez.
+        long tasksInColumn = taskRepository.countByBoardColumn_Id(columnId);
+        checkWipLimit(column, tasksInColumn + 1);
 
-        User creator = userRepository.findById(currentUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario", currentUserId()));
+        Long userId = SecurityUtils.requireCurrentUserId();
+        User creator = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
 
         Task task = Task.builder()
                 .title(request.title().trim())
@@ -73,7 +77,7 @@ public class TaskService {
                 .boardColumn(column)
                 .assignee(resolveAssignee(column, request.assigneeId()))
                 .createdBy(creator)
-                .position((int) taskRepository.countByBoardColumn_Id(columnId))
+                .position((int) tasksInColumn)
                 .build();
 
         Task saved = taskRepository.save(task);
@@ -208,8 +212,4 @@ public class TaskService {
         return a.getId().equals(b.getId());
     }
 
-    private Long currentUserId() {
-        return SecurityUtils.currentUserId()
-                .orElseThrow(() -> new BusinessRuleException("No hay usuario autenticado"));
-    }
 }

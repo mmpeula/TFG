@@ -1,3 +1,4 @@
+import { minutesSince, withinTheDay } from '@/lib/format'
 import type { WorkspaceResponse } from '@/types/api'
 
 /**
@@ -33,13 +34,13 @@ export function iconOf(workspace: Pick<WorkspaceResponse, 'name' | 'icon'>): str
 
 /** Texto de la ultima actividad en lenguaje corriente: «hace 2 dias». */
 export function lastActivityLabel(iso?: string): string {
-  if (!iso) return 'sin actividad todavia'
-  const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (minutes < 1) return 'ahora mismo'
-  if (minutes < 60) return `hace ${minutes} min`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `hace ${hours} h`
-  const days = Math.floor(hours / 24)
+  const minutes = minutesSince(iso)
+  if (minutes === null) return 'sin actividad todavia'
+
+  const reciente = withinTheDay(minutes)
+  if (reciente) return reciente
+
+  const days = Math.floor(minutes / 1440)
   if (days === 1) return 'ayer'
   if (days < 30) return `hace ${days} dias`
   const months = Math.floor(days / 30)

@@ -93,7 +93,7 @@ public class InvitationService {
     /** Las que esperan respuesta de quien esta mirando. */
     public List<MyInvitationResponse> mine() {
         return invitationRepository
-                .findByInvited_IdAndStatusOrderByCreatedAtDesc(currentUserId(), InvitationStatus.PENDIENTE).stream()
+                .findByInvited_IdAndStatusOrderByCreatedAtDesc(SecurityUtils.requireCurrentUserId(), InvitationStatus.PENDIENTE).stream()
                 .map(MyInvitationResponse::from)
                 .toList();
     }
@@ -154,7 +154,7 @@ public class InvitationService {
         Invitation invitation = invitationRepository.findByToken(token)
                 .orElseThrow(() -> new ResourceNotFoundException("Esa invitacion no existe o ya no es valida"));
 
-        if (!invitation.getInvited().getId().equals(currentUserId())) {
+        if (!invitation.getInvited().getId().equals(SecurityUtils.requireCurrentUserId())) {
             // Mismo mensaje que si no existiera: quien tiene un token ajeno no debe
             // poder averiguar si es valido ni de quien es.
             throw new ResourceNotFoundException("Esa invitacion no existe o ya no es valida");
@@ -199,8 +199,4 @@ public class InvitationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Equipo", teamId));
     }
 
-    private Long currentUserId() {
-        return SecurityUtils.currentUserId()
-                .orElseThrow(() -> new BusinessRuleException("No hay usuario autenticado"));
-    }
 }

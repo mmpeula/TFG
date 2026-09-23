@@ -6,7 +6,6 @@ import com.tfg.kanban.domain.model.TeamMember;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.text.Normalizer;
 import java.util.*;
 
 /**
@@ -151,12 +150,12 @@ public class WorkloadBalancer {
      * resolver a quien excluir del reparto cuando el usuario lo pide.
      */
     public static Optional<Long> matchName(String name, List<TeamMember> members) {
-        String normalized = normalize(name);
+        String normalized = TextNormalizer.plain(name);
         if (normalized.isBlank()) return Optional.empty();
 
         return members.stream()
                 .filter(member -> {
-                    String full = normalize(member.getUser().getFullName());
+                    String full = TextNormalizer.plain(member.getUser().getFullName());
                     String first = full.split(" ")[0];
                     return full.equals(normalized) || normalized.equals(first) || full.startsWith(normalized);
                 })
@@ -171,13 +170,4 @@ public class WorkloadBalancer {
                 .orElseThrow();
     }
 
-    private static String normalize(String value) {
-        if (value == null) return "";
-        return Normalizer.normalize(value, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .toLowerCase()
-                .replaceAll("[^a-z0-9 ]", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
-    }
 }

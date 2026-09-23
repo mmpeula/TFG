@@ -66,7 +66,15 @@ export function derivePulse(board?: BoardResponse, project?: ProjectResponse): P
   const cycleDays = cycles.length ? cycles.reduce((a, b) => a + b, 0) / cycles.length : 0
 
   const signals = deriveSignals(board)
-  const blocked = signals.filter((signal) => signal.kind !== 'saturacion').length
+  // Tareas distintas, no senales: una misma tarea parada y ademas sin responsable
+  // levanta dos senales, y contarlas sueltas decia «hay 4 tareas atascadas» de un
+  // tablero que solo tenia dos. Las de saturacion son de columna, no de tarea.
+  const blocked = new Set(
+    signals
+      .filter((signal) => signal.kind !== 'saturacion')
+      .map((signal) => signal.target.taskId)
+      .filter((taskId): taskId is number => taskId !== undefined),
+  ).size
   const dueSoon = pending.filter((task) => {
     const remaining = task.dueDate ? daysUntil(task.dueDate) : null
     return remaining !== null && remaining <= 2
@@ -185,7 +193,7 @@ function buildInsights(input: InsightInput): Insight[] {
 
     const body =
       velocity <= 0
-        ? `Quedan ${pending.length} tareas y esta semana no se ha cerrado ninguna, asi que todavia no hay ritmo con el que estimar la fecha de entrega.`
+        ? `Quedan ${pending.length} tareas y en el ultimo mes no se ha cerrado ninguna, asi que todavia no hay ritmo con el que estimar la fecha de entrega.`
         : remaining === null
           ? `Quedan ${pending.length} tareas a un ritmo de ${decimal(velocity)} por semana: unas ${decimal(weeksNeeded)} semanas de trabajo. El proyecto no tiene fecha de entrega fijada.`
           : weeksLeft !== null && weeksNeeded > weeksLeft

@@ -1,6 +1,7 @@
 package com.tfg.kanban.workspace;
 
 import com.tfg.kanban.activity.ActivityService;
+import com.tfg.kanban.board.DefaultBoard;
 import com.tfg.kanban.common.CountByEntity;
 import com.tfg.kanban.common.BusinessRuleException;
 import com.tfg.kanban.common.ResourceNotFoundException;
@@ -34,9 +35,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class WorkspaceService {
 
-    /** Columnas con las que nace todo workspace. */
-    private static final List<String> DEFAULT_COLUMNS = List.of("Por hacer", "En progreso", "Hecho");
-
     private final ProjectRepository projectRepository;
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
@@ -55,7 +53,7 @@ public class WorkspaceService {
      * cuantos workspaces tenga la persona.
      */
     public List<WorkspaceResponse> findMine() {
-        Long userId = currentUserId();
+        Long userId = SecurityUtils.requireCurrentUserId();
         List<Project> projects = projectRepository.findAll(
                 ProjectSpecifications.visibleTo(userId, null, null),
                 Sort.by(Sort.Direction.DESC, "createdAt"));
@@ -131,8 +129,9 @@ public class WorkspaceService {
      */
     @Transactional
     public WorkspaceResponse create(CreateWorkspaceRequest request) {
-        User owner = userRepository.findById(currentUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario", currentUserId()));
+        Long userId = SecurityUtils.requireCurrentUserId();
+        User owner = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
         if (owner.getRole() != Role.MIEMBRO && owner.getRole() != Role.RESPONSABLE) {
             throw new BusinessRuleException("Solo una cuenta MIEMBRO puede crear un workspace");
         }
@@ -159,18 +158,7 @@ public class WorkspaceService {
                 .team(team)
                 .build();
 
-        Board board = Board.builder()
-                .name("Tablero")
-                .project(project)
-                .build();
-        for (int i = 0; i < DEFAULT_COLUMNS.size(); i++) {
-            board.getColumns().add(BoardColumn.builder()
-                    .board(board)
-                    .name(DEFAULT_COLUMNS.get(i))
-                    .position(i)
-                    .build());
-        }
-        project.getBoards().add(board);
+        project.getBoards().add(DefaultBoard.of("Tablero", null, project));
         team.getProjects().add(project);
 
         teamRepository.save(team);
@@ -218,7 +206,7 @@ public class WorkspaceService {
         projectRepository.flush();
 
         boolean vacio = projectRepository.findByTeam_Id(team.getId()).isEmpty();
-        boolean esMio = team.getOwner() != null && team.getOwner().getId().equals(currentUserId());
+        boolean esMio = team.getOwner() != null && team.getOwner().getId().equals(SecurityUtils.requireCurrentUserId());
         if (vacio && esMio) {
             teamRepository.delete(team);
         }
@@ -261,11 +249,8 @@ public class WorkspaceService {
     }
 
     private Role roleIn(Project project) {
-        return teamMemberRepository.findByTeam_IdAndUser_Id(project.getTeam().getId(), currentUserId())
+        return teamMemberRepository.findByTeam_IdAndUser_Id(project.getTeam().getId(), SecurityUtils.requireCurrentUserId())
                 .map(TeamMember::getRole).orElse(null);
     }
 
-    private Long currentUserId() {
-        return SecurityUtils.currentUserId().orElseThrow();
-    }
 }

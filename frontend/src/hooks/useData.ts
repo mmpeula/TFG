@@ -106,11 +106,6 @@ export function useWorkspaceMutations(workspaceId?: number) {
 }
 
 /**
- * Miembros del workspace. Sigue siendo el equipo por debajo, de ahi el nombre de
- * las llamadas; lo que cambia es que ya no hay pantalla de equipos donde crearlos
- * o borrarlos: eso lo hace el workspace.
- */
-/**
  * Invitar, cancelar y responder.
  *
  * Invitar refresca las invitaciones pero no los miembros: por definicion no
@@ -214,11 +209,6 @@ export function useMemberMutations(teamId?: number) {
   }
 
   return {
-    addMember: useMutation({
-      mutationFn: (payload: { email: string; role: Role }) => teams.addMember(teamId!, payload),
-      onSuccess: (member) => { invalidate(); pushToast(`${member.user.fullName} anadido al workspace`) },
-      onError,
-    }),
     updateRole: useMutation({
       mutationFn: ({ userId, role }: { userId: number; role: Role }) => teams.updateMemberRole(teamId!, userId, role),
       onSuccess: () => { invalidate(); pushToast('Rol actualizado') },
@@ -240,7 +230,8 @@ export function useUserMutations(userId?: number) {
 
   return {
     update: useMutation({
-      mutationFn: (payload: { fullName: string; password?: string }) => users.update(userId!, payload),
+      mutationFn: (payload: { fullName: string; currentPassword?: string; password?: string }) =>
+        users.update(userId!, payload),
       onSuccess: () => {
         // "auth","me" lleva el token como tercer trozo de la key: se invalida por
         // prefijo para no tener que conocerlo aqui.
@@ -303,11 +294,6 @@ export function useBoardMutations(boardId?: number, projectId?: number) {
   }
 
   return {
-    createBoard: useMutation({
-      mutationFn: (payload: { name: string; description?: string }) => boards.create(projectId!, payload),
-      onSuccess: () => { invalidate(); pushToast('Tablero creado con sus columnas por defecto') },
-      onError,
-    }),
     removeBoard: useMutation({
       mutationFn: (id: number) => boards.remove(id),
       onSuccess: () => { invalidate(); pushToast('Tablero borrado') },
@@ -323,12 +309,6 @@ export function useBoardMutations(boardId?: number, projectId?: number) {
         boards.updateColumn(columnId, payload),
       onSuccess: () => { invalidate(); pushToast('Columna actualizada') },
       onError,
-    }),
-    moveColumn: useMutation({
-      mutationFn: ({ columnId, position }: { columnId: number; position: number }) =>
-        boards.moveColumn(columnId, position),
-      onSuccess: invalidate,
-      onError: (error) => { onError(error); invalidate() },
     }),
     removeColumn: useMutation({
       mutationFn: (columnId: number) => boards.removeColumn(columnId),

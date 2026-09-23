@@ -28,7 +28,11 @@ public class UserController {
     private final UserService userService;
 
     @Operation(summary = "Buscar usuarios",
-            description = "Listado paginado con busqueda por nombre o email. Se usa al invitar gente a un equipo.")
+            description = "Listado paginado con busqueda por nombre o email. Reservado al administrador "
+                    + "de la plataforma: es el directorio completo de cuentas y lo consume su panel. "
+                    + "Para meter a alguien en un equipo no hace falta: se le invita por su email, que "
+                    + "quien invita ya conoce.")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public PageResponse<UserResponse> search(
             @Parameter(description = "Texto a buscar en nombre o email") @RequestParam(required = false) String search,
@@ -36,11 +40,16 @@ public class UserController {
         return userService.search(search, pageable);
     }
 
-    @Operation(summary = "Obtener un usuario por id")
+    @Operation(summary = "Obtener un usuario por id",
+            description = "La propia cuenta o, si es el administrador de la plataforma, cualquiera. "
+                    + "Los nombres y las caras del resto del equipo no salen de aqui sino de "
+                    + "/api/teams/{id}/members, que solo ve quien pertenece a ese equipo.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Usuario encontrado"),
+            @ApiResponse(responseCode = "403", description = "No es tu cuenta"),
             @ApiResponse(responseCode = "404", description = "No existe")
     })
+    @PreAuthorize("@access.isSelf(#id) or hasRole('ADMIN')")
     @GetMapping("/{id}")
     public UserResponse findById(@PathVariable Long id) {
         return userService.findById(id);

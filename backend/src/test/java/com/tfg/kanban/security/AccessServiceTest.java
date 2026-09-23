@@ -150,7 +150,6 @@ class AccessServiceTest {
         when(attachmentRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThat(accessService.canModifyComment(99L)).isFalse();
-        assertThat(accessService.canReadComment(99L)).isFalse();
         assertThat(accessService.canReadAttachment(99L)).isFalse();
         assertThat(accessService.canDeleteAttachment(99L)).isFalse();
     }
@@ -168,7 +167,6 @@ class AccessServiceTest {
         assertThat(accessService.canDeleteAttachment(30L)).isTrue();
         assertThat(accessService.canDeleteAttachment(31L)).isFalse();
         assertThat(accessService.canReadAttachment(30L)).isTrue();
-        assertThat(accessService.canReadComment(30L)).isFalse();
     }
 
     @Test
@@ -189,16 +187,13 @@ class AccessServiceTest {
         when(teamMemberRepository.findRoleByTask(11L, 1L)).thenReturn(Optional.of(Role.RESPONSABLE));
 
         assertThat(accessService.canReadBoard(2L)).isTrue();
-        assertThat(accessService.canWriteBoard(2L)).isTrue();
         assertThat(accessService.canManageBoard(2L)).isFalse();
 
-        assertThat(accessService.canReadColumn(5L)).isTrue();
         assertThat(accessService.canWriteColumn(5L)).isFalse();
         assertThat(accessService.canManageColumn(5L)).isFalse();
 
         assertThat(accessService.canReadTask(11L)).isTrue();
         assertThat(accessService.canWriteTask(11L)).isTrue();
-        assertThat(accessService.canManageTask(11L)).isTrue();
 
         assertThat(accessService.isSelf(1L)).isTrue();
         assertThat(accessService.isSelf(2L)).isFalse();
@@ -207,8 +202,8 @@ class AccessServiceTest {
     @Test
     @DisplayName("isTeamMember refleja la pertenencia al equipo")
     void teamMembershipIsChecked() {
-        when(teamMemberRepository.findActiveRoleInTeam(3L, 1L)).thenReturn(List.of(Role.MIEMBRO));
-        when(teamMemberRepository.findActiveRoleInTeam(4L, 1L)).thenReturn(List.of());
+        when(teamMemberRepository.findActiveRoleInTeam(3L, 1L)).thenReturn(Optional.of(Role.MIEMBRO));
+        when(teamMemberRepository.findActiveRoleInTeam(4L, 1L)).thenReturn(Optional.empty());
 
         assertThat(accessService.isTeamMember(3L)).isTrue();
         assertThat(accessService.canManageTeam(3L)).isFalse();
@@ -220,7 +215,7 @@ class AccessServiceTest {
     void aSuspendedWorkspaceFreezesItsTeam() {
         // La consulta ya no devuelve rol: para los permisos es como no pertenecer
         // al equipo, y asi se congela de una vez todo lo que cuelga de el.
-        when(teamMemberRepository.findActiveRoleInTeam(3L, 1L)).thenReturn(List.of());
+        when(teamMemberRepository.findActiveRoleInTeam(3L, 1L)).thenReturn(Optional.empty());
 
         assertThat(accessService.isTeamMember(3L)).isFalse();
         assertThat(accessService.canManageTeam(3L)).isFalse();

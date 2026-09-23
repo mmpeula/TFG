@@ -15,9 +15,10 @@ class UserControllerIT extends AbstractApiIT {
     @Test
     @DisplayName("La busqueda de usuarios encuentra por email y nunca devuelve el hash de la contrasena")
     void searchFindsUserAndHidesPassword() throws Exception {
+        TestUser admin = registerUser(Role.ADMIN);
         TestUser user = registerUser(Role.MIEMBRO);
 
-        mockMvc.perform(authorized(get("/api/users").param("search", user.email()), user))
+        mockMvc.perform(authorized(get("/api/users").param("search", user.email()), admin))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].email").value(user.email()))
@@ -25,17 +26,40 @@ class UserControllerIT extends AbstractApiIT {
     }
 
     @Test
-    @DisplayName("GET /api/users/{id} devuelve la ficha y 404 si no existe")
+    @DisplayName("El directorio de cuentas es del administrador: nadie mas lo lista")
+    void onlyAdminBrowsesTheDirectory() throws Exception {
+        // Es la agenda de toda la plataforma (nombres y emails de gente con la que
+        // no se comparte nada). Para invitar a alguien a un equipo no hace falta:
+        // se le invita por su email, que quien invita ya conoce.
+        TestUser user = registerUser(Role.MIEMBRO);
+
+        mockMvc.perform(authorized(get("/api/users"), user))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /api/users/{id} devuelve la ficha propia y 404 si no existe")
     void findByIdAndNotFound() throws Exception {
+        TestUser admin = registerUser(Role.ADMIN);
         TestUser user = registerUser(Role.MIEMBRO);
 
         mockMvc.perform(authorized(get("/api/users/{id}", user.id()), user))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(user.id()));
 
-        mockMvc.perform(authorized(get("/api/users/{id}", 999999), user))
+        mockMvc.perform(authorized(get("/api/users/{id}", 999999), admin))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("La ficha de otra persona no se lee, ni siquiera siendo de su equipo")
+    void cannotReadSomeoneElsesAccount() throws Exception {
+        TestUser user = registerUser(Role.MIEMBRO);
+        TestUser other = registerUser(Role.MIEMBRO);
+
+        mockMvc.perform(authorized(get("/api/users/{id}", other.id()), user))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -63,12 +87,63 @@ class UserControllerIT extends AbstractApiIT {
 
         mockMvc.perform(authorized(put("/api/users/{id}", user.id()), user)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"fullName\":\"Usuario de prueba\",\"password\":\"nuevaClave456\"}"))
+                        .content("""
+                                {"fullName":"Usuario de prueba","currentPassword":"password123",\
+                                "password":"nuevaClave456"}
+                                """))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email":"%s","password":"nuevaClave456"}
+                                """.formatted(user.email())))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Cambiarse la contrasena exige saber la actual")
+    void changingOwnPasswordNeedsTheCurrentOne() throws Exception {
+        // Una sesion abierta y sin vigilancia no puede bastar para echar a alguien
+        // de su propia cuenta: quien se sentara delante elegiria la contrasena
+        // nueva y el dueno ya no la sabria.
+        TestUser user = registerUser(Role.MIEMBRO);
+
+        mockMvc.perform(authorized(put("/api/users/{id}", user.id()), user)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Usuario de prueba\",\"password\":\"nuevaClave456\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+
+        mockMvc.perform(authorized(put("/api/users/{id}", user.id()), user)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fullName":"Usuario de prueba","currentPassword":"noEsLaSuya",\
+                                "password":"nuevaClave456"}
+                                """))
+                .andExpect(status().isConflict());
+
+        // Y la de siempre sigue valiendo: no se ha cambiado nada.
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"password123"}
+                                """.formatted(user.email())))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("El administrador restablece la contrasena de otro sin saber la suya")
+    void adminResetsSomeoneElsesPassword() throws Exception {
+        TestUser admin = registerUser(Role.ADMIN);
+        TestUser user = registerUser(Role.MIEMBRO);
+
+        mockMvc.perform(authorized(put("/api/users/{id}", user.id()), admin)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Usuario de prueba\",\"password\":\"claveRestablecida9\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"claveRestablecida9"}
                                 """.formatted(user.email())))
                 .andExpect(status().isOk());
     }

@@ -41,18 +41,34 @@ export function daysSince(value?: string | null): number {
   return days === null ? 0 : -days
 }
 
-/** "hace 6 d", "hace 4 h", "ahora mismo". */
-export function relativeTime(value?: string | null): string {
-  if (!value) return ''
+/**
+ * Minutos transcurridos desde una fecha; null si no hay fecha o no se entiende.
+ *
+ * Lo usan los dos textos de «hace cuanto» que tiene la aplicacion, que hasta
+ * dentro de las 24 horas dicen exactamente lo mismo y a partir de ahi cambian de
+ * vocabulario: la insignia va apretada y la tarjeta del workspace escribe en
+ * prosa. Lo que comparten se calcula una sola vez.
+ */
+export function minutesSince(value?: string | null): number | null {
+  if (!value) return null
   const diff = Date.now() - new Date(value).getTime()
-  if (Number.isNaN(diff)) return ''
-  const minutes = Math.floor(diff / 60000)
+  return Number.isNaN(diff) ? null : Math.floor(diff / 60000)
+}
+
+/** Lo que dicen los dos por igual: menos de un dia. `undefined` si ya pasa de ahi. */
+export function withinTheDay(minutes: number): string | undefined {
   if (minutes < 1) return 'ahora mismo'
   if (minutes < 60) return `hace ${minutes} min`
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `hace ${hours} h`
-  const days = Math.floor(hours / 24)
-  return `hace ${days} d`
+  return undefined
+}
+
+/** "hace 6 d", "hace 4 h", "ahora mismo". La version corta, para insignias. */
+export function relativeTime(value?: string | null): string {
+  const minutes = minutesSince(value)
+  if (minutes === null) return ''
+  return withinTheDay(minutes) ?? `hace ${Math.floor(minutes / 1440)} d`
 }
 
 /** Un numero con coma decimal, como se escribe en espanol. */

@@ -3,7 +3,6 @@ package com.tfg.kanban.comment;
 import com.tfg.kanban.activity.ActivityService;
 import com.tfg.kanban.comment.dto.CommentRequest;
 import com.tfg.kanban.comment.dto.CommentResponse;
-import com.tfg.kanban.common.BusinessRuleException;
 import com.tfg.kanban.common.PageResponse;
 import com.tfg.kanban.common.ResourceNotFoundException;
 import com.tfg.kanban.domain.model.ActivityAction;
@@ -37,8 +36,9 @@ public class CommentService {
     @Transactional
     public CommentResponse create(Long taskId, CommentRequest request) {
         Task task = taskService.getTask(taskId);
-        User author = userRepository.findById(currentUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario", currentUserId()));
+        Long userId = SecurityUtils.requireCurrentUserId();
+        User author = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
 
         Comment comment = commentRepository.save(Comment.builder()
                 .task(task)
@@ -71,8 +71,4 @@ public class CommentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Comentario", commentId));
     }
 
-    private Long currentUserId() {
-        return SecurityUtils.currentUserId()
-                .orElseThrow(() -> new BusinessRuleException("No hay usuario autenticado"));
-    }
 }

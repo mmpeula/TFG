@@ -1,6 +1,7 @@
 package com.tfg.kanban.domain.repository;
 
 import com.tfg.kanban.common.CountByEntity;
+import com.tfg.kanban.domain.model.Role;
 import com.tfg.kanban.domain.model.TeamMember;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -31,14 +32,14 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
             where m.team.id = :teamId and m.user.id = :userId
               and not exists (select 1 from Project p where p.team = m.team and p.enabled = false)
             """)
-    List<com.tfg.kanban.domain.model.Role> findActiveRoleInTeam(Long teamId, Long userId);
+    Optional<Role> findActiveRoleInTeam(Long teamId, Long userId);
 
 
     List<TeamMember> findByTeam_IdOrderByUser_FullNameAsc(Long teamId);
 
     boolean existsByTeam_IdAndUser_Id(Long teamId, Long userId);
 
-    long countByTeam_IdAndRole(Long teamId, com.tfg.kanban.domain.model.Role role);
+    long countByTeam_IdAndRole(Long teamId, Role role);
 
     /** Cuantos miembros tiene cada equipo del lote. Evita una consulta por workspace. */
     @Query("""
@@ -71,7 +72,7 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
             join Project p on p.team = m.team
             where p.id = :projectId and m.user.id = :userId and p.enabled = true
             """)
-    Optional<com.tfg.kanban.domain.model.Role> findRoleByProject(Long projectId, Long userId);
+    Optional<Role> findRoleByProject(Long projectId, Long userId);
 
     /** Rol del usuario en el equipo al que pertenece un tablero. */
     @Query("""
@@ -80,7 +81,7 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
             join Board b on b.project = p
             where b.id = :boardId and m.user.id = :userId and p.enabled = true
             """)
-    Optional<com.tfg.kanban.domain.model.Role> findRoleByBoard(Long boardId, Long userId);
+    Optional<Role> findRoleByBoard(Long boardId, Long userId);
 
     /** Rol del usuario en el equipo al que pertenece una columna. */
     @Query("""
@@ -90,7 +91,7 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
             join BoardColumn c on c.board = b
             where c.id = :columnId and m.user.id = :userId and p.enabled = true
             """)
-    Optional<com.tfg.kanban.domain.model.Role> findRoleByColumn(Long columnId, Long userId);
+    Optional<Role> findRoleByColumn(Long columnId, Long userId);
 
     /** Rol del usuario en el equipo al que pertenece una tarea. */
     @Query("""
@@ -101,5 +102,5 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
             join Task t on t.boardColumn = c
             where t.id = :taskId and m.user.id = :userId and p.enabled = true
             """)
-    Optional<com.tfg.kanban.domain.model.Role> findRoleByTask(Long taskId, Long userId);
+    Optional<Role> findRoleByTask(Long taskId, Long userId);
 }

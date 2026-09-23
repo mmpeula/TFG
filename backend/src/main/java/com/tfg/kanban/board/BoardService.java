@@ -3,6 +3,7 @@ package com.tfg.kanban.board;
 import com.tfg.kanban.activity.ActivityService;
 import com.tfg.kanban.board.dto.*;
 import com.tfg.kanban.common.BusinessRuleException;
+import com.tfg.kanban.common.CountByEntity;
 import com.tfg.kanban.common.ResourceNotFoundException;
 import com.tfg.kanban.domain.model.*;
 import com.tfg.kanban.domain.repository.BoardColumnRepository;
@@ -32,8 +33,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class BoardService {
-
-    private static final List<String> DEFAULT_COLUMNS = List.of("Por hacer", "En progreso", "Hecho");
 
     private final BoardRepository boardRepository;
     private final BoardColumnRepository columnRepository;
@@ -70,21 +69,8 @@ public class BoardService {
     public BoardResponse create(Long projectId, BoardRequest request) {
         Project project = projectService.getProject(projectId);
 
-        Board board = Board.builder()
-                .name(request.name().trim())
-                .description(request.description())
-                .project(project)
-                .build();
-
-        for (int i = 0; i < DEFAULT_COLUMNS.size(); i++) {
-            board.getColumns().add(BoardColumn.builder()
-                    .board(board)
-                    .name(DEFAULT_COLUMNS.get(i))
-                    .position(i)
-                    .build());
-        }
-
-        Board saved = boardRepository.save(board);
+        Board saved = boardRepository.save(
+                DefaultBoard.of(request.name().trim(), request.description(), project));
         activityService.record(project, ActivityAction.CREACION, "Board", saved.getId(),
                 "Creo el tablero '%s'".formatted(saved.getName()));
 
@@ -113,9 +99,7 @@ public class BoardService {
 
     public List<ColumnResponse> findColumns(Long boardId) {
         getBoard(boardId);
-        return columnRepository.findByBoard_IdOrderByPositionAsc(boardId).stream()
-                .map(column -> ColumnResponse.summary(column, (int) taskRepository.countByBoardColumn_Id(column.getId())))
-                .toList();
+        return summaries(columnRepository.findByBoard_IdOrderByPositionAsc(boardId));
     }
 
     @Transactional
@@ -173,8 +157,27 @@ public class BoardService {
                 "BoardColumn", column.getId(),
                 "Movio la columna '%s' a la posicion %d".formatted(column.getName(), target));
 
+        return summaries(columns);
+    }
+
+    /**
+     * Las columnas con su numero de tareas, contadas en una sola consulta.
+     *
+     * Una consulta por columna es barato con tres y deja de serlo en cuanto un
+     * equipo se hace su propio flujo; ademas es el mismo lote que ya resuelven asi
+     * el tablero y la pantalla de inicio.
+     */
+    private List<ColumnResponse> summaries(List<BoardColumn> columns) {
+        if (columns.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Long> tasksByColumn = taskRepository
+                .countByColumnIds(columns.stream().map(BoardColumn::getId).toList()).stream()
+                .collect(Collectors.toMap(CountByEntity::entityId, CountByEntity::total));
+
         return columns.stream()
-                .map(item -> ColumnResponse.summary(item, (int) taskRepository.countByBoardColumn_Id(item.getId())))
+                .map(column -> ColumnResponse.summary(column,
+                        tasksByColumn.getOrDefault(column.getId(), 0L).intValue()))
                 .toList();
     }
 

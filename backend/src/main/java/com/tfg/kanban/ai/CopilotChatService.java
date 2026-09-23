@@ -3,6 +3,7 @@ package com.tfg.kanban.ai;
 import com.tfg.kanban.ai.dto.ChatRequest;
 import com.tfg.kanban.ai.dto.ChatResponse;
 import com.tfg.kanban.ai.dto.ChatTurn;
+import com.tfg.kanban.common.CountByEntity;
 import com.tfg.kanban.domain.model.*;
 import com.tfg.kanban.domain.repository.CommentRepository;
 import com.tfg.kanban.domain.repository.TaskRepository;
@@ -17,6 +18,8 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * El copiloto conversacional del workspace.
@@ -164,7 +167,12 @@ public class CopilotChatService {
         }
 
         sb.append("\nTareas del tablero (").append(tasks.size()).append(" en total):\n");
-        for (Task task : tasks.stream().limit(MAX_TASKS).toList()) {
+        List<Task> descritas = tasks.stream().limit(MAX_TASKS).toList();
+        Map<Long, Long> comentariosPorTarea = commentRepository
+                .countByTaskIds(descritas.stream().map(Task::getId).toList()).stream()
+                .collect(Collectors.toMap(CountByEntity::entityId, CountByEntity::total));
+
+        for (Task task : descritas) {
             sb.append("- «").append(task.getTitle()).append("»")
                     .append(" | estado: ").append(task.getBoardColumn().getName())
                     .append(" | prioridad: ").append(task.getPriority().name().toLowerCase());
@@ -181,7 +189,7 @@ public class CopilotChatService {
             if (task.getEstimatedHours() != null) {
                 sb.append(" | horas estimadas: ").append(task.getEstimatedHours());
             }
-            long comentarios = commentRepository.countByTask_Id(task.getId());
+            long comentarios = comentariosPorTarea.getOrDefault(task.getId(), 0L);
             if (comentarios > 0) {
                 sb.append(" | ").append(comentarios).append(" comentarios");
             }

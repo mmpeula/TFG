@@ -78,14 +78,18 @@ class HealthControllerTest {
     }
 
     @Test
-    @DisplayName("Si la base de datos no responde, el error se refleja en la respuesta")
+    @DisplayName("Si la base de datos no responde, se informa sin filtrar el detalle del error")
     void reportsDownWhenSqlFails() throws SQLException {
-        when(dataSource.getConnection()).thenThrow(new SQLException("ORA-12541: no listener"));
+        when(dataSource.getConnection()).thenThrow(new SQLException("ORA-12541: TNS:no listener en bd:1521"));
 
         var response = controller.health();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-        assertThat(response.getBody().database().error()).contains("ORA-12541");
+        assertThat(response.getBody().database().status()).isEqualTo("DOWN");
+        // El endpoint es publico: el mensaje de Oracle (con host y puerto) se queda
+        // en el log y fuera solo sale que la base de datos no responde.
+        assertThat(response.getBody().database().error()).isEqualTo("La base de datos no responde");
+        assertThat(response.getBody().database().error()).doesNotContain("ORA-12541");
         // Sin perfiles activos se informa de "default"
         assertThat(response.getBody().profile()).isEqualTo("default");
     }

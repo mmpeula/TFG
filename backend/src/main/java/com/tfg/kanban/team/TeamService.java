@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -35,20 +36,21 @@ public class TeamService {
     private final UserRepository userRepository;
 
     public PageResponse<TeamResponse> findMine(Pageable pageable) {
-        Long userId = currentUserId();
+        Long userId = SecurityUtils.requireCurrentUserId();
         return PageResponse.of(teamRepository.findByMembers_User_Id(userId, pageable),
                 team -> TeamResponse.from(team, roleOf(team, userId)));
     }
 
     public TeamResponse findById(Long teamId) {
         Team team = getTeam(teamId);
-        return TeamResponse.from(team, roleOf(team, currentUserId()));
+        return TeamResponse.from(team, roleOf(team, SecurityUtils.requireCurrentUserId()));
     }
 
     @Transactional
     public TeamResponse create(TeamRequest request) {
-        User owner = userRepository.findById(currentUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario", currentUserId()));
+        Long userId = SecurityUtils.requireCurrentUserId();
+        User owner = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
 
         Team team = Team.builder()
                 .name(request.name().trim())
@@ -72,7 +74,7 @@ public class TeamService {
         Team team = getTeam(teamId);
         team.setName(request.name().trim());
         team.setDescription(request.description());
-        return TeamResponse.from(team, roleOf(team, currentUserId()));
+        return TeamResponse.from(team, roleOf(team, SecurityUtils.requireCurrentUserId()));
     }
 
     @Transactional
@@ -165,7 +167,7 @@ public class TeamService {
         return team.getMembers().stream()
                 .filter(member -> member.getRole() == Role.RESPONSABLE)
                 .filter(member -> !member.getUser().getId().equals(saliente))
-                .min(java.util.Comparator.comparing(TeamMember::getId))
+                .min(Comparator.comparing(TeamMember::getId))
                 .map(TeamMember::getUser)
                 .orElseThrow(() -> new BusinessRuleException(
                         "Eres la unica persona responsable: nombra a otra antes de salirte del equipo"));
@@ -197,8 +199,4 @@ public class TeamService {
                 .orElse(null);
     }
 
-    private Long currentUserId() {
-        return SecurityUtils.currentUserId()
-                .orElseThrow(() -> new BusinessRuleException("No hay usuario autenticado"));
-    }
 }

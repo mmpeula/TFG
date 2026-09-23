@@ -34,6 +34,10 @@ public final class TaskSpecifications {
 
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(isTeamMember(cb, query, project, userId));
+            // Un workspace suspendido no se puede abrir: GET /api/tasks/{id} lo
+            // rechaza porque el permiso por tarea filtra por enabled. Sin esta linea
+            // la busqueda era la puerta de atras que devolvia sus tareas igualmente.
+            predicates.add(cb.isTrue(project.get("enabled")));
 
             if (projectId != null) {
                 predicates.add(cb.equal(project.get("id"), projectId));
