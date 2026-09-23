@@ -107,6 +107,75 @@ class TeamControllerIT extends AbstractApiIT {
     }
 
     @Test
+    @DisplayName("Las indicaciones para el plan se guardan y se leen con el miembro")
+    void planNotesSurviveAndTravelWithTheMember() throws Exception {
+        TestUser responsable = registerUser(Role.MIEMBRO);
+        TestUser companero = registerUser(Role.MIEMBRO);
+        Long teamId = createTeam(responsable, "Equipo con fichas");
+        addMember(responsable, teamId, companero, Role.MIEMBRO);
+
+        mockMvc.perform(authorized(
+                        patch("/api/teams/{id}/members/{userId}/notes", teamId, companero.id()), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"planNotes\":\"Se maneja con Java y Spring. Evitar frontend.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.planNotes").value("Se maneja con Java y Spring. Evitar frontend."));
+
+        // Se queda: es lo que la distingue de las indicaciones de una ejecucion.
+        mockMvc.perform(authorized(get("/api/teams/{id}/members", teamId), responsable))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.user.id == %d)].planNotes".formatted(companero.id()))
+                        .value("Se maneja con Java y Spring. Evitar frontend."));
+
+        // Y un texto en blanco las borra en vez de dejar una cadena vacia.
+        mockMvc.perform(authorized(
+                        patch("/api/teams/{id}/members/{userId}/notes", teamId, companero.id()), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"planNotes\":\"   \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.planNotes").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Solo el responsable escribe las indicaciones de un miembro")
+    void onlyResponsableWritesPlanNotes() throws Exception {
+        TestUser responsable = registerUser(Role.MIEMBRO);
+        TestUser companero = registerUser(Role.MIEMBRO);
+        Long teamId = createTeam(responsable, "Equipo con fichas");
+        addMember(responsable, teamId, companero, Role.MIEMBRO);
+
+        // Ni siquiera la suya propia: la ficha la mantiene quien coordina el equipo,
+        // igual que el rol, porque es lo que decide como se le reparte el trabajo.
+        mockMvc.perform(authorized(
+                        patch("/api/teams/{id}/members/{userId}/notes", teamId, companero.id()), companero)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"planNotes\":\"Solo quiero tareas faciles\"}"))
+                .andExpect(status().isForbidden());
+
+        TestUser ajeno = registerUser(Role.MIEMBRO);
+        mockMvc.perform(authorized(
+                        patch("/api/teams/{id}/members/{userId}/notes", teamId, companero.id()), ajeno)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"planNotes\":\"Me invento una ficha\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Una ficha desmedida se rechaza por validacion")
+    void planNotesAreCapped() throws Exception {
+        TestUser responsable = registerUser(Role.MIEMBRO);
+        Long teamId = createTeam(responsable, "Equipo con fichas");
+
+        mockMvc.perform(authorized(
+                        patch("/api/teams/{id}/members/{userId}/notes", teamId, responsable.id()), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                java.util.Map.of("planNotes", "a".repeat(601)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     @DisplayName("No se borra un equipo que aun tiene proyectos")
     void cannotDeleteTeamWithProjects() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);

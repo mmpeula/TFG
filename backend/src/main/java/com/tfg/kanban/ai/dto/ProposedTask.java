@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Schema(description = "Tarea propuesta por el modelo. No existe en el tablero hasta que se acepta.",
         example = """
@@ -43,16 +44,49 @@ public record ProposedTask(
         Long assigneeId,
 
         @Schema(description = "Nombre del miembro, para poder mostrarlo sin otra consulta")
-        String assigneeName
+        String assigneeName,
+
+        /**
+         * Por que le ha tocado a esa persona, en una frase.
+         *
+         * <p>Lo escribe el servidor, no el modelo, porque el reparto final tampoco
+         * lo decide el modelo: este sugiere y {@code WorkloadBalancer} confirma o
+         * cambia la sugerencia segun la carga. Dejar aqui la frase del modelo
+         * cuando el servidor le ha llevado la contraria seria guardar una
+         * explicacion que no corresponde a lo que acabo pasando.</p>
+         */
+        @Schema(description = "Por que se le ha asignado a esa persona. Lo compone el servidor "
+                + "combinando lo que dijo el modelo con lo que decidio el reparto por carga.",
+                example = "Backend y Java (segun el modelo)")
+        @Size(max = 300)
+        String assignmentReason,
+
+        /**
+         * Quienes no pueden acabar con esta tarea, segun el modelo.
+         *
+         * <p>Es como llegan al reparto las prohibiciones escritas en la ficha de
+         * cada persona: el equilibrado es determinista y no entiende «nunca le des
+         * frontend», asi que el modelo traduce esas frases a nombres concretos por
+         * tarea y el servidor los respeta. Vacia mientras nadie prohiba nada, que
+         * es el caso corriente.</p>
+         */
+        @Schema(description = "Nombres que el reparto no debe elegir para esta tarea")
+        List<String> avoid
 ) {
 
-    /** Copia de la tarea con el reparto ya resuelto. */
-    public ProposedTask assignedTo(Long id, String name) {
-        return new ProposedTask(title, reason, type, priority, estimatedHours, dueDate, id, name);
+    /** Copia de la tarea con el reparto ya resuelto y su explicacion. */
+    public ProposedTask assignedTo(Long id, String name, String why) {
+        return new ProposedTask(title, reason, type, priority, estimatedHours, dueDate, id, name, why, avoid);
     }
 
     /** Copia de la tarea con la fecha ya calculada. */
     public ProposedTask withDueDate(LocalDate date) {
-        return new ProposedTask(title, reason, type, priority, estimatedHours, date, assigneeId, assigneeName);
+        return new ProposedTask(title, reason, type, priority, estimatedHours, date,
+                assigneeId, assigneeName, assignmentReason, avoid);
+    }
+
+    /** Nunca null, para no tener que comprobarlo en cada sitio que la recorre. */
+    public List<String> avoidOrEmpty() {
+        return avoid == null ? List.of() : avoid;
     }
 }

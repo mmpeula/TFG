@@ -28,12 +28,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * Lo que hace util al copiloto no es el modelo sino el contexto que se le manda.
+ * Lo que hace util al asistente no es el modelo sino el contexto que se le manda.
  * Aqui se comprueba justo eso: que en el prompt esta el tablero de verdad.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class CopilotChatServiceTest {
+class AssistantChatServiceTest {
 
     @Mock private AiProperties properties;
     @Mock private OllamaClient ollamaClient;
@@ -41,7 +41,7 @@ class CopilotChatServiceTest {
     @Mock private TaskRepository taskRepository;
     @Mock private CommentRepository commentRepository;
 
-    @InjectMocks private CopilotChatService service;
+    @InjectMocks private AssistantChatService service;
 
     private Project project;
     private Board board;
@@ -120,6 +120,52 @@ class CopilotChatServiceTest {
         service.answer(10L, new ChatRequest("Vamos tarde?", List.of()));
 
         assertThat(contexto()).contains("(ATRASADA)").contains("(urge)");
+    }
+
+    @Test
+    @DisplayName("Una tarea en curso sin mover hace dias se marca como parada")
+    void marksStaleTasksInAWorkColumn() {
+        BoardColumn enCurso = BoardColumn.builder().id(32L).name("En curso").position(1).board(board).build();
+        // Reordena el tablero a tres columnas: por hacer / en curso / hecho. Solo la
+        // de en medio cuenta como "trabajo en marcha" para la senal de parada.
+        board.getColumns().clear();
+        board.getColumns().addAll(List.of(porHacer, enCurso, hecho));
+
+        Task quieta = task(1L, "Migrar el esquema", enCurso, ana, null);
+        quieta.setUpdatedAt(java.time.Instant.now().minus(6, java.time.temporal.ChronoUnit.DAYS));
+        Task reciente = task(2L, "Revisar el PR", enCurso, ana, null);
+        reciente.setUpdatedAt(java.time.Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS));
+        Task sinEmpezar = task(3L, "Preparar la demo", porHacer, ana, null);
+        sinEmpezar.setUpdatedAt(java.time.Instant.now().minus(30, java.time.temporal.ChronoUnit.DAYS));
+
+        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L))
+                .thenReturn(List.of(quieta, reciente, sinEmpezar));
+
+        service.answer(10L, new ChatRequest("hay algo parado?", null));
+
+        assertThat(contexto())
+                .contains("Migrar el esquema").contains("sin mover desde hace 6 dias (PARADA)")
+                .doesNotContainPattern("Revisar el PR[^\\n]*PARADA")
+                // Todavia no se ha empezado a trabajar en ella: no es lo mismo estar
+                // parado que no haber arrancado, aunque lleve mas tiempo sin tocarse.
+                .doesNotContainPattern("Preparar la demo[^\\n]*PARADA");
+    }
+
+    @Test
+    @DisplayName("Sin fecha de movimiento no se puede afirmar que este parada")
+    void tasksWithoutTimestampsAreNotFlagged() {
+        BoardColumn enCurso = BoardColumn.builder().id(32L).name("En curso").position(1).board(board).build();
+        board.getColumns().clear();
+        board.getColumns().addAll(List.of(porHacer, enCurso, hecho));
+
+        // El builder de tareas de este test no rellena createdAt/updatedAt, igual
+        // que una entidad recien construida en memoria sin pasar por Hibernate.
+        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L))
+                .thenReturn(List.of(task(1L, "Sin fecha registrada", enCurso, ana, null)));
+
+        service.answer(10L, new ChatRequest("hay algo parado?", null));
+
+        assertThat(contexto()).doesNotContain("PARADA");
     }
 
     @Test

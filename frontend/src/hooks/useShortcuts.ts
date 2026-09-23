@@ -5,7 +5,7 @@ interface Shortcuts {
   plan?: () => void
   board?: () => void
   pulse?: () => void
-  copilot?: () => void
+  generatePlan?: () => void
   help?: () => void
   escape?: () => void
 }
@@ -16,7 +16,7 @@ const KEYS: Record<string, keyof Shortcuts> = {
   p: 'plan',
   b: 'board',
   i: 'pulse',
-  c: 'copilot',
+  g: 'generatePlan',
   '?': 'help',
 }
 

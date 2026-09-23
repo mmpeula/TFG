@@ -2,6 +2,7 @@ package com.tfg.kanban.domain.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 /**
@@ -42,4 +43,38 @@ public class TeamMember extends Auditable {
     @Column(name = "ROLE", nullable = false, length = 20)
     @Builder.Default
     private Role role = Role.MIEMBRO;
+
+    /**
+     * Lo que hay que saber de esta persona para repartirle trabajo al generar el plan:
+     * en que se maneja, que prefiere, que conviene no darle. Texto libre, en
+     * lenguaje corriente, porque quien lo escribe es el responsable del equipo y
+     * quien lo lee es un modelo de lenguaje: una lista cerrada de habilidades
+     * obligaria a traducir «se defiende con SQL pero nunca ha tocado React» a
+     * unas etiquetas que pierden justo el matiz que hace util la frase.
+     *
+     * <p>Cuelga de la pertenencia al equipo y no de la cuenta a proposito. Lo
+     * escribe el responsable del workspace, y solo debe valer ahi: la misma
+     * persona puede ser la que lleva el backend en una practica y la que se
+     * encarga de la memoria en otra. Colgarlo de {@code User} dejaria ademas que
+     * el responsable de un equipo editara el perfil que esa persona arrastra a
+     * equipos suyos en los que el no pinta nada.</p>
+     *
+     * <p>Es distinto de las indicaciones que se escriben justo antes de generar
+     * un plan: aquellas valen solo para esa vez y no se guardan en ningun sitio.
+     * Esto se queda y se usa en todas las ejecuciones siguientes.</p>
+     */
+    @Size(max = MAX_PLAN_NOTES)
+    @Column(name = "PLAN_NOTES", length = MAX_PLAN_NOTES)
+    private String planNotes;
+
+    /**
+     * Tope de las indicaciones de una persona.
+     *
+     * <p>Son varias las que entran en el mismo prompt —una por miembro— y compiten
+     * por el sitio con el enunciado de la practica, que es lo que de verdad hay
+     * que planificar. Con un parrafo por persona sobra para decir en que se maneja
+     * y que conviene evitarle; un texto largo no da mejor reparto, solo empuja al
+     * enunciado fuera del contexto de un modelo pequeno.</p>
+     */
+    public static final int MAX_PLAN_NOTES = 600;
 }

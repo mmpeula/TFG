@@ -119,6 +119,12 @@ export interface TeamMemberResponse {
   user: UserSummary
   role: Role
   joinedAt: string
+  /**
+   * Lo que se sabe de esta persona al repartir trabajo en un plan. Se guarda y vale
+   * para todas las ejecuciones; no confundir con las indicaciones que se escriben
+   * justo antes de generar un plan, que solo valen para esa vez.
+   */
+  planNotes?: string | null
 }
 
 export interface ProjectResponse {
@@ -218,6 +224,10 @@ export interface ProposedTask {
   dueDate?: string
   assigneeId?: number
   assigneeName?: string
+  /** Por que le ha tocado a esa persona. Lo compone el servidor, no el modelo. */
+  assignmentReason?: string
+  /** Nombres que el reparto no debe elegir para esta tarea. */
+  avoid?: string[]
 }
 
 export interface MemberWorkload {

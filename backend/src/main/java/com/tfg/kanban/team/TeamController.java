@@ -99,6 +99,18 @@ public class TeamController {
         return teamService.updateMemberRole(id, userId, request);
     }
 
+    @Operation(summary = "Indicaciones permanentes de un miembro para generar el plan",
+            description = "Lo que se tiene en cuenta de esa persona al repartir trabajo: en que "
+                    + "se maneja, que prefiere y que conviene evitarle. Se guarda y vale para todas las "
+                    + "ejecuciones siguientes, a diferencia de las indicaciones que se escriben justo antes "
+                    + "de generar un plan, que solo valen para esa vez. Solo el RESPONSABLE.")
+    @PreAuthorize("@access.canManageTeam(#id)")
+    @PatchMapping("/{id}/members/{userId}/notes")
+    public TeamMemberResponse updateMemberNotes(@PathVariable Long id, @PathVariable Long userId,
+                                                @Valid @RequestBody UpdateMemberNotesRequest request) {
+        return teamService.updateMemberNotes(id, userId, request);
+    }
+
     @Operation(summary = "Expulsar a un miembro o salirse del equipo",
             description = "El RESPONSABLE puede expulsar a cualquiera; cualquier miembro puede salirse el mismo.")
     @ApiResponses(@ApiResponse(responseCode = "204", description = "Miembro eliminado"))

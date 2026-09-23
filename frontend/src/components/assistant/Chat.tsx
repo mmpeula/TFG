@@ -30,7 +30,7 @@ interface Props {
 }
 
 /**
- * La conversacion con el copiloto.
+ * La conversacion con el asistente.
  *
  * Es un chat corriente a proposito: es la unica interfaz que un estudiante ya
  * sabe usar sin que nadie se la explique.

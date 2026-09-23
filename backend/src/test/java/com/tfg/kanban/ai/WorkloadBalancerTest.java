@@ -27,8 +27,12 @@ class WorkloadBalancerTest {
     }
 
     private ProposedTask task(String title, Integer hours, String suggested) {
+        return task(title, hours, suggested, List.of());
+    }
+
+    private ProposedTask task(String title, Integer hours, String suggested, List<String> avoid) {
         return new ProposedTask(title, null, null, TaskPriority.MEDIA,
-                hours == null ? null : BigDecimal.valueOf(hours), null, null, suggested);
+                hours == null ? null : BigDecimal.valueOf(hours), null, null, suggested, null, avoid);
     }
 
     private final List<TeamMember> equipo = List.of(
@@ -53,6 +57,71 @@ class WorkloadBalancerTest {
                 List.of(task("A", 2, "luis"), task("B", 2, "ANA GARCÍA")), equipo, null);
 
         assertThat(result.tasks()).extracting(ProposedTask::assigneeId).containsExactly(2L, 1L);
+    }
+
+    @Test
+    @DisplayName("La especializacion sobrevive a mas de una tarea seguida")
+    void specialistKeepsASecondTask() {
+        // Antes no: a la segunda tarea el especialista ya cargaba mas que nadie y el
+        // reparto se la quitaba, asi que tener una ficha no servia de nada. Con el
+        // margen de una tarea media puede encadenar lo suyo.
+        var result = balancer.distribute(List.of(
+                task("API de login", 4, "Luis Perez"),
+                task("API de prestamos", 4, "Luis Perez")), equipo, null);
+
+        assertThat(result.tasks()).extracting(ProposedTask::assigneeName)
+                .containsExactly("Luis Perez", "Luis Perez");
+    }
+
+    @Test
+    @DisplayName("Pero la especializacion no llega a acaparar el trabajo entero")
+    void specialistDoesNotTakeEverything() {
+        var result = balancer.distribute(List.of(
+                task("A", 6, "Luis Perez"), task("B", 6, "Luis Perez"),
+                task("C", 6, "Luis Perez"), task("D", 6, "Luis Perez"),
+                task("E", 6, "Luis Perez"), task("F", 6, "Luis Perez")), equipo, null);
+
+        assertThat(result.workload())
+                .filteredOn(w -> w.memberId().equals(2L))
+                .singleElement()
+                .satisfies(w -> assertThat(w.tasks()).isLessThan(6));
+        assertThat(result.workload()).allSatisfy(w -> assertThat(w.tasks()).isPositive());
+    }
+
+    @Test
+    @DisplayName("A quien la tarea veta no se le da, aunque sea quien menos carga lleve")
+    void forbiddenMemberNeverGetsTheTask() {
+        var vetada = task("Maquetar el login", 4, null, List.of("Ana Garcia"));
+
+        var result = balancer.distribute(List.of(vetada), equipo, null);
+
+        assertThat(result.tasks()).singleElement()
+                .satisfies(t -> assertThat(t.assigneeName()).isNotEqualTo("Ana Garcia"));
+    }
+
+    @Test
+    @DisplayName("Un veto sobre todo el equipo se ignora antes que dejar la tarea sin nadie")
+    void anImpossibleVetoIsIgnored() {
+        var imposible = task("Tarea", 4, null,
+                List.of("Ana Garcia", "Luis Perez", "Marta Ruiz"));
+
+        var result = balancer.distribute(List.of(imposible), equipo, null);
+
+        assertThat(result.tasks()).singleElement()
+                .satisfies(t -> assertThat(t.assigneeId()).isNotNull());
+    }
+
+    @Test
+    @DisplayName("El reparto explica cada asignacion")
+    void everyAssignmentIsExplained() {
+        var conRazon = new ProposedTask("Montar la API", null, null, TaskPriority.MEDIA,
+                BigDecimal.valueOf(4), null, null, "Luis Perez", "Backend y Java", List.of());
+        var sinNadie = task("Redactar la memoria", 4, null);
+
+        var result = balancer.distribute(List.of(conRazon, sinNadie), equipo, null);
+
+        assertThat(result.tasks().get(0).assignmentReason()).isEqualTo("Backend y Java");
+        assertThat(result.tasks().get(1).assignmentReason()).contains("Reparto");
     }
 
     @Test

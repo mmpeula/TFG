@@ -3,24 +3,24 @@ import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
 import { Bot, MessageCircleQuestion, X } from 'lucide-react'
 import { Chat } from './Chat'
-import styles from './HelpChat.module.css'
+import styles from './Assistant.module.css'
 import { workspaces as workspacesApi } from '@/api/endpoints'
 import { toErrorMessage } from '@/lib/api-client'
-import { useHelpChat } from '@/state/context'
+import { useAssistant } from '@/state/context'
 import type { ChatTurn } from '@/types/api'
 
 /**
  * Chat de ayuda del workspace: un boton flotante que se despliega en un panel
- * para preguntarle al copiloto sobre el trabajo.
+ * para preguntarle al asistente sobre el trabajo.
  *
  * Flotante y no una pantalla propia a proposito: se pregunta «que hago primero?»
  * mirando el tablero, no yendo a otro sitio a preguntarlo. Por eso el panel se
  * abre encima de lo que haya debajo y la conversacion sobrevive al cambio de
- * seccion (vive en HelpChatProvider). Automatizar tareas es otra cosa: eso es el
- * Copiloto, que si tiene pestana y solo la ve el responsable.
+ * seccion (vive en AssistantProvider). Automatizar tareas es otra cosa: eso es el
+ * Generar plan, que si tiene pestana y solo la ve el responsable.
  */
-export function HelpChat({ workspaceId }: { workspaceId: number }) {
-  const { open, toggle, close, messagesOf, append, reset } = useHelpChat()
+export function Assistant({ workspaceId }: { workspaceId: number }) {
+  const { open, toggle, close, messagesOf, append, reset } = useAssistant()
   const messages = messagesOf(workspaceId)
 
   // Escape cierra el panel, como cualquier cosa que se abre por encima.
@@ -68,7 +68,7 @@ export function HelpChat({ workspaceId }: { workspaceId: number }) {
               <Bot size={14} strokeWidth={2.75} />
             </span>
             <span className={styles.titles}>
-              <span className={styles.title}>Copiloto</span>
+              <span className={styles.title}>Asistente</span>
               <span className={styles.hint}>Responde sobre este workspace</span>
             </span>
             <button className={styles.close} onClick={close} aria-label="Cerrar el chat">

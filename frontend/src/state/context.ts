@@ -30,22 +30,22 @@ export interface AuthValue {
 
 /**
  * Generar una planificacion con el modelo local tarda: si dependiera de que
- * Copiloto siguiera montado, cambiar de pestana mientras piensa perderia el
+ * Generar plan siguiera montada, cambiar de pestana mientras piensa perderia el
  * resultado. Este contexto vive por encima de las rutas (junto a Auth/Ui) para
  * que la generacion siga aunque el usuario se vaya a mirar el tablero, y el
  * resultado (o el error) le espere cuando vuelva.
  */
-export type CopilotJobStatus = 'pending' | 'done' | 'error'
+export type PlanJobStatus = 'pending' | 'done' | 'error'
 
-export interface CopilotJob {
-  status: CopilotJobStatus
+export interface PlanJob {
+  status: PlanJobStatus
   /** De donde esta leyendo, para el mensaje de "generando…" aunque se remonte la pantalla. */
   sourceLabel: string
   plan?: AiPlanResponse
   error?: string
 }
 
-export interface CopilotGenerateRequest {
+export interface PlanGenerateRequest {
   workspaceId: number
   /** Solo para el aviso: "Propuesta lista para «Bases de Datos»". */
   workspaceName: string
@@ -55,10 +55,10 @@ export interface CopilotGenerateRequest {
   indications?: string
 }
 
-export interface CopilotJobsValue {
+export interface PlanJobsValue {
   /** Una entrada por workspace con una generacion en curso o ya resuelta. */
-  jobs: Record<number, CopilotJob>
-  start: (request: CopilotGenerateRequest) => void
+  jobs: Record<number, PlanJob>
+  start: (request: PlanGenerateRequest) => void
   /** Descarta el resultado (o el error) de este workspace, p. ej. al cambiar el documento/descripcion. */
   clear: (workspaceId: number) => void
 }
@@ -69,7 +69,7 @@ export interface CopilotJobsValue {
  * borraria a media pregunta. Se guarda aqui, por workspace, junto con si el panel
  * esta abierto, para que cambiar de seccion no interrumpa nada.
  */
-export interface HelpChatMessage {
+export interface AssistantMessage {
   role: 'user' | 'assistant'
   content: string
   /** Lo que el modelo tenia delante al responder; se muestra en pequeno. */
@@ -78,7 +78,7 @@ export interface HelpChatMessage {
 }
 
 /**
- * Lo que hay escrito y elegido en la pantalla de Copiloto, por workspace.
+ * Lo que hay escrito y elegido en la pantalla de Generar plan, por workspace.
  *
  * Vive fuera de la pantalla por lo mismo que la generacion: subir un documento,
  * escribir las indicaciones y luego pasarse al tablero a mirar algo no puede
@@ -86,7 +86,7 @@ export interface HelpChatMessage {
  * referencia en memoria, sigue valiendo—; lo que no sobrevive es recargar la
  * pagina, y ahi no hay nada que hacer sin volver a elegirlo.
  */
-export interface CopilotDraft {
+export interface PlanDraft {
   file: File | null
   text: string
   indications: string
@@ -99,12 +99,12 @@ export interface CopilotDraft {
   scheduleApplied: boolean
 }
 
-export interface CopilotDraftsValue {
-  draftOf: (workspaceId: number) => CopilotDraft
-  patch: (workspaceId: number, cambios: Partial<CopilotDraft>) => void
+export interface PlanDraftsValue {
+  draftOf: (workspaceId: number) => PlanDraft
+  patch: (workspaceId: number, cambios: Partial<PlanDraft>) => void
 }
 
-export const EMPTY_COPILOT_DRAFT: CopilotDraft = {
+export const EMPTY_PLAN_DRAFT: PlanDraft = {
   file: null,
   text: '',
   indications: '',
@@ -114,21 +114,21 @@ export const EMPTY_COPILOT_DRAFT: CopilotDraft = {
   scheduleApplied: false,
 }
 
-export interface HelpChatValue {
+export interface AssistantValue {
   open: boolean
   toggle: () => void
   close: () => void
   /** Conversacion de este workspace, vacia si todavia no se ha preguntado nada. */
-  messagesOf: (workspaceId: number) => HelpChatMessage[]
-  append: (workspaceId: number, message: HelpChatMessage) => void
+  messagesOf: (workspaceId: number) => AssistantMessage[]
+  append: (workspaceId: number, message: AssistantMessage) => void
   reset: (workspaceId: number) => void
 }
 
 export const UiContext = createContext<UiValue | null>(null)
 export const AuthContext = createContext<AuthValue | null>(null)
-export const CopilotJobsContext = createContext<CopilotJobsValue | null>(null)
-export const HelpChatContext = createContext<HelpChatValue | null>(null)
-export const CopilotDraftsContext = createContext<CopilotDraftsValue | null>(null)
+export const PlanJobsContext = createContext<PlanJobsValue | null>(null)
+export const AssistantContext = createContext<AssistantValue | null>(null)
+export const PlanDraftsContext = createContext<PlanDraftsValue | null>(null)
 
 export function useUi(): UiValue {
   const context = useContext(UiContext)
@@ -142,26 +142,26 @@ export function useAuth(): AuthValue {
   return context
 }
 
-export function useCopilotJobs(): CopilotJobsValue {
-  const context = useContext(CopilotJobsContext)
-  if (!context) throw new Error('useCopilotJobs debe usarse dentro de <CopilotJobsProvider>')
+export function usePlanJobs(): PlanJobsValue {
+  const context = useContext(PlanJobsContext)
+  if (!context) throw new Error('usePlanJobs debe usarse dentro de <PlanJobsProvider>')
   return context
 }
 
 /** Estado de la generacion de este workspace, o undefined si no hay ninguna todavia. */
-export function useCopilotJob(workspaceId: number): CopilotJob | undefined {
-  const { jobs } = useCopilotJobs()
+export function usePlanJob(workspaceId: number): PlanJob | undefined {
+  const { jobs } = usePlanJobs()
   return jobs[workspaceId]
 }
 
-export function useCopilotDrafts(): CopilotDraftsValue {
-  const context = useContext(CopilotDraftsContext)
-  if (!context) throw new Error('useCopilotDrafts debe usarse dentro de <CopilotDraftsProvider>')
+export function usePlanDrafts(): PlanDraftsValue {
+  const context = useContext(PlanDraftsContext)
+  if (!context) throw new Error('usePlanDrafts debe usarse dentro de <PlanDraftsProvider>')
   return context
 }
 
-export function useHelpChat(): HelpChatValue {
-  const context = useContext(HelpChatContext)
-  if (!context) throw new Error('useHelpChat debe usarse dentro de <HelpChatProvider>')
+export function useAssistant(): AssistantValue {
+  const context = useContext(AssistantContext)
+  if (!context) throw new Error('useAssistant debe usarse dentro de <AssistantProvider>')
   return context
 }

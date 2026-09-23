@@ -74,7 +74,7 @@ export function PlanTaskCard({ task, done, state, onOpen }: Props) {
             </span>
           )}
           {task.aiGenerated && (
-            <span className={styles.stat} title="Propuesta por el copiloto">
+            <span className={styles.stat} title="Propuesta por la IA">
               <Sparkles size={11} strokeWidth={2} />
             </span>
           )}

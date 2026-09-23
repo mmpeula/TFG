@@ -12,6 +12,7 @@ import com.tfg.kanban.domain.repository.TeamRepository;
 import com.tfg.kanban.domain.repository.UserRepository;
 import com.tfg.kanban.team.dto.AddMemberRequest;
 import com.tfg.kanban.team.dto.TeamRequest;
+import com.tfg.kanban.team.dto.UpdateMemberNotesRequest;
 import com.tfg.kanban.team.dto.UpdateMemberRoleRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -110,6 +111,52 @@ class TeamServiceTest {
 
         assertThatThrownBy(() -> teamService.addMember(5L, request))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("Las indicaciones para el plan se guardan en la pertenencia al equipo")
+    void planNotesArePersisted() {
+        Team team = Team.builder().id(5L).name("Grupo 4").owner(owner).build();
+        TeamMember membership = TeamMember.builder().id(9L).team(team).user(owner).role(Role.MIEMBRO).build();
+        when(teamMemberRepository.findByTeam_IdAndUser_Id(5L, 1L)).thenReturn(Optional.of(membership));
+
+        var response = teamService.updateMemberNotes(5L, 1L,
+                new UpdateMemberNotesRequest("  Se maneja con Java y Spring. Evitar frontend.  "));
+
+        assertThat(membership.getPlanNotes()).isEqualTo("Se maneja con Java y Spring. Evitar frontend.");
+        assertThat(response.planNotes()).isEqualTo("Se maneja con Java y Spring. Evitar frontend.");
+    }
+
+    @Test
+    @DisplayName("Un texto en blanco borra las indicaciones en vez de dejarlas vacias")
+    void blankNotesClearTheField() {
+        // «Sin indicaciones» tiene que ser un unico estado: null. Si no, el prompt
+        // tendria que distinguir entre null y "" para decidir si hay ficha o no.
+        Team team = Team.builder().id(5L).name("Grupo 4").owner(owner).build();
+        TeamMember membership = TeamMember.builder().id(9L).team(team).user(owner)
+                .role(Role.MIEMBRO).planNotes("Lo de antes").build();
+        when(teamMemberRepository.findByTeam_IdAndUser_Id(5L, 1L)).thenReturn(Optional.of(membership));
+
+        teamService.updateMemberNotes(5L, 1L, new UpdateMemberNotesRequest("   "));
+        assertThat(membership.getPlanNotes()).isNull();
+
+        teamService.updateMemberNotes(5L, 1L, new UpdateMemberNotesRequest(null));
+        assertThat(membership.getPlanNotes()).isNull();
+    }
+
+    @Test
+    @DisplayName("Cambiar el rol no toca las indicaciones, y al reves tampoco")
+    void notesAndRoleAreIndependent() {
+        Team team = Team.builder().id(5L).name("Grupo 4").owner(owner).build();
+        TeamMember membership = TeamMember.builder().id(9L).team(team).user(owner)
+                .role(Role.MIEMBRO).planNotes("Backend y Java").build();
+        when(teamMemberRepository.findByTeam_IdAndUser_Id(5L, 1L)).thenReturn(Optional.of(membership));
+
+        teamService.updateMemberRole(5L, 1L, new UpdateMemberRoleRequest(Role.RESPONSABLE));
+        assertThat(membership.getPlanNotes()).isEqualTo("Backend y Java");
+
+        teamService.updateMemberNotes(5L, 1L, new UpdateMemberNotesRequest("Ahora otra cosa"));
+        assertThat(membership.getRole()).isEqualTo(Role.RESPONSABLE);
     }
 
     @Test

@@ -214,6 +214,18 @@ export function useMemberMutations(teamId?: number) {
       onSuccess: () => { invalidate(); pushToast('Rol actualizado') },
       onError,
     }),
+    /** Lo que se tendra en cuenta de esa persona en los proximos planes generados. */
+    updateNotes: useMutation({
+      mutationFn: ({ userId, planNotes }: { userId: number; planNotes: string }) =>
+        teams.updateMemberNotes(teamId!, userId, planNotes),
+      onSuccess: (member) => {
+        invalidate()
+        pushToast(member.planNotes
+          ? `Indicaciones de ${member.user.fullName} guardadas`
+          : `Indicaciones de ${member.user.fullName} borradas`)
+      },
+      onError,
+    }),
     removeMember: useMutation({
       mutationFn: (userId: number) => teams.removeMember(teamId!, userId),
       onSuccess: () => { invalidate(); pushToast('Ya no esta en el workspace') },

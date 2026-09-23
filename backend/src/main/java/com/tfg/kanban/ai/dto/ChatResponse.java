@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
 
-@Schema(description = "Respuesta del copiloto", example = """
+@Schema(description = "Respuesta del asistente", example = """
         {"answer":"Empezaria por 'Modelar la base de datos'...","model":"llama3",
          "contextSummary":"8 tareas · 4 personas","generatedAt":"2026-09-02T18:04:00Z"}
         """)

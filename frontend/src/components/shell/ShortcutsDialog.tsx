@@ -5,7 +5,7 @@ const SHORTCUTS = [
   ['Nueva tarea', 'N'],
   ['Ir al plan', 'P'],
   ['Ir al tablero', 'B'],
-  ['Ir al copiloto', 'C'],
+  ['Ir a generar plan', 'G'],
   ['Ver el detalle del tablero', 'I'],
   ['Cerrar panel o modal', 'Esc'],
   ['Esta lista', '?'],

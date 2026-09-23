@@ -34,12 +34,13 @@
 
 .members { display: flex; flex-direction: column; gap: var(--space-2); }
 .member {
-  display: flex; align-items: center; gap: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-2);
   background: var(--color-neutral-100);
   border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-md);
   padding: var(--space-3);
 }
+.memberRow { display: flex; align-items: center; gap: var(--space-3); }
 .identity { min-width: 0; flex: 1; }
 .name { font-size: 14px; font-weight: 700; }
 .you { font-weight: 500; color: var(--color-neutral-500); }
@@ -47,6 +48,60 @@
 .joined { font-size: 11px; color: var(--color-neutral-500); white-space: nowrap; }
 
 .help { font-size: 12px; color: var(--color-neutral-600); line-height: 1.5; }
+
+/* Lo que se sabe de cada persona al generar el plan. Va dentro de su tarjeta y separado por
+   una linea, para que se lea como parte de esa persona y no como un campo suelto
+   del formulario de al lado: es un dato que se queda, no algo que se rellena una
+   vez y se olvida.
+
+   Plegado por defecto: con el campo siempre abierto, dos miembros ya llenaban la
+   pantalla y la lista dejaba de servir para lo que se entra a Miembros, que es ver
+   de un vistazo quien esta y con que rol. */
+.notes { border-top: 1px dashed var(--color-neutral-300); padding-top: var(--space-2); }
+
+.notesToggle {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  font-family: inherit; font-size: 12px; text-align: left;
+  color: var(--color-neutral-600);
+  background: none; border: 0; padding: 0;
+  transition: var(--transition);
+}
+.notesToggle:hover { color: var(--color-neutral-900); }
+/* El texto guardado, a una linea: lo que no cabe se corta y se lee entero al abrir. */
+.notesPreview { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notesEmpty { color: var(--color-neutral-500); }
+.notesToggle:hover .notesEmpty { color: var(--color-neutral-700); }
+.notesLabel {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; color: var(--color-neutral-600); margin-bottom: 5px;
+}
+.notesArea {
+  width: 100%; min-height: 62px; resize: vertical;
+  font-family: inherit; font-size: 13px; line-height: 1.5; color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  transition: var(--transition);
+}
+.notesArea:focus { outline: none; border-color: var(--color-neutral-900); }
+.notesArea::placeholder { color: var(--color-neutral-500); }
+.notesFoot {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  margin-top: 6px;
+}
+.notesHint { font-size: 11px; color: var(--color-neutral-500); line-height: 1.45; }
+.notesCount {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;
+}
+/* Solo lectura: quien no administra el workspace ve la ficha pero no la toca. Se
+   queda tambien a una linea, que es el motivo de haberlo plegado todo. */
+.notesText {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--color-neutral-600);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 @media (max-width: 640px) {
   .joined { display: none; }

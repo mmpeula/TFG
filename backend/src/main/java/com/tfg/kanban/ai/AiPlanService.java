@@ -60,42 +60,119 @@ public class AiPlanService {
      * del trabajo que pide el enunciado que tiene delante.
      */
     private static final String SYSTEM_PROMPT = """
-            Eres quien planifica practicas universitarias: lees el enunciado y lo conviertes en la
-            lista de tareas que el equipo tiene que hacer.
+            Actuas como un Project Manager senior y Technical Lead con anos repartiendo trabajo en
+            equipos de desarrollo real. Te dan el enunciado de una practica universitaria y lo
+            conviertes en lo que un buen PM entregaria el primer dia: la lista de tareas que hay que
+            hacer, en el orden en que hay que hacerlas, cada una con el nombre de quien del equipo
+            esta en mejores condiciones de sacarla adelante.
+
+            Lo que te distingue de un reparto automatico ingenuo es esto: no juntas palabras sueltas
+            ("frontend" con "frontend"), entiendes el trabajo. "Montar el endpoint de login" es
+            backend aunque la palabra "backend" no aparezca en ningun sitio, y "una funcionalidad de
+            autenticacion" no es una tarea sino tres o cuatro: el modelo de datos, la API, la pantalla,
+            las pruebas. Cada una con su propio nombre y, casi siempre, con una persona distinta detras.
 
             Respondes SIEMPRE en espanol y SIEMPRE con un unico objeto JSON, sin nada de texto
             alrededor. Una respuesta valida se ve exactamente asi:
 
             {"tasks":[
-              {"title":"Disenar el modelo entidad-relacion","reason":"El apartado 2 pide el diagrama E/R antes de crear las tablas","type":"TAREA","priority":"ALTA","estimatedHours":5,"assignee":"Ana Garcia"},
-              {"title":"Escribir el script SQL de creacion","reason":"Sin las tablas no se pueden probar las consultas","type":"TAREA","priority":"ALTA","estimatedHours":4,"assignee":"Luis Perez"},
-              {"title":"Redactar la memoria","reason":"El enunciado la pide como entregable final","type":"TAREA","priority":"MEDIA","estimatedHours":6,"assignee":"Ana Garcia"}],
+              {"title":"Disenar el modelo entidad-relacion","reason":"El apartado 2 pide el diagrama E/R antes de crear las tablas","type":"TAREA","priority":"ALTA","estimatedHours":5,"assignee":"Ana Garcia","why":"Lleva bases de datos","avoid":[]},
+              {"title":"Montar la API de autenticacion","reason":"El apartado 3 pide login con JWT","type":"TAREA","priority":"ALTA","estimatedHours":6,"assignee":"Luis Perez","why":"Backend y Java","avoid":["Ana Garcia"]},
+              {"title":"Maquetar la pantalla de login","reason":"El apartado 3 pide una interfaz de acceso","type":"TAREA","priority":"MEDIA","estimatedHours":4,"assignee":"Ana Garcia","why":"React y frontend","avoid":[]},
+              {"title":"Redactar la memoria","reason":"El enunciado la pide como entregable final","type":"TAREA","priority":"MEDIA","estimatedHours":6,"assignee":"Ana Garcia","why":"Reparto: es quien menos carga lleva","avoid":[]}],
              "schedule":{"startDate":null,"deadline":"2027-01-15","sprintDays":14},
              "excluded":[]}
 
-            QUE CUENTA COMO TAREA
-            - Un entregable concreto del enunciado: algo que alguien hace y se puede dar por terminado.
+            ====================================================================
+            PRIMERO EL TRABAJO: ANALIZA, DESCOMPON, ESTIMA
+            ====================================================================
+            Antes de escribir una sola tarea, lee el enunciado entero y separa que pide de verdad de
+            lo que es contexto o justificacion. Luego, para cada cosa que pide:
+
+            - Un entregable concreto: algo que alguien hace y se puede dar por terminado. No un
+              apartado del enunciado tal cual, sino el trabajo real que ese apartado implica.
             - El titulo empieza por un verbo, dice QUE se entrega y no pasa de 100 caracteres.
+              MAL: "Backend" (no es una tarea, es un area entera). MAL: "Planificar el sprint 1"
+              (no es un entregable, es gestion). MAL: "Hacer la segunda parte" (no dice que se
+              entrega). BIEN: "Implementar el endpoint de login con JWT".
             - Nada de ceremonias ni de relleno: no propongas reuniones, planificaciones de sprint,
-              revisiones, retrospectivas, ni titulos vacios tipo "hacer la segunda tarea". Si no sale
-              del enunciado, no va en la lista.
-            - Ni enormes ni minimas: de 1 a 20 horas cada una. Lo que pase de 20 horas, partelo.
+              revisiones, retrospectivas ni "documentacion tecnica" generica. Si no sale del
+              enunciado, no va en la lista.
+            - Parte por el trabajo real, no por apartados del enunciado. Una funcionalidad como
+              "login de usuarios" normalmente son varias tareas distintas —el modelo de datos, la
+              API, la pantalla, las pruebas— y cada una la puede hacer una persona distinta. Partirla
+              es lo que permite repartir; dejarla entera obliga a darsela toda a alguien.
+            - Calibra las horas con la dificultad real, no a ojo: 1-2h un cambio pequeno y acotado
+              (un formulario simple, un script puntual); 3-6h una pieza completa con una
+              responsabilidad clara (un endpoint con su validacion, una pantalla con su logica);
+              8-15h algo con varias piezas o que cruza capas (una funcionalidad con backend y
+              persistencia a la vez). Lo que pase de 20 horas no es una tarea, es varias: partelo.
 
             EL ORDEN DE LA LISTA ES EL ORDEN DEL TRABAJO
             - Primero lo que hay que hacer antes. El servidor reparte las tareas por iteraciones
               siguiendo ese orden, asi que una lista desordenada da un calendario desordenado.
+            - Si una tarea depende de otra —no se puede montar la API de login sin el modelo de
+              usuario debajo—, ponla despues. No hay campo de dependencias: el orden ES la
+              dependencia.
             - No pongas fechas en las tareas: las calcula el servidor.
 
+            ====================================================================
+            DESPUES EL REPARTO: A QUIEN LE TOCA CADA TAREA
+            ====================================================================
+            Para cada tarea pregunta que hace falta saber para hacerla, y mira a quien del equipo le
+            pega mas. No busques coincidencias de palabras: mira el fondo, como en el ejemplo de
+            "montar el endpoint de login" de mas arriba.
+
+            CUANDO LAS INSTRUCCIONES SE CONTRADIGAN, ESTE ES EL ORDEN. Lo de arriba gana:
+
+              1. PROHIBICIONES. Un "no puede" o un "nunca" de las indicaciones de una persona.
+                 No se saltan. Si ademas te piden lo contrario mas abajo, manda la prohibicion:
+                 pon a otra persona y dilo en "why" ("su ficha dice que no hace frontend").
+              2. INDICACIONES DE ESTA EJECUCION. Valen solo para este reparto y pisan a la ficha
+                 de cada persona. Si la ficha de alguien dice que prefiere backend y aqui te dicen
+                 que esta vez lleve la documentacion, lleva la documentacion.
+              3. LA FICHA DE CADA PERSONA. Lo que se le da bien y lo que prefiere. Es el criterio
+                 normal cuando no hay nada mas arriba que diga otra cosa.
+              4. TU CRITERIO DE PM. Si nada de lo anterior decide, reparte tu: dificultad de la
+                 tarea, lo que pide realmente y, sobre todo, que nadie acabe con el doble de trabajo
+                 que los demas.
+
+            Distingue lo que lees. "Evitar darle X si hay alternativa" es una preferencia: se la
+            saltas si no queda mas remedio. "No puede hacer X" es una prohibicion: no se la saltas
+            nunca, ni siquiera si una indicacion de esta ejecucion dice lo contrario.
+
+            EQUILIBRIO: EL CRITERIO QUE MAS SE OLVIDA
+            - Ser el mejor en algo no significa quedarse con todo lo de ese algo. Si hay cuatro
+              tareas de backend y dos personas que pueden hacerlo, no se las des las cuatro a la
+              misma aunque sea la mejor: reparte tambien entre quien lo hace bien, no solo entre
+              quien lo hace mejor.
+              MAL: darle a un unico "especialista en backend" las seis tareas de backend mientras
+              otra persona con perfil similar se queda con dos. BIEN: repartir esas seis entre los
+              dos, aunque una lleve un poco mas por ser mejor encaje.
+            - Mira el total en horas, no el numero de tareas: cinco tareas de una hora no son mas
+              trabajo que una de diez.
+            - Todo el mundo tiene que salir con algo. Si a alguien no le pega nada de lo tecnico,
+              dale lo que si puede hacer (documentacion, pruebas, revision) antes de dejarlo a cero.
+
+            ====================================================================
             CAMPOS
-            - "reason": una frase corta, citando el enunciado cuando puedas.
+            ====================================================================
+            - "reason": por que existe la tarea. Una frase corta, citando el enunciado cuando puedas.
+            - "why": por que se la das a esa persona. Una frase corta y comprobable —lo que dice su
+              ficha, lo que piden las indicaciones, o "reparto" si la has puesto para equilibrar—.
+              No expliques como has razonado, di en que te has apoyado.
+            - "avoid": nombres exactos de quienes NO deben acabar con esta tarea, si alguna
+              prohibicion lo dice. Lista vacia si no hay ninguna. El servidor lo respeta.
             - "type": TAREA para trabajo tecnico (el caso normal), HISTORIA si aporta valor visible a
               quien usa lo que se construye, EPICA para un bloque que agrupa varias, BUG o INCIDENCIA
               solo para arreglar algo que ya existe.
-            - "priority": ALTA, MEDIA o BAJA. ALTA es lo que bloquea al resto del trabajo.
-            - "assignee": el nombre EXACTO de una de las personas de la lista. Repartelas entre todas,
-              no se lo des todo a la misma.
-            - "excluded": lista vacia, salvo que las indicaciones pidan dejar a alguien sin tareas esta
-              vez; entonces va ahi su nombre exacto.
+            - "priority": ALTA es lo que bloquea al resto del trabajo si no esta hecho (la base sobre
+              la que se construye lo demas, o lo que pide explicitamente el enunciado como critico).
+              MEDIA es el grueso del trabajo: importante pero nada se para si va justo despues. BAJA
+              es una mejora o un detalle que no compromete el entregable si se queda para el final.
+            - "assignee": el nombre EXACTO de una de las personas de la lista.
+            - "excluded": lista vacia, salvo que las indicaciones de esta ejecucion pidan dejar a
+              alguien sin tareas esta vez; entonces va ahi su nombre exacto.
 
             "schedule" ES DEL PROYECTO ENTERO, NO DE UNA TAREA
             - Rellena cada campo solo si el enunciado lo dice; si no lo dice, null. No calcules fechas
@@ -108,7 +185,7 @@ public class AiPlanService {
             Y ADEMAS
             - Cubre el enunciado de principio a fin, sin inventarte trabajo que no pide.
             - No repitas ninguna tarea que ya este en el tablero.
-            - Si las indicaciones del usuario contradicen al enunciado, mandan las indicaciones.
+            - Si las indicaciones de esta ejecucion contradicen al enunciado, mandan las indicaciones.
             """;
 
     private final AiProperties properties;
@@ -152,7 +229,7 @@ public class AiPlanService {
     }
 
     /**
-     * Genera la propuesta a partir de un texto escrito a mano en el copiloto
+     * Genera la propuesta a partir de un texto escrito a mano en Generar plan
      * («tenemos que hacer una practica de...»). No toca el guion guardado: eso
      * queda reservado al documento oficial de la actividad.
      */
@@ -319,14 +396,23 @@ public class AiPlanService {
         return result;
     }
 
-    /** Contexto real: documento, fecha, personas concretas y lo que ya hay en el tablero. */
+    /**
+     * Contexto real: documento, fecha, personas concretas y lo que ya hay en el tablero.
+     *
+     * <p>Va por apartados con titulo, y cada fuente en el suyo, porque el modelo
+     * tiene que poder distinguirlas para aplicar la jerarquia que le pide el
+     * prompt de sistema: lo que dice el enunciado, lo que sabemos de cada persona
+     * y lo que se ha pedido solo para esta vez son tres cosas con distinto peso, y
+     * mezcladas en un parrafo corrido un modelo pequeno las trata como una sola.</p>
+     */
     private String buildUserPrompt(Project project, String text, List<Task> existing,
                                    List<TeamMember> members, Integer people, String indications) {
         StringBuilder prompt = new StringBuilder();
         // Sin esto el modelo planifica en el ano en que se entreno y propone un curso
         // ya terminado: las fechas quedan vencidas y no encajan con ningun sprint real.
         prompt.append("Hoy es ").append(LocalDate.now()).append('\n');
-        prompt.append("Practica: ").append(project.getName()).append('\n');
+        prompt.append("\n## LA PRACTICA\n");
+        prompt.append("Nombre: ").append(project.getName()).append('\n');
 
         if (project.getDescription() != null && !project.getDescription().isBlank()) {
             prompt.append("Descripcion: ").append(project.getDescription()).append('\n');
@@ -352,29 +438,55 @@ public class AiPlanService {
         List<TeamMember> reparto = (people != null && people > 0 && people < members.size())
                 ? members.subList(0, people)
                 : members;
-        prompt.append("Personas del equipo entre las que hay que repartir el trabajo (")
-              .append(reparto.size()).append("):\n");
-        reparto.forEach(member -> prompt.append("- ").append(member.getUser().getFullName()).append('\n'));
+
+        prompt.append("\n## EL EQUIPO (").append(reparto.size())
+              .append(reparto.size() == 1 ? " persona)\n" : " personas)\n");
+        appendTeam(prompt, reparto);
+
+        if (indications != null && !indications.isBlank()) {
+            // Su propio apartado, y nombrado como lo que es: el prompt de sistema
+            // le da mas peso que a la ficha de cada persona, y para poder aplicar
+            // esa regla el modelo tiene que ver cual es cual.
+            prompt.append("\n## INDICACIONES SOLO PARA ESTE REPARTO\n")
+                  .append("Mandan sobre la ficha de cada persona, pero no sobre una prohibicion suya.\n")
+                  .append(indications).append('\n');
+        }
 
         if (!existing.isEmpty()) {
-            prompt.append("Tareas que YA existen en el tablero (no las repitas):\n");
+            prompt.append("\n## YA ESTA EN EL TABLERO (no lo repitas)\n");
             existing.forEach(task -> prompt.append("- ").append(task.getTitle()).append('\n'));
         }
 
-        prompt.append("\nDocumento de la actividad:\n").append(text).append('\n');
+        prompt.append("\n## DOCUMENTO DE LA ACTIVIDAD\n").append(text).append('\n');
 
-        if (indications != null && !indications.isBlank()) {
-            prompt.append("\nIndicaciones del usuario para esta propuesta (tienen prioridad sobre el ")
-                  .append("documento si hay conflicto):\n").append(indications).append('\n');
-        }
-
-        prompt.append("\nPropon como maximo ").append(properties.getMaxTasks())
+        prompt.append("\n## LO QUE TIENES QUE DEVOLVER\n")
+              .append("Como maximo ").append(properties.getMaxTasks())
               .append(" tareas, en el orden en que hay que hacerlas, que cubran el documento entero, ")
               .append("cada una asignada a una de las ").append(reparto.size())
-              .append(" personas de la lista. Solo entregables del documento: ni reuniones ni ")
-              .append("planificaciones ni titulos genericos.");
+              .append(" personas de arriba y con una frase de por que es esa persona. Solo ")
+              .append("entregables del documento: ni reuniones ni planificaciones ni titulos genericos.");
 
         return prompt.toString();
+    }
+
+    /**
+     * Quien es cada cual, con su ficha si la tiene.
+     *
+     * <p>A quien no tenga nada escrito se le dice explicitamente que no hay ficha,
+     * en vez de listarlo a secas: callarlo hace que el modelo lo lea como «de este
+     * no hay nada que contar» y acabe dandole solo las sobras. Diciendolo, entiende
+     * que es una persona valida para cualquier tarea y no un comodin de segunda.</p>
+     */
+    private void appendTeam(StringBuilder prompt, List<TeamMember> members) {
+        for (TeamMember member : members) {
+            prompt.append("\n### ").append(member.getUser().getFullName()).append('\n');
+            String notes = member.getPlanNotes();
+            if (notes != null && !notes.isBlank()) {
+                prompt.append("Ficha: ").append(notes.strip().replace('\n', ' ')).append('\n');
+            } else {
+                prompt.append("Ficha: sin indicaciones. Puede encargarse de cualquier cosa.\n");
+            }
+        }
     }
 
     /**
@@ -415,7 +527,12 @@ public class AiPlanService {
                         hours(node),
                         null,
                         null,
-                        text(node, "assignee", "asignado", 150)));
+                        text(node, "assignee", "asignado", 150),
+                        // Lo que el modelo alega para esa persona. Es provisional: si el
+                        // reparto acaba cambiando de duena la tarea, WorkloadBalancer lo
+                        // sustituye por el motivo de verdad.
+                        text(node, "why", "porque", 300),
+                        names(node.path("avoid"))));
 
                 if (tasks.size() >= properties.getMaxTasks()) break;
             }
@@ -423,7 +540,7 @@ public class AiPlanService {
             return new ParsedResponse(
                     tasks,
                     root.isArray() ? null : schedule(root.path("schedule")),
-                    root.isArray() ? List.of() : excludedNames(root.path("excluded")));
+                    root.isArray() ? List.of() : names(root.path("excluded")));
 
         } catch (AiUnavailableException ex) {
             throw ex;
@@ -559,8 +676,15 @@ public class AiPlanService {
         return days;
     }
 
-    /** Nombres tal cual, sin resolver: eso lo hace {@link #plan} contra el equipo real. */
-    private List<String> excludedNames(JsonNode node) {
+    /**
+     * Una lista de nombres del modelo, tal cual: sin resolver contra el equipo
+     * real, que es cosa de {@link #plan} y de {@link WorkloadBalancer}.
+     *
+     * <p>La usan los dos sitios donde el modelo nombra personas: a quien dejar
+     * fuera del reparto entero ("excluded") y a quien no debe tocarle una tarea
+     * concreta ("avoid").</p>
+     */
+    private List<String> names(JsonNode node) {
         if (!node.isArray()) return List.of();
         List<String> names = new ArrayList<>();
         for (JsonNode item : node) {

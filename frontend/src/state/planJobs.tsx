@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { CopilotJobsContext, useUi, type CopilotGenerateRequest, type CopilotJob } from './context'
+import { PlanJobsContext, useUi, type PlanGenerateRequest, type PlanJob } from './context'
 import { projects as projectsApi, workspaces as workspacesApi } from '@/api/endpoints'
 import { keys } from '@/hooks/useData'
 import { ROUTES } from '@/app/routes'
@@ -14,14 +14,14 @@ function sourceLabelOf(file: File | null, text: string): string {
   return 'el guion guardado'
 }
 
-export function CopilotJobsProvider({ children }: { children: ReactNode }) {
-  const [jobs, setJobs] = useState<Record<number, CopilotJob>>({})
+export function PlanJobsProvider({ children }: { children: ReactNode }) {
+  const [jobs, setJobs] = useState<Record<number, PlanJob>>({})
   const { pushToast } = useUi()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
   const start = useCallback(
-    (request: CopilotGenerateRequest) => {
+    (request: PlanGenerateRequest) => {
       const { workspaceId, workspaceName, file, text, people, indications } = request
       const sourceLabel = sourceLabelOf(file, text)
       setJobs((current) => ({ ...current, [workspaceId]: { status: 'pending', sourceLabel } }))
@@ -32,19 +32,19 @@ export function CopilotJobsProvider({ children }: { children: ReactNode }) {
           ? workspacesApi.proposeFromText(workspaceId, text, people, indications)
           : projectsApi.aiPlan(workspaceId, people, indications)
 
-      const verEnCopiloto = { label: 'Ver', onClick: () => navigate(ROUTES.copilotoById(workspaceId)) }
+      const verElPlan = { label: 'Ver', onClick: () => navigate(ROUTES.generarPlanById(workspaceId)) }
 
       call.then(
         (plan) => {
           setJobs((current) => ({ ...current, [workspaceId]: { status: 'done', sourceLabel, plan } }))
           // Subir un documento actualiza el guion guardado del proyecto; lo demas no lo toca.
           if (file) queryClient.invalidateQueries({ queryKey: keys.project(workspaceId) })
-          pushToast(`Propuesta de planificacion lista para «${workspaceName}»`, verEnCopiloto)
+          pushToast(`Propuesta de planificacion lista para «${workspaceName}»`, verElPlan)
         },
         (err) => {
           const message = toErrorMessage(err)
           setJobs((current) => ({ ...current, [workspaceId]: { status: 'error', sourceLabel, error: message } }))
-          pushToast(`No se ha podido generar la planificacion de «${workspaceName}»`, verEnCopiloto)
+          pushToast(`No se ha podido generar la planificacion de «${workspaceName}»`, verElPlan)
         },
       )
     },
@@ -62,5 +62,5 @@ export function CopilotJobsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ jobs, start, clear }), [jobs, start, clear])
 
-  return <CopilotJobsContext.Provider value={value}>{children}</CopilotJobsContext.Provider>
+  return <PlanJobsContext.Provider value={value}>{children}</PlanJobsContext.Provider>
 }

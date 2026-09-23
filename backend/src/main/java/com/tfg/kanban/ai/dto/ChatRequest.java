@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
-@Schema(description = "Pregunta al copiloto sobre el workspace", example = """
+@Schema(description = "Pregunta al asistente sobre el workspace", example = """
         {"message":"Que deberia hacer primero?",
          "history":[{"role":"user","content":"Resume lo pendiente"},
                     {"role":"assistant","content":"Quedan 5 tareas..."}]}

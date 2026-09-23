@@ -128,8 +128,91 @@ class AiPlanServiceTest {
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
         verify(ollamaClient).chatJson(anyString(), promptCaptor.capture());
         assertThat(promptCaptor.getValue())
-                .contains("Indicaciones del usuario")
+                .contains("INDICACIONES SOLO PARA ESTE REPARTO")
                 .contains("Que Ana lleve menos carga esta semana, tiene examenes");
+    }
+
+    @Test
+    @DisplayName("La ficha permanente de cada miembro llega al modelo")
+    void memberNotesReachThePrompt() {
+        project.getTeam().getMembers().stream()
+                .filter(member -> member.getUser().getId().equals(2L))
+                .forEach(member -> member.setPlanNotes("Se maneja con Java y Spring. Evitar frontend."));
+        modelReplies("""
+                {"tasks":[{"title":"Modelar el esquema"}]}""");
+
+        service.generate(7L, null, null);
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ollamaClient).chatJson(anyString(), promptCaptor.capture());
+        assertThat(promptCaptor.getValue())
+                .contains("### Luis Perez")
+                .contains("Ficha: Se maneja con Java y Spring. Evitar frontend.")
+                // Ana no tiene ficha: se dice, en vez de dejarla como un hueco que el
+                // modelo interpreta como «de esta no hay nada que contar».
+                .contains("Ficha: sin indicaciones");
+    }
+
+    @Test
+    @DisplayName("La ficha del docente no entra: no participa en el reparto")
+    void teacherNotesStayOutOfThePrompt() {
+        project.getTeam().getMembers().stream()
+                .filter(member -> member.getRole() == Role.DOCENTE)
+                .forEach(member -> member.setPlanNotes("Corrige la memoria"));
+        modelReplies("""
+                {"tasks":[{"title":"Modelar el esquema"}]}""");
+
+        service.generate(7L, null, null);
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ollamaClient).chatJson(anyString(), promptCaptor.capture());
+        assertThat(promptCaptor.getValue())
+                .doesNotContain("Profesor Soto")
+                .doesNotContain("Corrige la memoria");
+    }
+
+    @Test
+    @DisplayName("Las indicaciones de la ejecucion no se guardan en la ficha de nadie")
+    void executionIndicationsDoNotTouchMemberNotes() {
+        // Es la diferencia entre las dos: esta vale para este reparto y se acaba ahi.
+        modelReplies("""
+                {"tasks":[{"title":"Modelar el esquema"}]}""");
+
+        service.generate(7L, null, "Esta vez Luis lleva la documentacion");
+
+        assertThat(project.getTeam().getMembers())
+                .allSatisfy(member -> assertThat(member.getPlanNotes()).isNull());
+    }
+
+    @Test
+    @DisplayName("El modelo puede vetar a alguien para una tarea concreta")
+    void avoidKeepsTheTaskAwayFromThatPerson() {
+        modelReplies("""
+                {"tasks":[{"title":"Maquetar la pantalla de login","assignee":"Luis Perez",
+                           "why":"backend","avoid":["Luis Perez"],"estimatedHours":4}]}""");
+
+        var response = service.generate(7L, null, null);
+
+        // Aunque el propio modelo se contradiga proponiendolo y vetandolo a la vez,
+        // manda el veto: es como llegan aqui las prohibiciones de la ficha.
+        assertThat(response.tasks()).singleElement().satisfies(task -> {
+            assertThat(task.assigneeName()).isEqualTo("Ana Garcia");
+            assertThat(task.assignmentReason()).contains("pueden hacerla");
+        });
+    }
+
+    @Test
+    @DisplayName("Cada tarea sale con una frase de por que le ha tocado a esa persona")
+    void everyTaskExplainsItsAssignment() {
+        modelReplies("""
+                {"tasks":[{"title":"Montar la API","assignee":"Luis Perez","why":"Backend y Java","estimatedHours":5}]}""");
+
+        var response = service.generate(7L, null, null);
+
+        assertThat(response.tasks()).singleElement().satisfies(task -> {
+            assertThat(task.assigneeName()).isEqualTo("Luis Perez");
+            assertThat(task.assignmentReason()).isEqualTo("Backend y Java");
+        });
     }
 
     @Test
@@ -142,7 +225,7 @@ class AiPlanServiceTest {
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
         verify(ollamaClient).chatJson(anyString(), promptCaptor.capture());
-        assertThat(promptCaptor.getValue()).doesNotContain("Indicaciones del usuario");
+        assertThat(promptCaptor.getValue()).doesNotContain("INDICACIONES SOLO PARA ESTE REPARTO");
     }
 
     @Test
@@ -558,7 +641,7 @@ class AiPlanServiceTest {
         LocalDate fecha = LocalDate.now().plusDays(5);
         service.apply(7L, new ApplyPlanRequest(3L, List.of(
                 new ProposedTask("Modelar el esquema", "porque si", TaskType.HISTORIA, TaskPriority.ALTA,
-                        BigDecimal.valueOf(6), fecha, 2L, "Luis Perez"))));
+                        BigDecimal.valueOf(6), fecha, 2L, "Luis Perez", "Backend", List.of()))));
 
         ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
         verify(taskRepository).save(captor.capture());
@@ -591,7 +674,7 @@ class AiPlanServiceTest {
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.apply(7L, new ApplyPlanRequest(3L, List.of(
-                new ProposedTask("Tarea sin tipo", null, null, null, null, null, null, null))));
+                new ProposedTask("Tarea sin tipo", null, null, null, null, null, null, null, null, null))));
 
         ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
         verify(taskRepository).save(captor.capture());
@@ -607,7 +690,7 @@ class AiPlanServiceTest {
         when(boardService.getBoard(3L)).thenReturn(board);
 
         var request = new ApplyPlanRequest(3L, List.of(
-                new ProposedTask("Tarea", null, null, null, null, null, null, null)));
+                new ProposedTask("Tarea", null, null, null, null, null, null, null, null, null)));
 
         assertThatThrownBy(() -> service.apply(7L, request))
                 .isInstanceOf(BusinessRuleException.class)

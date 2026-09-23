@@ -3,9 +3,9 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/app/query-client'
 import { AuthProvider } from '@/state/auth'
 import { UiProvider } from '@/state/ui'
-import { CopilotJobsProvider } from '@/state/copilotJobs'
-import { CopilotDraftsProvider } from '@/state/copilotDraft'
-import { HelpChatProvider } from '@/state/helpChat'
+import { PlanJobsProvider } from '@/state/planJobs'
+import { PlanDraftsProvider } from '@/state/planDraft'
+import { AssistantProvider } from '@/state/assistant'
 import { ToastStack } from '@/components/ui/Toast'
 
 /**
@@ -19,16 +19,16 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <UiProvider>
-        <CopilotJobsProvider>
-          <CopilotDraftsProvider>
-            <HelpChatProvider>
+        <PlanJobsProvider>
+          <PlanDraftsProvider>
+            <AssistantProvider>
               <AuthProvider>
                 {children}
                 <ToastStack />
               </AuthProvider>
-            </HelpChatProvider>
-          </CopilotDraftsProvider>
-        </CopilotJobsProvider>
+            </AssistantProvider>
+          </PlanDraftsProvider>
+        </PlanJobsProvider>
       </UiProvider>
     </QueryClientProvider>
   )

@@ -21,7 +21,8 @@ class AiTaskSchedulerTest {
     private final AiTaskScheduler scheduler = new AiTaskScheduler();
 
     private ProposedTask task(String title, Long assigneeId) {
-        return new ProposedTask(title, null, null, TaskPriority.MEDIA, null, null, assigneeId, null);
+        return new ProposedTask(title, null, null, TaskPriority.MEDIA, null, null, assigneeId,
+                null, null, java.util.List.of());
     }
 
     @Test
@@ -182,7 +183,8 @@ class AiTaskSchedulerTest {
     void onlyTheDueDateChanges() {
         var original = new ProposedTask("Modelar el esquema", "porque lo pide el guion",
                 com.tfg.kanban.domain.model.TaskType.HISTORIA, TaskPriority.ALTA,
-                java.math.BigDecimal.valueOf(6), null, 2L, "Luis Perez");
+                java.math.BigDecimal.valueOf(6), null, 2L, "Luis Perez",
+                "Backend y Java", java.util.List.of("Ana Garcia"));
 
         var result = scheduler.schedule(List.of(original), null, null, 14);
 

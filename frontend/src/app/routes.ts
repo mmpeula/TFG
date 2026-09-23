@@ -17,8 +17,8 @@ export const ROUTES = {
   planById: (id: string | number) => `/workspaces/${id}/plan`,
   tablero: '/workspaces/:workspaceId/tablero',
   tableroById: (id: string | number) => `/workspaces/${id}/tablero`,
-  copiloto: '/workspaces/:workspaceId/copiloto',
-  copilotoById: (id: string | number) => `/workspaces/${id}/copiloto`,
+  generarPlan: '/workspaces/:workspaceId/generar-plan',
+  generarPlanById: (id: string | number) => `/workspaces/${id}/generar-plan`,
   miembros: '/workspaces/:workspaceId/miembros',
   miembrosById: (id: string | number) => `/workspaces/${id}/miembros`,
   ajustes: '/workspaces/:workspaceId/ajustes',
@@ -39,6 +39,8 @@ export const ROUTES = {
   legacyProyecto: '/proyecto/:workspaceId',
   legacyTablero: '/proyecto/:workspaceId/tablero',
   legacyCopiloto: '/proyecto/:workspaceId/copiloto',
+  /** La seccion se llamaba «Copiloto» antes de pasar a llamarse «Generar plan». */
+  legacyCopilotoWorkspace: '/workspaces/:workspaceId/copiloto',
   legacyPulso: '/proyecto/:workspaceId/pulso',
 } as const
 

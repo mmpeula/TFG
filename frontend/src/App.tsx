@@ -6,7 +6,7 @@ import { RegisterScreen } from './screens/RegisterScreen'
 import { WorkspacesScreen } from './screens/WorkspacesScreen'
 import { PlanScreen } from './screens/PlanScreen'
 import { BoardScreen } from './screens/BoardScreen'
-import { CopilotScreen } from './screens/CopilotScreen'
+import { GeneratePlanScreen } from './screens/GeneratePlanScreen'
 import { MembersScreen } from './screens/MembersScreen'
 import { WorkspaceSettingsScreen } from './screens/WorkspaceSettingsScreen'
 import { PulseScreen } from './screens/PulseScreen'
@@ -53,7 +53,7 @@ export function App() {
           <Route path={ROUTES.workspace} element={<LegacyRedirect to={ROUTES.planById} />} />
           <Route path={ROUTES.plan} element={<PlanScreen />} />
           <Route path={ROUTES.tablero} element={<BoardScreen />} />
-          <Route path={ROUTES.copiloto} element={<CopilotScreen />} />
+          <Route path={ROUTES.generarPlan} element={<GeneratePlanScreen />} />
           <Route path={ROUTES.miembros} element={<MembersScreen />} />
           <Route path={ROUTES.ajustes} element={<WorkspaceSettingsScreen />} />
           <Route path={ROUTES.pulso} element={<PulseScreen />} />
@@ -68,7 +68,8 @@ export function App() {
           <Route path={ROUTES.legacyProyectos} element={<Navigate to={ROUTES.workspaces} replace />} />
           <Route path={ROUTES.legacyProyecto} element={<LegacyRedirect to={ROUTES.planById} />} />
           <Route path={ROUTES.legacyTablero} element={<LegacyRedirect to={ROUTES.tableroById} />} />
-          <Route path={ROUTES.legacyCopiloto} element={<LegacyRedirect to={ROUTES.copilotoById} />} />
+          <Route path={ROUTES.legacyCopiloto} element={<LegacyRedirect to={ROUTES.generarPlanById} />} />
+          <Route path={ROUTES.legacyCopilotoWorkspace} element={<LegacyRedirect to={ROUTES.generarPlanById} />} />
           <Route path={ROUTES.legacyPulso} element={<LegacyRedirect to={ROUTES.pulsoById} />} />
         </Route>
 

@@ -1,10 +1,10 @@
 import { useRef, useState, type ReactNode } from 'react'
 import {
-  AlertCircle, CalendarDays, Check, CheckCircle2, ChevronDown, FileText, Sparkles, Upload, Users, X,
+  AlertCircle, CalendarDays, Check, CheckCircle2, ChevronDown, FileText, Upload, Users, X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Tag'
-import styles from './Copilot.module.css'
+import styles from './PlanGenerator.module.css'
 import type { MemberWorkload, ProposedTask, SuggestedSchedule } from '@/types/api'
 import { PRIORITY_LABELS } from '@/lib/roles'
 import { typeOf } from '@/lib/taskTypes'
@@ -66,15 +66,10 @@ export function AiWorkbench({
   const sinFuente = !file && !text.trim() && !briefing.trim()
   const equipoSinCargar = !maxPeople
 
+  // Sin titulo propio: la pestana de arriba ya dice «Generar plan» y repetirlo
+  // dentro de la tarjeta solo gasta la primera pantalla sin decir nada nuevo.
   return (
     <div className={styles.workbench}>
-      <header className={styles.head}>
-        <span className={styles.icon}>
-          <Sparkles size={15} strokeWidth={2.75} />
-        </span>
-        <h2 className={styles.title}>Generar planificacion</h2>
-      </header>
-
       <div className={styles.context}>
         <input
           ref={inputRef}
@@ -157,13 +152,19 @@ export function AiWorkbench({
         )}
 
         <label className={styles.label}>
-          Indicaciones para la IA <span className={styles.optional}>opcional</span>
+          Indicaciones para este reparto <span className={styles.optional}>opcional</span>
           <input
             className={styles.input}
             value={indications}
-            placeholder="P. ej.: que Ana lleve menos carga esta semana, o prioriza el backend"
+            placeholder="P. ej.: que Ana lleve menos carga esta semana, o que Luis se centre en el backend"
             onChange={(event) => onIndications(event.target.value)}
           />
+          {/* Lo dice aqui porque es justo la duda que produce tener los dos sitios:
+              esto y la ficha de cada persona en Miembros se escriben parecido y solo
+              uno de los dos se queda. */}
+          <span className={styles.optional}>
+            Solo valen para esta vez. Lo que sea siempre cierto de alguien va en su ficha, en Miembros.
+          </span>
         </label>
 
         <div className={styles.contextFoot}>
@@ -301,7 +302,11 @@ function ProposedTaskRow({
         {task.reason && <span className={styles.rowReason}>{task.reason}</span>}
       </span>
       {task.assigneeName && (
-        <Tag small variant={selected ? 'accent2' : 'neutral'}>
+        // El porque va en el title y no a la vista: con ocho tareas en la lista,
+        // ocho frases de reparto tapan lo que se viene a decidir aqui, que es
+        // que tareas entran al tablero. Quien quiera saber por que le ha tocado
+        // a esa persona, lo tiene a un vistazo encima del nombre.
+        <Tag small variant={selected ? 'accent2' : 'neutral'} title={task.assignmentReason}>
           {task.assigneeName}
         </Tag>
       )}

@@ -24,8 +24,8 @@ interface Props {
  * identidad del workspace, no hay motivo para posponerlos. Lo que si se pospone
  * son las fechas y la duracion del sprint, porque esas normalmente ya estan
  * escritas en el guion de la practica: se piden solo al editar, y al crear se
- * rellenan despues por dos caminos — el copiloto las propone solas si el
- * documento las dice (ver `SuggestedScheduleCard` en `CopilotScreen`), o se
+ * rellenan despues por dos caminos — al generar el plan se proponen solas si el
+ * documento las dice (ver `SuggestedScheduleCard` en `GeneratePlanScreen`), o se
  * ajustan aqui mismo, en modo edicion, desde Ajustes.
  */
 export function WorkspaceFormModal({ open, workspace, isPending, onClose, onSubmit }: Props) {
@@ -147,7 +147,7 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
         {!editing && (
           <p className={styles.createHint}>
             Las fechas y la duracion del sprint se proponen solas al subir el guion al
-            copiloto —si el documento las dice— o se ajustan luego a mano desde Ajustes.
+            generar el plan —si el documento las dice— o se ajustan luego a mano desde Ajustes.
           </p>
         )}
 

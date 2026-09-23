@@ -44,7 +44,7 @@ export const workspaces = {
   /** Pregunta en texto libre sobre el workspace. Nunca escribe en el tablero. */
   ask: (workspaceId: number, message: string, history: ChatTurn[]) =>
     apiClient
-      .post<ChatResponse>(`/workspaces/${workspaceId}/copilot/chat`, { message, history }, {
+      .post<ChatResponse>(`/workspaces/${workspaceId}/ai/chat`, { message, history }, {
         // El modelo local tarda; el resto de llamadas no deberian esperar tanto.
         timeout: 240000,
       })
@@ -53,7 +53,7 @@ export const workspaces = {
   /** Convierte una descripcion escrita a mano en una propuesta de tareas. */
   proposeFromText: (workspaceId: number, text: string, people?: number, indications?: string) =>
     apiClient
-      .post<AiPlanResponse>(`/workspaces/${workspaceId}/copilot/tasks`, { text, indications }, {
+      .post<AiPlanResponse>(`/workspaces/${workspaceId}/ai/plan`, { text, indications }, {
         params: { people },
         timeout: 240000,
       })
@@ -70,6 +70,16 @@ export const teams = {
     apiClient.get<TeamMemberResponse[]>(`/teams/${teamId}/members`).then((r) => r.data),
   updateMemberRole: (teamId: number, userId: number, role: Role) =>
     apiClient.patch<TeamMemberResponse>(`/teams/${teamId}/members/${userId}`, { role }).then((r) => r.data),
+
+  /**
+   * Lo que hay que tener en cuenta de esa persona al repartir. Se guarda
+   * y vale para todas las ejecuciones siguientes, al reves que las indicaciones
+   * que se escriben justo antes de generar un plan.
+   */
+  updateMemberNotes: (teamId: number, userId: number, planNotes: string) =>
+    apiClient
+      .patch<TeamMemberResponse>(`/teams/${teamId}/members/${userId}/notes`, { planNotes })
+      .then((r) => r.data),
   removeMember: (teamId: number, userId: number) =>
     apiClient.delete(`/teams/${teamId}/members/${userId}`).then(() => undefined),
 

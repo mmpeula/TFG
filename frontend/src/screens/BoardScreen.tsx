@@ -209,7 +209,7 @@ export function BoardScreen() {
               title="Este workspace esta vacio"
               body={
                 writable
-                  ? 'Empieza creando tu primera tarea. Tambien puedes pedirsela al copiloto a partir del enunciado.'
+                  ? 'Empieza creando tu primera tarea. Tambien puedes generar el plan con IA a partir del enunciado.'
                   : 'Todavia no hay ninguna tarea que ver.'
               }
               action={
@@ -219,9 +219,9 @@ export function BoardScreen() {
                       <Plus size={15} strokeWidth={2.75} />
                       Crear tarea
                     </Button>
-                    <Button variant="secondary" onClick={() => navigate(ROUTES.copilotoById(projectId))}>
+                    <Button variant="secondary" onClick={() => navigate(ROUTES.generarPlanById(projectId))}>
                       <Bot size={15} strokeWidth={2.75} />
-                      Pedirselo al copiloto
+                      Generar plan
                     </Button>
                   </div>
                 ) : undefined

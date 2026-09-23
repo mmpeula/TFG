@@ -131,6 +131,25 @@ public class TeamService {
     }
 
     /**
+     * Guarda lo que hay que saber de esta persona al repartir trabajo en un plan.
+     *
+     * <p>Se queda: vale para todos los planes que se generen despues en este
+     * workspace. Es lo contrario de las indicaciones que se escriben justo antes
+     * de generar un plan, que no se guardan en ningun sitio y mueren con esa
+     * ejecucion.</p>
+     *
+     * <p>Un texto en blanco borra las indicaciones en vez de guardar una cadena
+     * vacia, para que «sin indicaciones» sea un unico estado y no dos.</p>
+     */
+    @Transactional
+    public TeamMemberResponse updateMemberNotes(Long teamId, Long userId, UpdateMemberNotesRequest request) {
+        TeamMember member = getMember(teamId, userId);
+        String notes = request.planNotes() == null ? null : request.planNotes().trim();
+        member.setPlanNotes(notes == null || notes.isEmpty() ? null : notes);
+        return TeamMemberResponse.from(member);
+    }
+
+    /**
      * Saca a alguien del equipo, tanto si lo expulsa el responsable como si se sale
      * por su cuenta.
      *

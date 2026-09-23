@@ -4,7 +4,7 @@ import { ArrowLeft, Bot, CalendarRange, Columns3, LogOut, PauseCircle, Settings,
 import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Tooltip } from '@/components/ui/Controls'
-import { HelpChat } from '@/components/copilot/HelpChat'
+import { Assistant } from '@/components/assistant/Assistant'
 import { ShortcutsDialog } from './ShortcutsDialog'
 import { useShortcuts } from '@/hooks/useShortcuts'
 import styles from './WorkspaceShell.module.css'
@@ -40,8 +40,8 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
   const { user, signOut } = useAuth()
   const [helpOpen, setHelpOpen] = useState(false)
   const isTeacher = user?.role === 'DOCENTE'
-  // Automatizar tareas (el Copiloto) es cosa de quien administra el equipo;
-  // preguntarle algo (ver HelpChat) sigue abierto a cualquiera que no sea
+  // Generar el plan con IA es cosa de quien administra el equipo;
+  // preguntarle algo (ver Assistant) sigue abierto a cualquiera que no sea
   // el docente, que solo observa.
   const puedeAutomatizar = canManage(workspace?.myRole)
 
@@ -57,7 +57,7 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
         newTask: onNewTask,
         board: () => navigate(ROUTES.tableroById(workspaceId)),
         plan: () => navigate(ROUTES.planById(workspaceId)),
-        copilot: puedeAutomatizar ? () => navigate(ROUTES.copilotoById(workspaceId)) : undefined,
+        generatePlan: puedeAutomatizar ? () => navigate(ROUTES.generarPlanById(workspaceId)) : undefined,
         pulse: () => navigate(ROUTES.pulsoById(workspaceId)),
         help: () => setHelpOpen(true),
         escape: () => setHelpOpen(false),
@@ -69,7 +69,7 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
   const tabs = [
     { label: 'Plan', icon: <CalendarRange {...ICON} />, to: ROUTES.planById(workspaceId) },
     { label: 'Tablero', icon: <Columns3 {...ICON} />, to: ROUTES.tableroById(workspaceId) },
-    ...(puedeAutomatizar ? [{ label: 'Copiloto', icon: <Bot {...ICON} />, to: ROUTES.copilotoById(workspaceId) }] : []),
+    ...(puedeAutomatizar ? [{ label: 'Generar plan', icon: <Bot {...ICON} />, to: ROUTES.generarPlanById(workspaceId) }] : []),
     { label: 'Miembros', icon: <Users {...ICON} />, to: ROUTES.miembrosById(workspaceId) },
   ]
 
@@ -146,7 +146,7 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
       {/* Flotante sobre cualquier seccion del workspace: preguntar «que hago
           primero?» se hace mirando el tablero, no yendose a otra pantalla. El
           docente no lo ve: observa el trabajo, no lo hace. */}
-      {!isTeacher && <HelpChat workspaceId={workspaceId} />}
+      {!isTeacher && <Assistant workspaceId={workspaceId} />}
 
       <ShortcutsDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>

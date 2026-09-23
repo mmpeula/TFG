@@ -58,7 +58,7 @@ public class OllamaClient {
     }
 
     /**
-     * Conversacion en texto libre: la usa el copiloto para responder preguntas
+     * Conversacion en texto libre: la usa el asistente para responder preguntas
      * sobre el workspace. Se le pasa el historial para que entienda «y eso?».
      */
     public String chatText(String systemPrompt, List<Message> messages) {

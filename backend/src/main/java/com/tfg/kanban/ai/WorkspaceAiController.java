@@ -18,7 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * El copiloto de un workspace.
+ * Lo que la IA hace sobre un workspace.
  *
  * <p>Dos cosas distintas conviven aqui a proposito: <b>preguntar</b>, que solo
  * devuelve texto y nunca escribe, y <b>proponer tareas</b>, que devuelve una
@@ -26,15 +26,15 @@ import org.springframework.web.bind.annotation.*;
  * tablero por su cuenta en ninguno de los dos casos.</p>
  */
 @RestController
-@RequestMapping("/api/workspaces/{workspaceId}/copilot")
+@RequestMapping("/api/workspaces/{workspaceId}/ai")
 @RequiredArgsConstructor
-@Tag(name = "IA", description = "Planificacion automatica y copiloto del workspace")
-public class CopilotController {
+@Tag(name = "IA", description = "Generar plan y asistente del workspace")
+public class WorkspaceAiController {
 
-    private final CopilotChatService copilotChatService;
+    private final AssistantChatService assistantChatService;
     private final AiPlanService aiPlanService;
 
-    @Operation(summary = "Preguntar al copiloto",
+    @Operation(summary = "Preguntar al asistente",
             description = """
                     Responde en texto sobre el estado real del workspace: tareas, columnas,
                     fechas, personas y comentarios. No modifica nada.
@@ -49,7 +49,7 @@ public class CopilotController {
     @PreAuthorize("@access.canReadProject(#workspaceId)")
     @PostMapping("/chat")
     public ChatResponse chat(@PathVariable Long workspaceId, @Valid @RequestBody ChatRequest request) {
-        return copilotChatService.answer(workspaceId, request);
+        return assistantChatService.answer(workspaceId, request);
     }
 
     @Operation(summary = "Proponer tareas a partir de una descripcion",
@@ -59,7 +59,7 @@ public class CopilotController {
                     POST /api/projects/{id}/ai-plan/apply.
                     """)
     @PreAuthorize("@access.canManageProject(#workspaceId)")
-    @PostMapping("/tasks")
+    @PostMapping("/plan")
     public AiPlanResponse proposeFromText(@PathVariable Long workspaceId,
                                           @Valid @RequestBody TextRequest request,
                                           @Parameter(description = "Entre cuantas personas repartir")

@@ -121,7 +121,7 @@ export function WorkspaceSettingsScreen() {
           </Section>
 
           {project?.briefing && (
-            <Section title="Enunciado guardado" subtitle="lo que lee el copiloto para proponer tareas">
+            <Section title="Enunciado guardado" subtitle="lo que se lee al generar el plan para proponer tareas">
               <p className={styles.briefing}>{project.briefing}</p>
             </Section>
           )}

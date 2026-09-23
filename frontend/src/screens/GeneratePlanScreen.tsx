@@ -4,32 +4,32 @@ import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
 import {
   AiErrorCard, AiWorkbench, AppliedTasksSummary, PrivacyNote, ProposalPanel, SuggestedScheduleCard,
   WorkloadSummary,
-} from '@/components/copilot/Copilot'
+} from '@/components/generator/PlanGenerator'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
-import styles from './CopilotScreen.module.css'
+import styles from './GeneratePlanScreen.module.css'
 import { projects as projectsApi } from '@/api/endpoints'
 import {
   keys, useProject, useProjectBoards, useTeamMembers, useWorkspace, useWorkspaceMutations,
 } from '@/hooks/useData'
-import { useCopilotDrafts, useCopilotJob, useCopilotJobs, useUi } from '@/state/context'
+import { usePlanDrafts, usePlanJob, usePlanJobs, useUi } from '@/state/context'
 import { toErrorMessage } from '@/lib/api-client'
 import { canManage } from '@/lib/roles'
 import { ROUTES } from '@/app/routes'
 
 /**
- * El copiloto del workspace: automatizar tareas a partir de un documento o una
+ * Generar plan: crear tareas con IA a partir de un documento o una
  * descripcion, nada mas. Preguntarle algo puntual al modelo es otra cosa —el
- * desplegable de ayuda de la cabecera (ver HelpChat)— y esta abierto a
+ * desplegable de ayuda de la cabecera (ver Assistant)— y esta abierto a
  * cualquiera; esta pantalla, en cambio, solo la ve quien administra el equipo,
  * porque lo que hace (proponer y aplicar tareas al tablero) tambien esta
  * restringido en el servidor a ese rol.
  *
- * Generar tarda: la peticion en si la lanza {@link useCopilotJobs}, anclada por
+ * Generar tarda: la peticion en si la lanza {@link usePlanJobs}, anclada por
  * encima de las rutas, asi que sigue en marcha aunque el usuario se vaya a
  * mirar el tablero o los miembros. Esta pantalla solo lee su resultado.
  */
-export function CopilotScreen() {
+export function GeneratePlanScreen() {
   const { workspaceId: param } = useParams()
   const workspaceId = Number(param)
 
@@ -40,14 +40,14 @@ export function CopilotScreen() {
   const { pushToast } = useUi()
   const queryClient = useQueryClient()
   const workspaceMutations = useWorkspaceMutations(workspaceId)
-  const copilotJobs = useCopilotJobs()
-  const job = useCopilotJob(workspaceId)
+  const planJobs = usePlanJobs()
+  const job = usePlanJob(workspaceId)
 
   // Nada de estado local aqui: el borrador (documento, descripcion,
   // indicaciones, personas y lo que quede marcado de la propuesta) vive por
   // encima de las rutas, para que irse un momento al tablero no obligue a
   // volver a subir el enunciado ni a reescribir las indicaciones.
-  const { draftOf, patch } = useCopilotDrafts()
+  const { draftOf, patch } = usePlanDrafts()
   const draft = draftOf(workspaceId)
   const { file, text: descripcion, indications: indicaciones, appliedTitles, scheduleApplied } = draft
   const set = (cambios: Partial<typeof draft>) => patch(workspaceId, cambios)
@@ -79,7 +79,7 @@ export function CopilotScreen() {
       // vez de reflejar que ya esta hecho. El resumen plegable de abajo es la
       // confirmacion de que salio bien.
       set({ appliedTitles: created.map((task) => task.title), selected: null })
-      copilotJobs.clear(workspaceId)
+      planJobs.clear(workspaceId)
 
       const boardId = boards?.[0]?.id
       if (boardId) queryClient.invalidateQueries({ queryKey: keys.board(boardId) })
@@ -94,7 +94,7 @@ export function CopilotScreen() {
   /** Documento si lo hay, si no la descripcion, si tampoco el guion ya guardado del proyecto. */
   function runGenerate() {
     set({ appliedTitles: null, scheduleApplied: false, selected: null })
-    copilotJobs.start({
+    planJobs.start({
       workspaceId,
       workspaceName: workspace?.name ?? 'el workspace',
       file,
@@ -146,12 +146,12 @@ export function CopilotScreen() {
           // que su "generando…" desaparezca: sigue corriendo igual, solo se
           // descarta un resultado o error ya terminado, que ahora si quedaria
           // desactualizado.
-          if (job?.status !== 'pending') copilotJobs.clear(workspaceId)
+          if (job?.status !== 'pending') planJobs.clear(workspaceId)
         }}
         text={descripcion}
         onText={(next) => {
           set({ text: next, appliedTitles: null })
-          if (job?.status !== 'pending') copilotJobs.clear(workspaceId)
+          if (job?.status !== 'pending') planJobs.clear(workspaceId)
         }}
         indications={indicaciones}
         onIndications={(next) => set({ indications: next })}
