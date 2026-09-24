@@ -1,5 +1,8 @@
-import { CalendarDays, MessageSquare, Paperclip, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { CalendarDays, MessageSquare, MoreHorizontal, Paperclip, Sparkles, Trash2 } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
+import { Dropdown, DropdownItem } from '@/components/ui/Controls'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import styles from './PlanTaskCard.module.css'
 import { formatDate, daysUntil } from '@/lib/format'
 import { typeOf } from '@/lib/taskTypes'
@@ -11,7 +14,9 @@ interface Props {
   done?: boolean
   /** Estado con su color y su texto: por hacer / en curso / terminada. */
   state: { label: string; color: string }
+  canWrite?: boolean
   onOpen: (task: TaskResponse) => void
+  onDelete: (task: TaskResponse) => void | Promise<unknown>
 }
 
 /**
@@ -25,17 +30,39 @@ interface Props {
  * solo por esa insignia, nunca por estar en un sitio distinto de la pantalla.
  * Cambiar el estado se hace abriendo la tarjeta, igual que en el tablero.
  */
-export function PlanTaskCard({ task, done, state, onOpen }: Props) {
+export function PlanTaskCard({ task, done, state, canWrite = true, onOpen, onDelete }: Props) {
   const tipo = typeOf(task.type)
   const quedan = task.dueDate ? daysUntil(task.dueDate) : null
   const urge = !done && quedan !== null && quedan <= 3
   const alta = task.priority === 'ALTA' || task.priority === 'CRITICA'
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   return (
     <article
       className={[styles.card, done && styles.done].filter(Boolean).join(' ')}
       style={{ '--tipo': tipo.color } as React.CSSProperties}
     >
+      {canWrite && (
+        <div className={styles.menuRow}>
+          <Dropdown
+            trigger={({ toggle }) => (
+              <button className={styles.menu} onClick={toggle} aria-label={`Acciones de ${task.title}`}>
+                <MoreHorizontal size={13} strokeWidth={2.75} />
+              </button>
+            )}
+          >
+            {(close) => (
+              <>
+                <DropdownItem onClick={() => { close(); onOpen(task) }}>Abrir la tarea</DropdownItem>
+                <DropdownItem onClick={() => { close(); setConfirmOpen(true) }}>
+                  <Trash2 size={13} strokeWidth={2.75} /> Borrar
+                </DropdownItem>
+              </>
+            )}
+          </Dropdown>
+        </div>
+      )}
+
       <button className={styles.hit} onClick={() => onOpen(task)} aria-label={`Abrir ${task.title}`}>
         <span className={styles.title}>{task.title}</span>
 
@@ -86,6 +113,14 @@ export function PlanTaskCard({ task, done, state, onOpen }: Props) {
           )}
         </span>
       </button>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Borrar «${task.title}»`}
+        description="Se borraran tambien sus comentarios y adjuntos."
+        onConfirm={() => onDelete(task)}
+      />
     </article>
   )
 }

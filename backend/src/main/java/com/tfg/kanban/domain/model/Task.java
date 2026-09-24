@@ -53,6 +53,14 @@ public class Task extends Auditable {
     @Builder.Default
     private TaskType type = TaskType.TAREA;
 
+    /**
+     * Bloque de trabajo al que pertenece ("Autenticacion", "Memoria"...). Lo pone
+     * la generacion de plan con IA; en las tareas creadas a mano queda vacio.
+     */
+    @Size(max = 100)
+    @Column(name = "EPIC", length = 100)
+    private String epic;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "PRIORITY", nullable = false, length = 20)
     @Builder.Default

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { AiPlanResponse, AuthResponse, UserResponse } from '@/types/api'
+import type { AiPlanResponse, AuthResponse, PlanOptions, UserResponse } from '@/types/api'
 
 export interface ToastAction {
   label: string
@@ -51,8 +51,8 @@ export interface PlanGenerateRequest {
   workspaceName: string
   file: File | null
   text: string
-  people: number
-  indications?: string
+  /** Calendario, equipo e indicaciones de esta generacion. */
+  options: PlanOptions
 }
 
 export interface PlanJobsValue {
@@ -90,13 +90,31 @@ export interface PlanDraft {
   file: File | null
   text: string
   indications: string
-  /** Entre cuantas personas repartir; null es «las que haya en el equipo». */
-  people: number | null
+  /**
+   * Fecha de inicio elegida a mano, solo para cuando el workspace no tiene una
+   * propia. Si el workspace ya tiene fecha de inicio, esta se ignora: siempre
+   * manda la del workspace.
+   */
+  startDate: string | null
+  /**
+   * Quien entra en este reparto y con que datos. null es «todo el equipo con sus
+   * valores por defecto»; en cuanto se toca algo, la lista completa.
+   */
+  team: PlanTeamDraft[] | null
   /** null = todas marcadas, que es lo normal al generar. Un array, lo que el usuario dejo marcado a mano. */
   selected: number[] | null
   /** Titulos de la ultima tanda llevada al tablero, para el resumen de confirmacion. */
   appliedTitles: string[] | null
   scheduleApplied: boolean
+}
+
+/** Una fila del equipo en el formulario. `included` a false la deja fuera sin perder lo escrito. */
+export interface PlanTeamDraft {
+  userId: number
+  name: string
+  hoursPerWeek: number
+  preferences: string
+  included: boolean
 }
 
 export interface PlanDraftsValue {
@@ -108,7 +126,8 @@ export const EMPTY_PLAN_DRAFT: PlanDraft = {
   file: null,
   text: '',
   indications: '',
-  people: null,
+  startDate: null,
+  team: null,
   selected: null,
   appliedTitles: null,
   scheduleApplied: false,

@@ -3,8 +3,8 @@ package com.tfg.kanban.ai;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tfg.kanban.TestSecurity;
 import com.tfg.kanban.activity.ActivityService;
-import com.tfg.kanban.ai.dto.AiPlanResponse;
 import com.tfg.kanban.ai.dto.ApplyPlanRequest;
+import com.tfg.kanban.ai.dto.PlanOptions;
 import com.tfg.kanban.ai.dto.ProposedTask;
 import com.tfg.kanban.board.BoardService;
 import com.tfg.kanban.common.BusinessRuleException;
@@ -23,23 +23,28 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
 /**
- * El punto fragil del modulo de IA no es la llamada HTTP sino interpretar lo que
- * devuelve el modelo: aqui se prueban las formas de respuesta que se han visto en
- * la practica, incluidas las que no siguen el formato pedido.
+ * Lo fragil del plan con IA no es la llamada HTTP sino lo que hay alrededor: que
+ * al modelo le llegue lo que tiene que llegarle, interpretar lo que devuelve y
+ * devolverselo con los errores cuando no cumple. Eso es lo que se prueba aqui.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -56,6 +61,8 @@ class AiPlanServiceTest {
     private AiProperties properties;
     private AiPlanService service;
     private Project project;
+    /** Un lunes: asi las fechas de fin de sprint caen en dias de la semana conocidos. */
+    private LocalDate inicio;
 
     @BeforeEach
     void setUp() {
@@ -63,24 +70,27 @@ class AiPlanServiceTest {
 
         properties = new AiProperties();
         properties.setModel("llama3");
-        properties.setMaxTasks(8);
 
         service = new AiPlanService(properties, ollamaClient, new ObjectMapper(), projectService,
                 boardService, taskRepository, userRepository, activityService, taskMapper,
-                new DocumentTextExtractor(), new WorkloadBalancer(), new AiTaskScheduler());
+                new DocumentTextExtractor(), new AiTaskScheduler());
+
+        inicio = LocalDate.now().plusWeeks(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
 
         Team team = Team.builder().id(1L).name("Grupo 4").build();
-        team.getMembers().add(TeamMember.builder().id(1L)
-                .team(team).user(User.builder().id(1L).fullName("Ana Garcia").build()).build());
-        team.getMembers().add(TeamMember.builder().id(2L)
+        team.getMembers().add(TeamMember.builder().id(1L).role(Role.RESPONSABLE)
+                .team(team).user(User.builder().id(1L).fullName("Ana García").build()).build());
+        team.getMembers().add(TeamMember.builder().id(2L).role(Role.MIEMBRO)
                 .team(team).user(User.builder().id(2L).fullName("Luis Perez").build()).build());
-        // El profesor: DOCENTE en el equipo, no un alumno. No debe entrar en el reparto.
+        // El profesor sigue el equipo pero no es alumno: no entra en ningun reparto.
         team.getMembers().add(TeamMember.builder().id(3L).role(Role.DOCENTE)
                 .team(team).user(User.builder().id(3L).fullName("Profesor Soto").build()).build());
+
+        // Cuatro semanas justas: dos sprints de 14 dias.
         project = Project.builder()
                 .id(7L).name("Practica 2").team(team)
                 .briefing("Implementar una API REST de biblioteca con JWT.")
-                .deadline(LocalDate.now().plusDays(30))
+                .startDate(inicio).sprintDays(14).deadline(inicio.plusDays(27))
                 .build();
         when(projectService.getProject(7L)).thenReturn(project);
         when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(any())).thenReturn(List.of());
@@ -91,606 +101,462 @@ class AiPlanServiceTest {
         TestSecurity.clear();
     }
 
-    private void modelReplies(String json) {
-        when(ollamaClient.chatJson(anyString(), anyString())).thenReturn(json);
+    /** Un plan que cumple todas las reglas: 2 personas x 2 sprints, nadie pasa de 20 h. */
+    private static final String PLAN_VALIDO = """
+            {"resumen":{"duracion_semanas":4,"num_sprints":2,
+                        "carga_por_persona":[{"nombre":"Ana Garcia","horas":12,"tareas":2}]},
+             "sprints":[{"numero":1,"objetivo":"Datos y API"},{"numero":2,"objetivo":"Interfaz y pruebas"}],
+             "tareas":[
+               {"titulo":"Disenar el modelo de datos","descripcion":"Tablas de libros y prestamos",
+                "tipo":"Tarea","epica":"Datos","sprint":1,"asignado":"Ana Garcia","horas":6,
+                "prioridad":"Alta","motivo":"El apartado 1 pide el modelo E/R","depende_de":[]},
+               {"titulo":"Montar la API de prestamos","descripcion":"Endpoints REST de prestamos",
+                "tipo":"Tarea","epica":"API","sprint":1,"asignado":"Luis Perez","horas":8,
+                "prioridad":"Alta","motivo":"El apartado 2 pide la API","depende_de":["Disenar el modelo de datos"]},
+               {"titulo":"Maquetar el catalogo","descripcion":"Pantalla con el listado de libros",
+                "tipo":"Historia","epica":"Interfaz","sprint":2,"asignado":"Ana","horas":6,
+                "prioridad":"Media","motivo":"El apartado 3 pide consultar el catalogo","depende_de":[]},
+               {"titulo":"Escribir las pruebas de la API","descripcion":"Pruebas de integracion",
+                "tipo":"Tarea","epica":"Calidad","sprint":2,"asignado":"Luis Perez","horas":5,
+                "prioridad":"Media","motivo":"El apartado 4 pide pruebas","depende_de":[]}],
+             "avisos":[]}""";
+
+    /** El mismo plan, pero con Luis a 24 h en el sprint 1 cuando solo tiene 20. */
+    private static final String PLAN_SOBRECARGADO = """
+            {"resumen":{"duracion_semanas":4,"num_sprints":2},
+             "tareas":[
+               {"titulo":"Disenar el modelo de datos","sprint":1,"asignado":"Ana Garcia","horas":6},
+               {"titulo":"Montar la API de prestamos","sprint":1,"asignado":"Luis Perez","horas":8},
+               {"titulo":"Montar la API de socios","sprint":1,"asignado":"Luis Perez","horas":8},
+               {"titulo":"Montar la API de autores","sprint":1,"asignado":"Luis Perez","horas":8},
+               {"titulo":"Maquetar el catalogo","sprint":2,"asignado":"Ana Garcia","horas":6},
+               {"titulo":"Escribir las pruebas de la API","sprint":2,"asignado":"Luis Perez","horas":5}],
+             "avisos":[]}""";
+
+    private void modelReplies(String first, String... rest) {
+        when(ollamaClient.chatJson(anyString(), anyList())).thenReturn(first, rest);
+    }
+
+    /** Todas las conversaciones que se le han mandado al modelo, en orden. */
+    @SuppressWarnings("unchecked")
+    private List<List<OllamaClient.Message>> conversaciones() {
+        ArgumentCaptor<List<OllamaClient.Message>> captor = ArgumentCaptor.forClass(List.class);
+        verify(ollamaClient, atLeastOnce()).chatJson(anyString(), captor.capture());
+        return captor.getAllValues();
+    }
+
+    /** El mensaje de usuario de la primera llamada: el que arma buildUserPrompt. */
+    private String promptDeUsuario() {
+        return conversaciones().get(0).get(0).content();
+    }
+
+    // -----------------------------------------------------------------
+    // Lo que se le manda al modelo
+    // -----------------------------------------------------------------
+
+    @Test
+    @DisplayName("El prompt de sistema es el fijo, palabra por palabra")
+    void usesTheFixedSystemPrompt() {
+        modelReplies(PLAN_VALIDO);
+
+        service.generate(7L, null);
+
+        verify(ollamaClient).chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyList());
+        assertThat(AiPlanService.SYSTEM_PROMPT)
+                .startsWith("Eres un Project Manager senior y Scrum Master certificado")
+                .endsWith("avisos:[]}");
     }
 
     @Test
-    @DisplayName("Interpreta la respuesta con el formato pedido")
-    void parsesExpectedShape() {
-        modelReplies("""
-                {"tasks":[
-                  {"title":"Modelar el esquema","reason":"El guion pide un modelo E/R","tag":"analisis","priority":"ALTA","estimatedHours":6},
-                  {"title":"Implementar el login","reason":"Hace falta JWT","tag":"backend","priority":"MEDIA","estimatedHours":4}
-                ]}""");
+    @DisplayName("El mensaje de usuario lleva calendario, equipo, indicaciones y documento")
+    void userPromptCarriesEverything() {
+        modelReplies(PLAN_VALIDO);
 
-        var response = service.generate(7L, null, null);
+        service.generate(7L, new PlanOptions(null, null, "Ana tiene examenes la segunda semana", null));
 
-        assertThat(response.status()).isEqualTo("ok");
-        assertThat(response.model()).isEqualTo("llama3");
-        assertThat(response.tasks()).hasSize(2);
-        assertThat(response.tasks().get(0).title()).isEqualTo("Modelar el esquema");
-        assertThat(response.tasks().get(0).priority()).isEqualTo(TaskPriority.ALTA);
-        assertThat(response.tasks().get(0).estimatedHours()).isEqualByComparingTo("6");
-        assertThat(response.message()).contains("2 tareas");
-        // El documento de este test no dice nada de fechas: no hay que inventarlas.
-        assertThat(response.schedule()).isNull();
+        assertThat(promptDeUsuario())
+                .contains("Fecha de inicio: " + inicio)
+                .contains("Duracion del sprint: 14 dias (2 semanas)")
+                .contains("- Sprint 1: " + inicio + " a " + inicio.plusDays(13))
+                .contains("- Sprint 2: " + inicio.plusDays(14) + " a " + inicio.plusDays(27))
+                .contains("EQUIPO (2 personas)")
+                .contains("INDICACIONES ADICIONALES (solo para este plan)")
+                .contains("Ana tiene examenes la segunda semana")
+                .contains("DOCUMENTO DEL PROYECTO")
+                .contains("Implementar una API REST de biblioteca con JWT.");
     }
 
     @Test
-    @DisplayName("Las indicaciones del usuario llegan al modelo, aparte del guion")
-    void indicationsReachThePrompt() {
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}]}""");
+    @DisplayName("Cada persona llega con sus horas, su capacidad y sus preferencias")
+    void teamLinesCarryTheFormData() {
+        modelReplies(PLAN_VALIDO);
 
-        service.generate(7L, null, "Que Ana lleve menos carga esta semana, tiene examenes");
+        service.generate(7L, new PlanOptions(null, null, null, List.of(
+                new PlanOptions.TeamSlot(1L, 8, "Frontend; React y maquetacion"),
+                new PlanOptions.TeamSlot(2L, 12, "Backend; Java y Spring"))));
 
-        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(ollamaClient).chatJson(anyString(), promptCaptor.capture());
-        assertThat(promptCaptor.getValue())
-                .contains("INDICACIONES SOLO PARA ESTE REPARTO")
-                .contains("Que Ana lleve menos carga esta semana, tiene examenes");
+        assertThat(promptDeUsuario())
+                .contains("- Ana García (lider) | 8 h/semana | preferencias: Frontend; React y maquetacion")
+                .contains("- Luis Perez | 12 h/semana | preferencias: Backend; Java y Spring")
+                // Con sprints fijos, la capacidad va sprint a sprint.
+                .contains("capacidad: Ana García 16 h, Luis Perez 24 h");
     }
 
     @Test
-    @DisplayName("La ficha permanente de cada miembro llega al modelo")
-    void memberNotesReachThePrompt() {
-        project.getTeam().getMembers().stream()
-                .filter(member -> member.getUser().getId().equals(2L))
-                .forEach(member -> member.setPlanNotes("Se maneja con Java y Spring. Evitar frontend."));
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}]}""");
+    @DisplayName("Sin preferencias en el formulario se usa la ficha de Miembros")
+    void preferencesDefaultToTheMemberNotes() {
+        project.getTeam().getMembers().get(1).setPlanNotes("Evitar frontend si hay alternativa");
+        modelReplies(PLAN_VALIDO);
 
-        service.generate(7L, null, null);
+        service.generate(7L, null);
 
-        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(ollamaClient).chatJson(anyString(), promptCaptor.capture());
-        assertThat(promptCaptor.getValue())
-                .contains("### Luis Perez")
-                .contains("Ficha: Se maneja con Java y Spring. Evitar frontend.")
-                // Ana no tiene ficha: se dice, en vez de dejarla como un hueco que el
-                // modelo interpreta como «de esta no hay nada que contar».
-                .contains("Ficha: sin indicaciones");
+        assertThat(promptDeUsuario())
+                .contains("- Luis Perez | 10 h/semana | preferencias: Evitar frontend si hay alternativa")
+                .contains("preferencias: ninguna");
     }
 
     @Test
-    @DisplayName("La ficha del docente no entra: no participa en el reparto")
-    void teacherNotesStayOutOfThePrompt() {
-        project.getTeam().getMembers().stream()
-                .filter(member -> member.getRole() == Role.DOCENTE)
-                .forEach(member -> member.setPlanNotes("Corrige la memoria"));
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}]}""");
+    @DisplayName("Quien se quita del formulario no entra en el reparto; el docente nunca entra")
+    void onlyTheChosenTeamReachesTheModel() {
+        modelReplies(PLAN_VALIDO);
 
-        service.generate(7L, null, null);
+        service.generate(7L, new PlanOptions(null, null, null, List.of(
+                new PlanOptions.TeamSlot(2L, 10, null),
+                // No es del equipo del reparto: el docente y alguien que no existe se ignoran.
+                new PlanOptions.TeamSlot(3L, 10, null),
+                new PlanOptions.TeamSlot(99L, 10, null))));
 
-        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(ollamaClient).chatJson(anyString(), promptCaptor.capture());
-        assertThat(promptCaptor.getValue())
+        assertThat(promptDeUsuario())
+                .contains("EQUIPO (1 persona)")
+                .contains("Luis Perez")
+                .doesNotContain("Ana García")
                 .doesNotContain("Profesor Soto")
-                .doesNotContain("Corrige la memoria");
+                .doesNotContain("Fantasma");
     }
 
     @Test
-    @DisplayName("Las indicaciones de la ejecucion no se guardan en la ficha de nadie")
-    void executionIndicationsDoNotTouchMemberNotes() {
-        // Es la diferencia entre las dos: esta vale para este reparto y se acaba ahi.
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}]}""");
+    @DisplayName("Sin nadie en el reparto no se llama al modelo")
+    void anEmptyTeamIsRejected() {
+        var options = new PlanOptions(null, null, null, List.of(new PlanOptions.TeamSlot(3L, 10, null)));
 
-        service.generate(7L, null, "Esta vez Luis lleva la documentacion");
-
-        assertThat(project.getTeam().getMembers())
-                .allSatisfy(member -> assertThat(member.getPlanNotes()).isNull());
+        assertThatThrownBy(() -> service.generate(7L, options))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("No hay nadie del equipo");
+        verifyNoInteractions(ollamaClient);
     }
 
     @Test
-    @DisplayName("El modelo puede vetar a alguien para una tarea concreta")
-    void avoidKeepsTheTaskAwayFromThatPerson() {
-        modelReplies("""
-                {"tasks":[{"title":"Maquetar la pantalla de login","assignee":"Luis Perez",
-                           "why":"backend","avoid":["Luis Perez"],"estimatedHours":4}]}""");
+    @DisplayName("Sin fecha de entrega, cuantos sprints hacen falta lo decide el modelo")
+    void withoutDeadlineTheModelProposesTheDuration() {
+        project.setDeadline(null);
+        modelReplies(PLAN_VALIDO);
 
-        var response = service.generate(7L, null, null);
+        var response = service.generate(7L, null);
 
-        // Aunque el propio modelo se contradiga proponiendolo y vetandolo a la vez,
-        // manda el veto: es como llegan aqui las prohibiciones de la ficha.
-        assertThat(response.tasks()).singleElement().satisfies(task -> {
-            assertThat(task.assigneeName()).isEqualTo("Ana Garcia");
-            assertThat(task.assignmentReason()).contains("pueden hacerla");
-        });
+        assertThat(promptDeUsuario()).contains("No hay fecha de entrega fijada").contains("resumen.num_sprints");
+        assertThat(response.sprints()).hasSize(2);
+        // Se ofrece guardar la entrega que sale del plan, para que la pestana Plan lo pinte igual.
+        assertThat(response.schedule()).isNotNull();
+        assertThat(response.schedule().deadline()).isEqualTo(inicio.plusDays(27));
+    }
+
+    // -----------------------------------------------------------------
+    // Lo que se devuelve
+    // -----------------------------------------------------------------
+
+    @Test
+    @DisplayName("Un plan valido se interpreta entero a la primera")
+    void parsesAValidPlan() {
+        modelReplies(PLAN_VALIDO);
+
+        var response = service.generate(7L, null);
+
+        assertThat(response.attempts()).isEqualTo(1);
+        assertThat(response.warnings()).isEmpty();
+        assertThat(response.durationWeeks()).isEqualTo(4);
+        assertThat(response.tasks()).hasSize(4);
+
+        ProposedTask api = response.tasks().get(1);
+        assertThat(api.title()).isEqualTo("Montar la API de prestamos");
+        assertThat(api.description()).isEqualTo("Endpoints REST de prestamos");
+        assertThat(api.reason()).isEqualTo("El apartado 2 pide la API");
+        assertThat(api.type()).isEqualTo(TaskType.TAREA);
+        assertThat(api.epic()).isEqualTo("API");
+        assertThat(api.sprint()).isEqualTo(1);
+        assertThat(api.priority()).isEqualTo(TaskPriority.ALTA);
+        assertThat(api.estimatedHours()).isEqualByComparingTo("8");
+        assertThat(api.dependsOn()).containsExactly("Disenar el modelo de datos");
+        assertThat(response.tasks().get(2).type()).isEqualTo(TaskType.HISTORIA);
     }
 
     @Test
-    @DisplayName("Cada tarea sale con una frase de por que le ha tocado a esa persona")
-    void everyTaskExplainsItsAssignment() {
-        modelReplies("""
-                {"tasks":[{"title":"Montar la API","assignee":"Luis Perez","why":"Backend y Java","estimatedHours":5}]}""");
+    @DisplayName("El nombre que da el modelo se resuelve contra el equipo, con o sin tildes y solo con el nombre")
+    void resolvesAssigneesAgainstTheTeam() {
+        modelReplies(PLAN_VALIDO);
 
-        var response = service.generate(7L, null, null);
+        var response = service.generate(7L, null);
 
-        assertThat(response.tasks()).singleElement().satisfies(task -> {
-            assertThat(task.assigneeName()).isEqualTo("Luis Perez");
-            assertThat(task.assignmentReason()).isEqualTo("Backend y Java");
-        });
+        // "Ana Garcia" y "Ana" son la misma persona que "Ana García".
+        assertThat(response.tasks().get(0).assigneeId()).isEqualTo(1L);
+        assertThat(response.tasks().get(0).assigneeName()).isEqualTo("Ana García");
+        assertThat(response.tasks().get(2).assigneeId()).isEqualTo(1L);
+        assertThat(response.tasks().get(1).assigneeId()).isEqualTo(2L);
     }
 
     @Test
-    @DisplayName("Sin indicaciones, el prompt no menciona el apartado")
-    void noIndicationsMeansNoExtraSection() {
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}]}""");
+    @DisplayName("Los sprints los fecha el servidor y cada tarea cae el ultimo dia laborable del suyo")
+    void datesComeFromTheServer() {
+        modelReplies(PLAN_VALIDO);
 
-        service.generate(7L, null, "   ");
+        var response = service.generate(7L, null);
 
-        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(ollamaClient).chatJson(anyString(), promptCaptor.capture());
-        assertThat(promptCaptor.getValue()).doesNotContain("INDICACIONES SOLO PARA ESTE REPARTO");
+        assertThat(response.sprints()).extracting(s -> s.number()).containsExactly(1, 2);
+        assertThat(response.sprints().get(0).start()).isEqualTo(inicio);
+        assertThat(response.sprints().get(0).end()).isEqualTo(inicio.plusDays(13));
+        assertThat(response.sprints().get(0).goal()).isEqualTo("Datos y API");
+        // El sprint acaba en domingo: su ultimo dia laborable es el viernes anterior.
+        assertThat(response.tasks().get(0).dueDate()).isEqualTo(inicio.plusDays(11));
+        assertThat(response.tasks().get(3).dueDate()).isEqualTo(inicio.plusDays(25));
     }
 
     @Test
-    @DisplayName("Una indicacion desmedida se recorta antes de mandarla al modelo")
-    void indicationsAreTruncated() {
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}]}""");
-        String larga = "a".repeat(600);
+    @DisplayName("La barra de reparto cuenta las horas del plan, no lo que el modelo dice de si mismo")
+    void workloadIsCountedFromTheTasks() {
+        modelReplies(PLAN_VALIDO);
 
-        service.generate(7L, null, larga);
+        var response = service.generate(7L, null);
 
-        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(ollamaClient).chatJson(anyString(), promptCaptor.capture());
-        assertThat(promptCaptor.getValue()).doesNotContain("a".repeat(501));
-    }
-
-    // ------------------------------------------------- excluir del reparto
-
-    @Test
-    @DisplayName("A quien las indicaciones piden excluir no le toca ninguna tarea, aunque el reparto normalmente no deje a nadie a cero")
-    void excludesTheNamedMemberFromTheReparto() {
-        modelReplies("""
-                {"tasks":[{"title":"Tarea A"},{"title":"Tarea B"},{"title":"Tarea C"}],
-                 "excluded":["Luis Perez"]}""");
-
-        var response = service.generate(7L, null, "Luis esta de baja, que no le toque nada esta vez");
-
-        assertThat(response.excludedMembers()).containsExactly("Luis Perez");
-        assertThat(response.tasks()).extracting(ProposedTask::assigneeId).doesNotContain(2L);
-        assertThat(response.workload()).extracting(w -> w.memberId()).doesNotContain(2L);
+        assertThat(response.workload()).hasSize(2);
+        assertThat(response.workload().get(0).memberName()).isEqualTo("Ana García");
+        assertThat(response.workload().get(0).tasks()).isEqualTo(2);
+        assertThat(response.workload().get(0).hours()).isEqualByComparingTo("12");
+        assertThat(response.workload().get(1).hours()).isEqualByComparingTo("13");
     }
 
     @Test
-    @DisplayName("Sin indicaciones de exclusion, nadie se queda fuera")
-    void noExclusionByDefault() {
-        modelReplies("""
-                {"tasks":[{"title":"Tarea A"}]}""");
+    @DisplayName("Los avisos del modelo llegan a la respuesta")
+    void modelWarningsAreKept() {
+        modelReplies(PLAN_VALIDO.replace("\"avisos\":[]", "\"avisos\":[\"El documento no dice la duracion\"]"));
 
-        assertThat(service.generate(7L, null, null).excludedMembers()).isEmpty();
+        var response = service.generate(7L, null);
+
+        assertThat(response.warnings()).containsExactly("El documento no dice la duracion");
     }
 
     @Test
-    @DisplayName("Un nombre excluido que no corresponde a nadie del equipo se ignora, no se inventa a quien excluir")
-    void unmatchedExclusionNameIsIgnored() {
-        modelReplies("""
-                {"tasks":[{"title":"Tarea A"}], "excluded":["Pedro El Inexistente"]}""");
-
-        var response = service.generate(7L, null, null);
-
-        assertThat(response.excludedMembers()).isEmpty();
-        assertThat(response.tasks()).singleElement().satisfies(t -> assertThat(t.assigneeId()).isNotNull());
-    }
-
-    @Test
-    @DisplayName("Si se excluye a todo el equipo, las tareas vuelven sin asignar en vez de fallar")
-    void excludingEveryoneLeavesTasksUnassigned() {
-        modelReplies("""
-                {"tasks":[{"title":"Tarea A"}], "excluded":["Ana Garcia","Luis Perez"]}""");
-
-        var response = service.generate(7L, null, null);
-
-        assertThat(response.excludedMembers()).containsExactlyInAnyOrder("Ana Garcia", "Luis Perez");
-        assertThat(response.workload()).isEmpty();
-        assertThat(response.tasks()).singleElement().satisfies(t -> assertThat(t.assigneeId()).isNull());
-    }
-
-    // ------------------------------------------------- el profesor no es un alumno
-
-    @Test
-    @DisplayName("El profesor (DOCENTE) nunca recibe tareas del reparto")
-    void observerNeverGetsAssignedWork() {
-        modelReplies("""
-                {"tasks":[{"title":"A"},{"title":"B"},{"title":"C"},{"title":"D"},{"title":"E"}]}""");
-
-        var response = service.generate(7L, null, null);
-
-        assertThat(response.tasks()).extracting(ProposedTask::assigneeId).doesNotContain(3L);
-        assertThat(response.workload()).extracting(w -> w.memberId()).doesNotContain(3L);
-    }
-
-    @Test
-    @DisplayName("El profesor no cuenta en la lista de personas que ve el modelo para repartir")
-    void observerIsNotShownToTheModelAsAssignable() {
-        modelReplies("""
-                {"tasks":[{"title":"A"}]}""");
-
-        service.generate(7L, null, null);
-
-        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(ollamaClient).chatJson(anyString(), promptCaptor.capture());
-        assertThat(promptCaptor.getValue())
-                .contains("Ana Garcia").contains("Luis Perez")
-                .doesNotContain("Profesor Soto");
-    }
-
-    @Test
-    @DisplayName("Si el modelo igualmente sugiere al profesor, la sugerencia se ignora")
-    void suggestingTheObserverIsIgnored() {
-        modelReplies("""
-                {"tasks":[{"title":"A","assignee":"Profesor Soto"}]}""");
-
-        var response = service.generate(7L, null, null);
-
-        assertThat(response.tasks()).singleElement()
-                .satisfies(t -> assertThat(t.assigneeId()).isNotEqualTo(3L));
-    }
-
-    /*
-     * Las fechas de estas pruebas son relativas a hoy a proposito: la planificacion
-     * propuesta se valida contra la fecha actual, asi que una fecha fija acabaria
-     * quedandose en el pasado y rompiendo la prueba con el tiempo.
-     */
-    private static final LocalDate INICIO = LocalDate.now().plusWeeks(2);
-    private static final LocalDate ENTREGA = LocalDate.now().plusWeeks(12);
-
-    @Test
-    @DisplayName("Si el documento dice fechas y duracion de sprint, se propone al usuario")
-    void parsesScheduleWhenDocumentStatesIt() {
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}],
-                 "schedule":{"startDate":"%s","deadline":"%s","sprintDays":14}}""".formatted(INICIO, ENTREGA));
-
-        var schedule = service.generate(7L, null, null).schedule();
-
-        assertThat(schedule).isNotNull();
-        assertThat(schedule.startDate()).isEqualTo(INICIO);
-        assertThat(schedule.deadline()).isEqualTo(ENTREGA);
-        assertThat(schedule.sprintDays()).isEqualTo(14);
-    }
-
-    @Test
-    @DisplayName("Las claves en espanol tambien valen para las fechas del documento")
-    void parsesSpanishAliasesForSchedule() {
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}],
-                 "schedule":{"fechaInicio":"%s","fechaEntrega":"%s","duracionSprint":7}}"""
-                .formatted(INICIO, ENTREGA));
-
-        var schedule = service.generate(7L, null, null).schedule();
-
-        assertThat(schedule).isNotNull();
-        assertThat(schedule.startDate()).isEqualTo(INICIO);
-        assertThat(schedule.sprintDays()).isEqualTo(7);
-    }
-
-    @Test
-    @DisplayName("Un curso ya pasado se adelanta al calendario actual: el dia y el mes son del enunciado, el ano lo inventa el modelo")
-    void movesAStaleScheduleIntoTheCurrentCalendar() {
-        LocalDate inicioViejo = LocalDate.now().minusYears(1).plusWeeks(3);
-        LocalDate entregaVieja = inicioViejo.plusWeeks(9);
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}],
-                 "schedule":{"startDate":"%s","deadline":"%s","sprintDays":21}}"""
-                .formatted(inicioViejo, entregaVieja));
-
-        var schedule = service.generate(7L, null, null).schedule();
-
-        assertThat(schedule).isNotNull();
-        assertThat(schedule.sprintDays()).isEqualTo(21);
-        // Mismo dia y mes, un ano despues: la ventana se conserva entera.
-        assertThat(schedule.startDate()).isEqualTo(inicioViejo.plusYears(1));
-        assertThat(schedule.deadline()).isEqualTo(entregaVieja.plusYears(1));
-        assertThat(schedule.deadline()).isAfter(LocalDate.now());
-    }
-
-    @Test
-    @DisplayName("Una fecha de inicio suelta y pasada tambien se adelanta")
-    void movesAStalePastStartDateWithoutDeadline() {
-        LocalDate inicioViejo = LocalDate.now().minusMonths(2);
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}], "schedule":{"startDate":"%s"}}"""
-                .formatted(inicioViejo));
-
-        var schedule = service.generate(7L, null, null).schedule();
-
-        assertThat(schedule).isNotNull();
-        assertThat(schedule.startDate()).isEqualTo(inicioViejo.plusYears(1));
-    }
-
-    @Test
-    @DisplayName("Una practica ya empezada no se toca: lo que manda es que la entrega siga por venir")
-    void keepsAPastStartWhenTheDeadlineIsStillAhead() {
-        LocalDate empezoHaceUnMes = LocalDate.now().minusMonths(1);
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}],
-                 "schedule":{"startDate":"%s","deadline":"%s"}}"""
-                .formatted(empezoHaceUnMes, ENTREGA));
-
-        var schedule = service.generate(7L, null, null).schedule();
-
-        assertThat(schedule).isNotNull();
-        assertThat(schedule.startDate()).isEqualTo(empezoHaceUnMes);
-        assertThat(schedule.deadline()).isEqualTo(ENTREGA);
-    }
-
-    @Test
-    @DisplayName("Una entrega anterior al inicio no describe ninguna ventana: se queda solo la entrega")
-    void dropsStartDateWhenItIsAfterTheDeadline() {
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}],
-                 "schedule":{"startDate":"%s","deadline":"%s"}}"""
-                .formatted(LocalDate.now().plusMonths(6), ENTREGA));
-
-        var schedule = service.generate(7L, null, null).schedule();
-
-        assertThat(schedule).isNotNull();
-        assertThat(schedule.startDate()).isNull();
-        assertThat(schedule.deadline()).isEqualTo(ENTREGA);
-    }
-
-    @Test
-    @DisplayName("Las fechas que se proponen son las mismas con las que se fechan las tareas")
-    void proposedScheduleAndTaskDatesAgree() {
-        modelReplies("""
-                {"tasks":[{"title":"A"},{"title":"B"},{"title":"C"}],
-                 "schedule":{"startDate":"%s","deadline":"%s","sprintDays":14}}"""
-                .formatted(INICIO, ENTREGA));
-
-        var response = service.generate(7L, null, null);
-
-        // Si divergieran, el usuario aplicaria al workspace una ventana en la que no
-        // cae ninguna de sus tareas y el plan saldria con sprints vacios de sobra.
-        assertThat(response.tasks()).allSatisfy(task -> assertThat(task.dueDate())
-                .isBetween(response.schedule().startDate(), response.schedule().deadline()));
-    }
-
-    @Test
-    @DisplayName("Una fecha que no se entiende, o una duracion de sprint absurda, se ignora en vez de adivinar")
-    void ignoresUnusableScheduleValues() {
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}],
-                 "schedule":{"startDate":"proximamente","deadline":"","sprintDays":500}}""");
-
-        assertThat(service.generate(7L, null, null).schedule()).isNull();
-    }
-
-    @Test
-    @DisplayName("Un dato suelto de fecha no se descarta solo porque falten los demas")
-    void keepsPartialSchedule() {
-        modelReplies("""
-                {"tasks":[{"title":"Modelar el esquema"}], "schedule":{"sprintDays":21}}""");
-
-        var schedule = service.generate(7L, null, null).schedule();
-
-        assertThat(schedule).isNotNull();
-        assertThat(schedule.sprintDays()).isEqualTo(21);
-        assertThat(schedule.startDate()).isNull();
-        assertThat(schedule.deadline()).isNull();
-    }
-
-    @Test
-    @DisplayName("Las fechas de las tareas caen dentro de la ventana que el documento acaba de decir, no en una inventada aparte")
-    void taskDatesMatchTheJustDetectedSchedule() {
-        // Lejos tanto de "hoy + 42 dias" (la ventana por defecto) como del deadline
-        // que ya tuviera guardado el proyecto (hoy + 30 dias, puesto en el setUp):
-        // si las tareas caen aqui es porque se ha usado la fecha del documento, no
-        // ninguna de esas dos.
-        LocalDate inicio = LocalDate.now().plusMonths(4);
-        LocalDate entrega = inicio.plusMonths(1);
-        modelReplies("""
-                {"tasks":[{"title":"A"},{"title":"B"},{"title":"C"}],
-                 "schedule":{"startDate":"%s","deadline":"%s","sprintDays":14}}""".formatted(inicio, entrega));
-
-        var response = service.generate(7L, null, null);
-
-        assertThat(response.schedule().startDate()).isEqualTo(inicio);
-        assertThat(response.tasks()).allSatisfy(task -> {
-            assertThat(task.dueDate()).isNotNull();
-            assertThat(task.dueDate()).isAfterOrEqualTo(inicio);
-            assertThat(task.dueDate()).isBeforeOrEqualTo(entrega);
-        });
-    }
-
-    @Test
-    @DisplayName("Un array suelto de tareas, sin objeto raiz, no puede traer schedule")
-    void arrayShapeHasNoSchedule() {
-        modelReplies("""
-                [{"title":"Modelar el esquema"}]""");
-
-        assertThat(service.generate(7L, null, null).schedule()).isNull();
-    }
-
-    @Test
-    @DisplayName("El metodo de ayuda isEmpty() no se cuela en el JSON como si fuera un campo")
-    void suggestedScheduleDoesNotLeakIsEmptyAsAField() throws Exception {
-        var schedule = new AiPlanResponse.SuggestedSchedule(LocalDate.now(), null, null);
-        // Igual que el ObjectMapper real de Spring Boot, que trae el soporte de
-        // java.time ya registrado: aqui hay que anadirlo a mano.
-        ObjectMapper mapper = new ObjectMapper()
-                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-
-        String json = mapper.writeValueAsString(schedule);
-
-        assertThat(json).doesNotContain("\"empty\"");
-    }
-
-    @Test
-    @DisplayName("Acepta un array suelto y tambien las claves en espanol")
-    void parsesAlternativeShapes() {
-        modelReplies("""
-                [{"titulo":"Escribir la memoria","motivo":"Lo pide el guion","tipo":"historia","prioridad":"BAJA","horas":8}]""");
-
-        var tasks = service.generate(7L, null, null).tasks();
-
-        assertThat(tasks).hasSize(1);
-        assertThat(tasks.get(0).title()).isEqualTo("Escribir la memoria");
-        assertThat(tasks.get(0).type()).isEqualTo(TaskType.HISTORIA);
-        assertThat(tasks.get(0).priority()).isEqualTo(TaskPriority.BAJA);
-        assertThat(tasks.get(0).estimatedHours()).isEqualByComparingTo("8");
-    }
-
-    @Test
-    @DisplayName("Descarta entradas sin titulo y normaliza prioridades y horas absurdas")
-    void discardsUnusableEntries() {
+    @DisplayName("Tambien se aceptan las claves en ingles, por si el modelo las cambia")
+    void acceptsEnglishKeys() {
         modelReplies("""
                 {"tasks":[
-                  {"title":"","reason":"sin titulo"},
-                  {"title":"Valida","priority":"URGENTISIMA","estimatedHours":999},
-                  {"title":"Otra valida","estimatedHours":-3}
-                ]}""");
+                  {"title":"Disenar el modelo","sprint":1,"assignee":"Ana","hours":"6h","priority":"high","type":"story"},
+                  {"title":"Montar la API","sprint":1,"assignee":"Luis","hours":6},
+                  {"title":"Maquetar","sprint":"Sprint 2","assignee":"Ana","hours":6},
+                  {"title":"Probar","sprint":2,"assignee":"Luis","hours":6}]}""");
 
-        var tasks = service.generate(7L, null, null).tasks();
+        var response = service.generate(7L, null);
 
-        assertThat(tasks).hasSize(2);
-        assertThat(tasks.get(0).priority()).isEqualTo(TaskPriority.MEDIA);
-        assertThat(tasks.get(0).estimatedHours()).isNull();
-        assertThat(tasks.get(1).estimatedHours()).isNull();
+        assertThat(response.warnings()).isEmpty();
+        assertThat(response.tasks().get(0).estimatedHours()).isEqualByComparingTo("6");
+        assertThat(response.tasks().get(0).priority()).isEqualTo(TaskPriority.ALTA);
+        assertThat(response.tasks().get(0).type()).isEqualTo(TaskType.HISTORIA);
+        assertThat(response.tasks().get(2).sprint()).isEqualTo(2);
     }
 
     @Test
-    @DisplayName("Descarta las tareas que el modelo repite pese a pedirle que no lo haga")
-    void filtersDuplicatesOfExistingTasks() {
-        Board board = Board.builder().id(3L).project(project).build();
-        project.getBoards().add(board);
-        BoardColumn column = BoardColumn.builder().id(10L).name("Por hacer").board(board).build();
-        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(3L)).thenReturn(List.of(
-                Task.builder().id(1L).title("Escribir los tests de servicio").boardColumn(column).build(),
-                Task.builder().id(2L).title("Preparar la presentacion").boardColumn(column).build()));
+    @DisplayName("Se descartan las tareas que ya estan en el tablero")
+    void dropsTasksAlreadyOnTheBoard() {
+        project.getBoards().add(Board.builder().id(3L).project(project).build());
+        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(3L))
+                .thenReturn(List.of(Task.builder().title("Escribir las pruebas de la API").build()));
+        modelReplies(PLAN_VALIDO);
 
-        modelReplies("""
-                {"tasks":[
-                  {"title":"Escribir tests de servicio"},
-                  {"title":"Preparar la presentación"},
-                  {"title":"Configurar la integracion continua"}
-                ]}""");
+        var response = service.generate(7L, null);
 
-        var tasks = service.generate(7L, null, null).tasks();
+        assertThat(promptDeUsuario()).contains("YA ESTA EN EL TABLERO");
+        assertThat(response.tasks()).extracting(ProposedTask::title)
+                .doesNotContain("Escribir las pruebas de la API");
+    }
 
-        // Se cuelan variantes con y sin tildes y con articulos distintos: se comparan normalizadas.
-        assertThat(tasks).extracting(com.tfg.kanban.ai.dto.ProposedTask::title)
-                .containsExactly("Configurar la integracion continua");
+    // -----------------------------------------------------------------
+    // Validar y reintentar
+    // -----------------------------------------------------------------
+
+    @Test
+    @DisplayName("Si el plan no cumple, se le devuelve al modelo con los errores y se usa el corregido")
+    void retriesWithConcreteErrors() {
+        modelReplies(PLAN_SOBRECARGADO, PLAN_VALIDO);
+
+        var response = service.generate(7L, null);
+
+        assertThat(response.attempts()).isEqualTo(2);
+        assertThat(response.warnings()).isEmpty();
+        assertThat(response.tasks()).hasSize(4);
+
+        assertThat(conversaciones()).hasSize(2);
+        List<OllamaClient.Message> correccion = conversaciones().get(1);
+        assertThat(correccion).hasSize(3);
+        assertThat(correccion.get(1).role()).isEqualTo("assistant");
+        assertThat(correccion.get(1).content()).isEqualTo(PLAN_SOBRECARGADO);
+        assertThat(correccion.get(2).content())
+                .contains("Luis Perez tiene 24 h en el sprint 1 y su capacidad es 20 h: quita o mueve 4 h.")
+                .contains("devuelve el plan COMPLETO");
     }
 
     @Test
-    @DisplayName("Respeta el maximo de tareas configurado")
-    void respectsMaxTasks() {
-        properties.setMaxTasks(2);
-        modelReplies("""
-                {"tasks":[{"title":"Una"},{"title":"Dos"},{"title":"Tres"},{"title":"Cuatro"}]}""");
+    @DisplayName("Tras los reintentos, lo que siga sin cumplirse se muestra como aviso")
+    void keepsTheLastPlanWithItsErrorsAsWarnings() {
+        modelReplies(PLAN_SOBRECARGADO);
 
-        assertThat(service.generate(7L, null, null).tasks()).hasSize(2);
+        var response = service.generate(7L, null);
+
+        // Uno mas los dos reintentos configurados por defecto.
+        assertThat(response.attempts()).isEqualTo(3);
+        assertThat(response.tasks()).hasSize(6);
+        assertThat(response.warnings())
+                .anySatisfy(aviso -> assertThat(aviso).contains("sigue sin cumplir"))
+                .anySatisfy(aviso -> assertThat(aviso).contains("Luis Perez tiene 24 h en el sprint 1"));
     }
 
     @Test
-    @DisplayName("Una respuesta que no es una lista de tareas se reporta como IA no disponible")
-    void rejectsUnusableResponse() {
-        modelReplies("{\"respuesta\":\"lo siento, no puedo ayudarte\"}");
+    @DisplayName("Un JSON roto tambien se reintenta")
+    void retriesAfterBrokenJson() {
+        modelReplies("esto no es json", PLAN_VALIDO);
 
-        assertThatThrownBy(() -> service.generate(7L, null, null))
+        var response = service.generate(7L, null);
+
+        assertThat(response.attempts()).isEqualTo(2);
+        assertThat(conversaciones().get(1).get(2).content()).contains("no era JSON valido");
+    }
+
+    @Test
+    @DisplayName("Si nunca llega un plan que se pueda leer, se avisa de que la IA no ha respondido bien")
+    void failsWhenNoAttemptIsReadable() {
+        modelReplies("nada", "{\"sin\":\"tareas\"}", "tampoco");
+
+        assertThatThrownBy(() -> service.generate(7L, null))
                 .isInstanceOf(AiUnavailableException.class)
-                .hasMessageContaining("lista de tareas");
+                .hasMessageContaining("tras 3 intentos");
+    }
+
+    @Test
+    @DisplayName("Los reintentos se pueden configurar")
+    void retriesAreConfigurable() {
+        properties.setMaxRetries(0);
+        modelReplies(PLAN_SOBRECARGADO);
+
+        var response = service.generate(7L, null);
+
+        assertThat(response.attempts()).isEqualTo(1);
+        assertThat(response.warnings()).isNotEmpty();
+    }
+
+    // -----------------------------------------------------------------
+    // Entradas y bordes
+    // -----------------------------------------------------------------
+
+    @Test
+    @DisplayName("Un documento subido se guarda como guion y es lo que se le manda al modelo")
+    void documentBecomesTheBriefing() {
+        modelReplies(PLAN_VALIDO);
+        var file = new MockMultipartFile("file", "guion.txt", "text/plain",
+                "Practica de gestion de una biblioteca".getBytes(StandardCharsets.UTF_8));
+
+        var response = service.generateFromDocument(7L, file, null);
+
+        assertThat(project.getBriefing()).isEqualTo("Practica de gestion de una biblioteca");
+        assertThat(response.source()).isEqualTo("documento: guion.txt");
+        assertThat(promptDeUsuario()).contains("Practica de gestion de una biblioteca");
     }
 
     @Test
     @DisplayName("Un proyecto sin guion no llega siquiera a llamar al modelo")
-    void requiresBriefing() {
-        project.setBriefing("   ");
+    void requiresABriefing() {
+        project.setBriefing("  ");
 
-        assertThatThrownBy(() -> service.generate(7L, null, null))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("guion");
+        assertThatThrownBy(() -> service.generate(7L, null))
+                .isInstanceOf(BusinessRuleException.class);
+        verifyNoInteractions(ollamaClient);
+    }
 
-        org.mockito.Mockito.verifyNoInteractions(ollamaClient);
+    @Test
+    @DisplayName("Una descripcion escrita vacia se rechaza antes de llamar al modelo")
+    void requiresADescription() {
+        assertThatThrownBy(() -> service.generateFromText(7L, "   ", null))
+                .isInstanceOf(BusinessRuleException.class);
+        verifyNoInteractions(ollamaClient);
     }
 
     @Test
     @DisplayName("Con el modulo desactivado se avisa sin llamar al modelo")
-    void respectsDisabledFlag() {
+    void refusesWhenDisabled() {
         properties.setEnabled(false);
 
-        assertThatThrownBy(() -> service.generate(7L, null, null))
+        assertThatThrownBy(() -> service.generate(7L, null))
                 .isInstanceOf(AiUnavailableException.class)
                 .hasMessageContaining("desactivado");
-
-        org.mockito.Mockito.verifyNoInteractions(ollamaClient);
+        verifyNoInteractions(ollamaClient);
     }
 
-    @Test
-    @DisplayName("Aplicar crea las tareas aceptadas en la primera columna, marcadas como generadas por IA")
-    void applyCreatesAcceptedTasks() {
-        Board board = Board.builder().id(3L).project(project).build();
-        BoardColumn primera = BoardColumn.builder().id(10L).name("Por hacer").position(0).board(board).build();
-        BoardColumn segunda = BoardColumn.builder().id(11L).name("En curso").position(1).board(board).build();
-        board.getColumns().addAll(List.of(segunda, primera));
-        project.getBoards().add(board);
-
-        when(boardService.getBoard(3L)).thenReturn(board);
-        when(taskRepository.countByBoardColumn_Id(10L)).thenReturn(2L);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(User.builder().id(1L).fullName("Ana").build()));
-        when(userRepository.findById(2L)).thenReturn(Optional.of(User.builder().id(2L).fullName("Luis Perez").build()));
-        when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        LocalDate fecha = LocalDate.now().plusDays(5);
-        service.apply(7L, new ApplyPlanRequest(3L, List.of(
-                new ProposedTask("Modelar el esquema", "porque si", TaskType.HISTORIA, TaskPriority.ALTA,
-                        BigDecimal.valueOf(6), fecha, 2L, "Luis Perez", "Backend", List.of()))));
-
-        ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
-        verify(taskRepository).save(captor.capture());
-
-        Task created = captor.getValue();
-        assertThat(created.getTitle()).isEqualTo("Modelar el esquema");
-        assertThat(created.isAiGenerated()).isTrue();
-        assertThat(created.getBoardColumn()).isEqualTo(primera);
-        assertThat(created.getPosition()).isEqualTo(2);
-        assertThat(created.getType()).isEqualTo(TaskType.HISTORIA);
-        assertThat(created.getDueDate()).isEqualTo(fecha);
-        // El reparto llega en la peticion y se respeta, siempre que sea del equipo.
-        assertThat(created.getAssignee()).isNotNull();
-        assertThat(created.getAssignee().getId()).isEqualTo(2L);
-
-        verify(activityService).record(any(), org.mockito.ArgumentMatchers.eq(ActivityAction.GENERACION_IA),
-                anyString(), any(), anyString());
-    }
+    // -----------------------------------------------------------------
+    // Aplicar al tablero
+    // -----------------------------------------------------------------
 
     @Test
-    @DisplayName("Si la propuesta no trae tipo, la tarea creada cae en TAREA")
-    void applyDefaultsMissingTypeToTarea() {
+    @DisplayName("Aplicar crea las tareas aceptadas con su epica, descripcion y motivo")
+    void applyCreatesTheAcceptedTasks() {
         Board board = Board.builder().id(3L).project(project).build();
         BoardColumn primera = BoardColumn.builder().id(10L).name("Por hacer").position(0).board(board).build();
         board.getColumns().add(primera);
-        project.getBoards().add(board);
-
         when(boardService.getBoard(3L)).thenReturn(board);
-        when(taskRepository.countByBoardColumn_Id(10L)).thenReturn(0L);
+        when(taskRepository.countByBoardColumn_Id(10L)).thenReturn(2L);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(User.builder().id(2L).fullName("Luis Perez").build()));
+        when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LocalDate fecha = inicio.plusDays(11);
+        service.apply(7L, new ApplyPlanRequest(3L, List.of(
+                new ProposedTask("Montar la API", "Endpoints REST", "Lo pide el apartado 2", TaskType.HISTORIA,
+                        "API", 1, TaskPriority.ALTA, BigDecimal.valueOf(6), fecha, 2L, "Luis Perez", List.of()))));
+
+        ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
+        verify(taskRepository).save(captor.capture());
+        Task created = captor.getValue();
+        assertThat(created.getTitle()).isEqualTo("Montar la API");
+        assertThat(created.getDescription()).isEqualTo("Endpoints REST\n\nMotivo: Lo pide el apartado 2");
+        assertThat(created.getEpic()).isEqualTo("API");
+        assertThat(created.getType()).isEqualTo(TaskType.HISTORIA);
+        assertThat(created.getDueDate()).isEqualTo(fecha);
+        assertThat(created.isAiGenerated()).isTrue();
+        assertThat(created.getPosition()).isEqualTo(2);
+        assertThat(created.getAssignee().getId()).isEqualTo(2L);
+        verify(activityService).record(any(), eq(ActivityAction.GENERACION_IA), anyString(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("Sin tipo la tarea cae en TAREA, y solo se asigna a gente del equipo")
+    void applyDefaultsAndGuardsTheAssignee() {
+        Board board = Board.builder().id(3L).project(project).build();
+        board.getColumns().add(BoardColumn.builder().id(10L).name("Por hacer").position(0).board(board).build());
+        when(boardService.getBoard(3L)).thenReturn(board);
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.apply(7L, new ApplyPlanRequest(3L, List.of(
-                new ProposedTask("Tarea sin tipo", null, null, null, null, null, null, null, null, null))));
+                new ProposedTask("Tarea", null, null, null, null, null, null, null, null, 99L, "Nadie", null))));
 
         ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
         verify(taskRepository).save(captor.capture());
         assertThat(captor.getValue().getType()).isEqualTo(TaskType.TAREA);
-        assertThat(captor.getValue().getDueDate()).isNull();
+        assertThat(captor.getValue().getAssignee()).isNull();
+        assertThat(captor.getValue().getEpic()).isNull();
     }
 
     @Test
     @DisplayName("No se pueden aplicar tareas a un tablero de otro proyecto")
     void applyRejectsForeignBoard() {
-        Project otro = Project.builder().id(99L).name("Otro").build();
-        Board board = Board.builder().id(3L).project(otro).build();
+        Board board = Board.builder().id(3L).project(Project.builder().id(99L).name("Otro").build()).build();
         when(boardService.getBoard(3L)).thenReturn(board);
 
         var request = new ApplyPlanRequest(3L, List.of(
-                new ProposedTask("Tarea", null, null, null, null, null, null, null, null, null)));
+                new ProposedTask("Tarea", null, null, null, null, null, null, null, null, null, null, null)));
 
         assertThatThrownBy(() -> service.apply(7L, request))
                 .isInstanceOf(BusinessRuleException.class)

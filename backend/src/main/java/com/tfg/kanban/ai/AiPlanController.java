@@ -2,10 +2,10 @@ package com.tfg.kanban.ai;
 
 import com.tfg.kanban.ai.dto.AiPlanResponse;
 import com.tfg.kanban.ai.dto.ApplyPlanRequest;
+import com.tfg.kanban.ai.dto.PlanOptions;
 import com.tfg.kanban.common.ApiError;
 import com.tfg.kanban.task.dto.TaskResponse;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.SchemaProperty;
@@ -40,10 +40,11 @@ public class AiPlanController {
 
     @Operation(summary = "Generar una propuesta de planificacion",
             description = """
-                    Envia al modelo local el guion de la practica, la fecha de entrega, el tamano
-                    del equipo y las tareas que ya existen, y devuelve una lista de tareas
-                    propuestas. No crea nada: para llevarlas al tablero hay que aceptarlas con
-                    POST /api/projects/{projectId}/ai-plan/apply.
+                    Envia al modelo local el guion de la practica, el calendario, el equipo con
+                    sus horas y preferencias y las tareas que ya existen, y devuelve un plan por
+                    sprints. El plan se valida en el servidor y, si incumple alguna regla, se le
+                    devuelve al modelo para que lo corrija. No crea nada: para llevar las tareas
+                    al tablero hay que aceptarlas con POST /api/projects/{projectId}/ai-plan/apply.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Propuesta generada"),
@@ -58,11 +59,8 @@ public class AiPlanController {
     @PostMapping
     public AiPlanResponse generate(
             @PathVariable Long projectId,
-            @Parameter(description = "Entre cuantas personas repartir. Por defecto, todo el equipo")
-            @RequestParam(required = false) Integer people,
-            @Parameter(description = "Indicaciones a tener en cuenta ademas del guion, con prioridad sobre el si hay conflicto")
-            @RequestParam(required = false) String indications) {
-        return aiPlanService.generate(projectId, people, indications);
+            @Valid @RequestBody(required = false) PlanOptions options) {
+        return aiPlanService.generate(projectId, options);
     }
 
     @Operation(summary = "Generar la planificacion a partir de un documento",
@@ -76,9 +74,13 @@ public class AiPlanController {
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
                     schema = @Schema(type = "object", requiredProperties = "file"),
-                    schemaProperties = @SchemaProperty(name = "file",
-                            schema = @Schema(type = "string", format = "binary",
-                                    description = "Documento de la actividad: PDF, Word (.docx) o texto"))))
+                    schemaProperties = {
+                            @SchemaProperty(name = "file",
+                                    schema = @Schema(type = "string", format = "binary",
+                                            description = "Documento de la actividad: PDF, Word (.docx) o texto")),
+                            @SchemaProperty(name = "options",
+                                    schema = @Schema(implementation = PlanOptions.class,
+                                            description = "Ajustes de esta generacion, como JSON (opcional)"))}))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Propuesta generada a partir del documento"),
             @ApiResponse(responseCode = "409", description = "Formato no admitido o documento sin texto legible",
@@ -91,11 +93,8 @@ public class AiPlanController {
     public AiPlanResponse generateFromDocument(
             @PathVariable Long projectId,
             @RequestPart("file") MultipartFile file,
-            @Parameter(description = "Entre cuantas personas repartir. Por defecto, todo el equipo")
-            @RequestParam(required = false) Integer people,
-            @Parameter(description = "Indicaciones a tener en cuenta ademas del documento, con prioridad sobre el si hay conflicto")
-            @RequestParam(required = false) String indications) {
-        return aiPlanService.generateFromDocument(projectId, file, people, indications);
+            @Valid @RequestPart(value = "options", required = false) PlanOptions options) {
+        return aiPlanService.generateFromDocument(projectId, file, options);
     }
 
     @Operation(summary = "Llevar al tablero las tareas aceptadas",

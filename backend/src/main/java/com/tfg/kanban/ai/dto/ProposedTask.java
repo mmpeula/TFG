@@ -12,9 +12,11 @@ import java.util.List;
 
 @Schema(description = "Tarea propuesta por el modelo. No existe en el tablero hasta que se acepta.",
         example = """
-        {"title":"Modelar el esquema de la base de datos","reason":"El guion pide un modelo E/R antes de implementar",
-         "type":"HISTORIA","priority":"ALTA","estimatedHours":6,"dueDate":"2026-11-20",
-         "assigneeId":2,"assigneeName":"Luis Perez"}
+        {"title":"Implementar el endpoint de login con JWT",
+         "description":"Endpoint POST /api/auth/login que devuelve un token firmado",
+         "reason":"El apartado 3 pide autenticacion con JWT","type":"TAREA","epic":"Autenticacion",
+         "sprint":1,"priority":"ALTA","estimatedHours":6,"dueDate":"2026-10-14",
+         "assigneeId":2,"assigneeName":"Luis Perez","dependsOn":["Disenar el modelo de usuario"]}
         """)
 public record ProposedTask(
 
@@ -22,22 +24,29 @@ public record ProposedTask(
         @Size(max = 200)
         String title,
 
-        @Schema(description = "Por que el modelo propone esta tarea")
-        @Size(max = 300)
+        @Schema(description = "Que hay que hacer, en concreto")
+        @Size(max = 2000)
+        String description,
+
+        @Schema(description = "Por que existe la tarea: cita la parte del documento de la que sale")
+        @Size(max = 500)
         String reason,
 
-        @Schema(description = "De que va la tarea; si el modelo no lo dice o se equivoca, TAREA")
+        @Schema(description = "HISTORIA si es funcionalidad visible, TAREA si es tecnica, BUG si corrige algo")
         TaskType type,
+
+        @Schema(description = "Bloque de trabajo al que pertenece")
+        @Size(max = 100)
+        String epic,
+
+        @Schema(description = "Numero de sprint, empezando en 1")
+        Integer sprint,
 
         TaskPriority priority,
 
         BigDecimal estimatedHours,
 
-        @Schema(description = """
-                Para cuando, calculado por el servidor repartiendo el trabajo de cada persona a lo
-                largo de la ventana del workspace: no lo decide el modelo, para que las tareas caigan
-                en un sprint real del plan en vez de amontonarse todas «sin fecha».
-                """)
+        @Schema(description = "Ultimo dia laborable de su sprint. Lo fija el servidor, no el modelo")
         LocalDate dueDate,
 
         @Schema(description = "Miembro del equipo al que se reparte la tarea")
@@ -46,47 +55,12 @@ public record ProposedTask(
         @Schema(description = "Nombre del miembro, para poder mostrarlo sin otra consulta")
         String assigneeName,
 
-        /**
-         * Por que le ha tocado a esa persona, en una frase.
-         *
-         * <p>Lo escribe el servidor, no el modelo, porque el reparto final tampoco
-         * lo decide el modelo: este sugiere y {@code WorkloadBalancer} confirma o
-         * cambia la sugerencia segun la carga. Dejar aqui la frase del modelo
-         * cuando el servidor le ha llevado la contraria seria guardar una
-         * explicacion que no corresponde a lo que acabo pasando.</p>
-         */
-        @Schema(description = "Por que se le ha asignado a esa persona. Lo compone el servidor "
-                + "combinando lo que dijo el modelo con lo que decidio el reparto por carga.",
-                example = "Backend y Java (segun el modelo)")
-        @Size(max = 300)
-        String assignmentReason,
-
-        /**
-         * Quienes no pueden acabar con esta tarea, segun el modelo.
-         *
-         * <p>Es como llegan al reparto las prohibiciones escritas en la ficha de
-         * cada persona: el equilibrado es determinista y no entiende «nunca le des
-         * frontend», asi que el modelo traduce esas frases a nombres concretos por
-         * tarea y el servidor los respeta. Vacia mientras nadie prohiba nada, que
-         * es el caso corriente.</p>
-         */
-        @Schema(description = "Nombres que el reparto no debe elegir para esta tarea")
-        List<String> avoid
+        @Schema(description = "Titulos de las tareas de las que depende")
+        List<String> dependsOn
 ) {
 
-    /** Copia de la tarea con el reparto ya resuelto y su explicacion. */
-    public ProposedTask assignedTo(Long id, String name, String why) {
-        return new ProposedTask(title, reason, type, priority, estimatedHours, dueDate, id, name, why, avoid);
-    }
-
-    /** Copia de la tarea con la fecha ya calculada. */
-    public ProposedTask withDueDate(LocalDate date) {
-        return new ProposedTask(title, reason, type, priority, estimatedHours, date,
-                assigneeId, assigneeName, assignmentReason, avoid);
-    }
-
     /** Nunca null, para no tener que comprobarlo en cada sitio que la recorre. */
-    public List<String> avoidOrEmpty() {
-        return avoid == null ? List.of() : avoid;
+    public List<String> dependsOnOrEmpty() {
+        return dependsOn == null ? List.of() : dependsOn;
     }
 }

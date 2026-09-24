@@ -89,7 +89,12 @@ app:
     base-url: ${OLLAMA_URL:http://localhost:11434}
     model: ${OLLAMA_MODEL:llama3}
     timeout: ${AI_TIMEOUT:3m}
-    max-tasks: ${AI_MAX_TASKS:8}
+    max-tasks: ${AI_MAX_TASKS:60}
+    temperature: ${AI_TEMPERATURE:0.3}
+    # Minimo 8192: con menos, un backlog completo en JSON sale cortado. No mas por
+    # defecto: es el contexto nativo de llama3. Subirlo solo con modelos de mas.
+    num-ctx: ${AI_NUM_CTX:8192}
+    max-retries: ${AI_MAX_RETRIES:2}
   storage:
     # Directorio de los ficheros adjuntos (volumen de Docker en despliegue).
     upload-dir: ${UPLOAD_DIR:./uploads}

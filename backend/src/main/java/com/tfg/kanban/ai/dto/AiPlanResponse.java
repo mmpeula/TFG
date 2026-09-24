@@ -7,44 +7,42 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-@Schema(description = "Planificacion propuesta por el modelo local, ya repartida entre el equipo",
+@Schema(description = "Plan propuesto por el modelo local: sprints, tareas repartidas y avisos",
         example = """
         {"status":"ok","projectId":5,"model":"llama3","source":"documento: guion-practica2.pdf",
-         "message":"6 tareas propuestas y repartidas entre 4 personas",
-         "tasks":[],"workload":[],
-         "schedule":{"startDate":"2026-10-01","deadline":"2026-12-20","sprintDays":14},
-         "excludedMembers":[],
-         "generatedAt":"2026-08-31T18:40:00Z"}
+         "message":"18 tareas en 3 sprints, repartidas entre 3 personas",
+         "durationWeeks":6,"sprints":[],"tasks":[],"workload":[],"warnings":[],
+         "schedule":{"startDate":"2026-10-01","deadline":"2026-11-11","sprintDays":14},
+         "attempts":1,"generatedAt":"2026-09-23T18:40:00Z"}
         """)
 public record AiPlanResponse(
         String status,
         Long projectId,
         String model,
-        @Schema(description = "De donde ha salido el texto: el guion guardado o un documento subido")
+        @Schema(description = "De donde ha salido el texto: el guion guardado, un documento o una descripcion")
         String source,
         String message,
+        @Schema(description = "Duracion total del plan en semanas")
+        Integer durationWeeks,
+        @Schema(description = "Sprints del plan, con las fechas calculadas por el servidor")
+        List<PlannedSprint> sprints,
         List<ProposedTask> tasks,
-        @Schema(description = "Reparto resultante, una entrada por persona")
+        @Schema(description = "Horas y tareas de cada persona, contadas sobre las tareas del plan")
         List<MemberWorkload> workload,
-        @Schema(description = "Fecha de inicio, entrega y duracion de sprint que el documento menciona "
-                + "explicitamente. Null si el documento no dice nada fiable: no se inventan fechas.")
+        @Schema(description = "Avisos del modelo y reglas que el plan sigue sin cumplir tras los reintentos")
+        List<String> warnings,
+        @Schema(description = "Fechas con las que se ha hecho el plan, cuando no coinciden con las guardadas "
+                + "en el workspace. Guardarlas hace que la pestana Plan pinte los mismos sprints.")
         SuggestedSchedule schedule,
-        @Schema(description = "Personas del equipo dejadas fuera del reparto porque las indicaciones "
-                + "del usuario lo pedian explicitamente. Vacia si no se ha excluido a nadie.")
-        List<String> excludedMembers,
+        @Schema(description = "Llamadas al modelo que ha costado: 1 si el primer plan era valido")
+        int attempts,
         Instant generatedAt
 ) {
 
-    /**
-     * Lo que el documento dice de fechas, tal cual, sin repartir ni calcular nada:
-     * eso es cosa de {@link com.tfg.kanban.ai.AiTaskScheduler}. Cada campo es
-     * independiente porque un enunciado real rara vez los da todos juntos (dice la
-     * entrega pero no la duracion del sprint, o al reves).
-     */
+    /** Inicio, fin y duracion de sprint de un plan. Cualquiera puede faltar. */
     public record SuggestedSchedule(LocalDate startDate, LocalDate deadline, Integer sprintDays) {
 
-        // Sin @JsonIgnore, Jackson trata isEmpty() como si fuera el campo "empty":
-        // es un metodo de ayuda interno para of(...), no parte de la respuesta.
+        // Sin @JsonIgnore, Jackson trata isEmpty() como si fuera el campo "empty".
         @JsonIgnore
         public boolean isEmpty() {
             return startDate == null && deadline == null && sprintDays == null;
@@ -52,26 +50,21 @@ public record AiPlanResponse(
     }
 
     /**
-     * @param duplicates      tareas que el modelo propuso pero que ya estaban en
-     *                        el tablero. Se cuentan para poder explicar por que a
-     *                        veces la propuesta sale corta o vacia.
-     * @param schedule        fechas/duracion de sprint sugeridas por el documento,
-     *                        o null si no ha detectado ninguna (se normaliza aqui:
-     *                        un objeto con los tres campos a null tambien pasa a
-     *                        null).
-     * @param excludedMembers a quien se ha dejado fuera del reparto por indicacion
-     *                        del usuario; ya resueltos contra el equipo real, no
-     *                        los nombres tal cual los dio el modelo.
+     * @param duplicates tareas que el modelo propuso pero que ya estaban en el
+     *                   tablero; se cuentan para poder explicar por que a veces la
+     *                   propuesta sale corta.
      */
-    public static AiPlanResponse of(Long projectId, String model, String source,
-                                    List<ProposedTask> tasks, List<MemberWorkload> workload, int duplicates,
-                                    SuggestedSchedule schedule, List<String> excludedMembers) {
+    public static AiPlanResponse of(Long projectId, String model, String source, Integer durationWeeks,
+                                    List<PlannedSprint> sprints, List<ProposedTask> tasks,
+                                    List<MemberWorkload> workload, List<String> warnings, int duplicates,
+                                    SuggestedSchedule schedule, int attempts) {
         return new AiPlanResponse("ok", projectId, model, source,
-                message(tasks.size(), workload.size(), duplicates), tasks, workload,
-                schedule == null || schedule.isEmpty() ? null : schedule, excludedMembers, Instant.now());
+                message(tasks.size(), sprints.size(), workload.size(), duplicates),
+                durationWeeks, sprints, tasks, workload, warnings,
+                schedule == null || schedule.isEmpty() ? null : schedule, attempts, Instant.now());
     }
 
-    private static String message(int propuestas, int personas, int duplicadas) {
+    private static String message(int propuestas, int sprints, int personas, int duplicadas) {
         if (propuestas == 0 && duplicadas > 0) {
             return "El modelo ha propuesto %d %s, pero %s trabajo que ya esta en el tablero. Anade o cierra tareas y vuelve a intentarlo."
                     .formatted(duplicadas, duplicadas == 1 ? "tarea" : "tareas",
@@ -80,10 +73,10 @@ public record AiPlanResponse(
         if (propuestas == 0) {
             return "El modelo no ha propuesto ninguna tarea; prueba con un documento mas detallado.";
         }
-        String base = "%d %s %s entre %d %s"
-                .formatted(propuestas, propuestas == 1 ? "tarea propuesta" : "tareas propuestas",
-                        propuestas == 1 ? "y asignada" : "y repartidas", personas,
-                        personas == 1 ? "persona" : "personas");
+        String base = "%d %s en %d %s, repartidas entre %d %s"
+                .formatted(propuestas, propuestas == 1 ? "tarea" : "tareas",
+                        sprints, sprints == 1 ? "sprint" : "sprints",
+                        personas, personas == 1 ? "persona" : "personas");
         return duplicadas == 0
                 ? base
                 : "%s (se han descartado %d que ya estaban en el tablero)".formatted(base, duplicadas);

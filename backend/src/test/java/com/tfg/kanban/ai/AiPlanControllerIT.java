@@ -98,6 +98,39 @@ class AiPlanControllerIT extends AbstractApiIT {
     }
 
     @Test
+    @DisplayName("Los ajustes de la generacion viajan como parte JSON del multipart")
+    void acceptsOptionsPartAlongsideTheDocument() throws Exception {
+        Contexto ctx = contexto();
+        String options = """
+                {"startDate":"2027-01-04","sprintDays":14,"indications":"Nada de reuniones",
+                 "team":[{"userId":%d,"hoursPerWeek":12,"preferences":"Backend; Java"}]}
+                """.formatted(ctx.miembro().id());
+
+        // Con la IA apagada se llega hasta el modelo y responde 503: prueba que la
+        // parte se ha leido bien, porque un JSON mal enlazado daria 400 antes.
+        mockMvc.perform(multipart("/api/projects/{id}/ai-plan/document", ctx.projectId())
+                        .file(new MockMultipartFile("file", "guion.txt", "text/plain",
+                                "Practica de biblioteca".getBytes(StandardCharsets.UTF_8)))
+                        .file(new MockMultipartFile("options", "", MediaType.APPLICATION_JSON_VALUE,
+                                options.getBytes(StandardCharsets.UTF_8)))
+                        .header(HttpHeaders.AUTHORIZATION, ctx.responsable().bearer()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("AI_UNAVAILABLE"));
+    }
+
+    @Test
+    @DisplayName("Unos ajustes invalidos se rechazan con el error de validacion")
+    void rejectsInvalidOptions() throws Exception {
+        Contexto ctx = contexto();
+
+        mockMvc.perform(authorized(post("/api/projects/{id}/ai-plan", ctx.projectId()), ctx.responsable())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sprintDays\":90}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     @DisplayName("Un documento con formato no admitido se rechaza antes de llamar al modelo")
     void rejectsUnsupportedDocument() throws Exception {
         Contexto ctx = contexto();

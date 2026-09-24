@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Clock3, Sparkles, UserMinus, UserPlus, Users, X } from 'lucide-react'
+import { Clock3, UserMinus, UserPlus, Users, X } from 'lucide-react'
 import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
@@ -17,12 +17,9 @@ import { useAuth } from '@/state/context'
 import { canManage, ROLE_LABELS } from '@/lib/roles'
 import { relativeTime } from '@/lib/format'
 import { ROUTES } from '@/app/routes'
-import type { Role, TeamMemberResponse } from '@/types/api'
+import type { Role } from '@/types/api'
 
 const ROLES: Role[] = ['RESPONSABLE', 'MIEMBRO', 'DOCENTE']
-
-/** El mismo tope que aplica el servidor (TeamMember.MAX_PLAN_NOTES). */
-const MAX_NOTAS = 600
 
 /**
  * Quien trabaja en este workspace y que puede hacer cada uno.
@@ -190,14 +187,6 @@ export function MembersScreen() {
                         />
                       )}
                     </div>
-
-                    <MemberNotes
-                      member={member}
-                      editable={manageable}
-                      onSave={(planNotes) =>
-                        mutations.updateNotes.mutateAsync({ userId: member.user.id, planNotes })
-                      }
-                    />
                   </li>
                 )
               })}
@@ -253,115 +242,5 @@ export function MembersScreen() {
         </div>
       )}
     </WorkspaceShell>
-  )
-}
-
-/**
- * Lo que hay que saber de esta persona para repartirle trabajo al generar el plan.
- *
- * Se queda guardado y vale para todas las ejecuciones siguientes. Es la diferencia
- * con el campo de la pantalla de Generar plan, que solo afecta a la generacion que se
- * lanza en ese momento; por eso aqui se dice explicitamente «se guarda» y alli
- * «solo para esta vez»: escritas parecido y en dos sitios distintos, es lo unico
- * que evita que se confundan.
- */
-function MemberNotes({
-  member,
-  editable,
-  onSave,
-}: {
-  member: TeamMemberResponse
-  editable: boolean
-  onSave: (planNotes: string) => Promise<unknown>
-}) {
-  const guardadas = member.planNotes ?? ''
-  const [texto, setTexto] = useState(guardadas)
-  const [guardando, setGuardando] = useState(false)
-  const [abierto, setAbierto] = useState(false)
-
-  if (!editable) {
-    // Quien no administra el workspace ve la ficha pero no la toca. Si no hay
-    // nada escrito no se ensena un hueco vacio que no puede rellenar.
-    if (!guardadas) return null
-    return (
-      <div className={styles.notes}>
-        <p className={styles.notesText} title={guardadas}>
-          <Sparkles size={11} strokeWidth={2.75} />
-          {guardadas}
-        </p>
-      </div>
-    )
-  }
-
-  if (!abierto) {
-    return (
-      <div className={styles.notes}>
-        <button
-          type="button"
-          className={styles.notesToggle}
-          // Se relee lo guardado al abrir y no solo al montar: si la ficha ha
-          // cambiado por otro lado, el textarea no arranca con lo viejo.
-          onClick={() => { setTexto(guardadas); setAbierto(true) }}
-        >
-          <Sparkles size={11} strokeWidth={2.75} />
-          {guardadas ? (
-            <span className={styles.notesPreview}>{guardadas}</span>
-          ) : (
-            <span className={styles.notesEmpty}>Anadir indicaciones para el plan</span>
-          )}
-        </button>
-      </div>
-    )
-  }
-
-  const cambiado = texto.trim() !== guardadas.trim()
-
-  async function guardar() {
-    if (!cambiado || guardando) return
-    setGuardando(true)
-    try {
-      await onSave(texto.trim())
-      setAbierto(false)
-    } finally {
-      setGuardando(false)
-    }
-  }
-
-  return (
-    <div className={styles.notes}>
-      <label className={styles.notesLabel} htmlFor={`notas-${member.id}`}>
-        <Sparkles size={11} strokeWidth={2.75} />
-        Indicaciones para el plan
-      </label>
-      <textarea
-        id={`notas-${member.id}`}
-        className={styles.notesArea}
-        value={texto}
-        autoFocus
-        maxLength={MAX_NOTAS}
-        placeholder={`En que se maneja ${member.user.fullName.split(' ')[0]}, que prefiere y que conviene no darle. Por ejemplo: «Se defiende con Java y Spring. Prefiere backend. Evitar darle diseno de interfaz si hay alternativa.»`}
-        onChange={(event) => setTexto(event.target.value)}
-      />
-      <div className={styles.notesFoot}>
-        <span className={styles.notesHint}>
-          Se guarda y vale para los proximos repartos. Lo que solo valga para una vez, escribelo al
-          generar el plan.
-        </span>
-        <span className={styles.notesCount}>
-          {texto.length}/{MAX_NOTAS}
-          <Button
-            variant="ghost"
-            small
-            onClick={() => { setTexto(guardadas); setAbierto(false) }}
-            disabled={guardando}
-          >
-            Cancelar
-          </Button>
-          <Button small onClick={guardar} disabled={!cambiado || guardando}>
-            {guardando ? 'Guardando…' : 'Guardar'}
-          </Button>
-        </span>
-      </div>
-    </div>
   )
 }

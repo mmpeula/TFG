@@ -1,0 +1,68 @@
+package com.tfg.kanban.ai.dto;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
+
+import java.time.LocalDate;
+import java.util.List;
+
+/**
+ * Lo que se decide en el formulario de Generar plan para esta ejecucion.
+ *
+ * <p>Todo es opcional: lo que no venga se toma del workspace (fecha de inicio y
+ * duracion del sprint) o del equipo (quien entra en el reparto, con su ficha como
+ * preferencias). Nada de esto se guarda: vale para esta generacion y se acaba ahi,
+ * igual que las indicaciones.</p>
+ */
+@Schema(description = "Ajustes de esta generacion de plan", example = """
+        {"startDate":"2026-10-01","sprintDays":14,
+         "indications":"Ana tiene examenes la segunda semana",
+         "team":[{"userId":2,"hoursPerWeek":12,"preferences":"Backend; Java y Spring"},
+                 {"userId":3,"hoursPerWeek":10,"preferences":"Frontend; React"}]}
+        """)
+public record PlanOptions(
+
+        @Schema(description = "Cuando empieza el primer sprint. Por defecto, la del workspace o hoy")
+        LocalDate startDate,
+
+        @Schema(description = "Dias de cada sprint. Por defecto, los del workspace o 14")
+        @Min(value = 7, message = "un sprint dura al menos una semana")
+        @Max(value = 28, message = "un sprint dura como mucho cuatro semanas")
+        Integer sprintDays,
+
+        @Schema(description = "Indicaciones adicionales solo para esta generacion")
+        @Size(max = 1000, message = "las indicaciones no pueden pasar de 1000 caracteres")
+        String indications,
+
+        @Schema(description = "Quien entra en el reparto. Vacio o ausente: todo el equipo menos el docente")
+        @Valid
+        List<TeamSlot> team
+) {
+
+    /** Sin nada ajustado: todo sale del workspace y del equipo. */
+    public static PlanOptions defaults() {
+        return new PlanOptions(null, null, null, null);
+    }
+
+    /**
+     * Una persona del equipo tal y como entra en este reparto. Solo cuenta si
+     * {@code userId} es de un miembro real: las tareas tienen que poder asignarse
+     * en el tablero, y ahi solo cabe gente del equipo.
+     */
+    @Schema(description = "Una persona del reparto con sus datos para esta generacion")
+    public record TeamSlot(
+            Long userId,
+
+            @Schema(description = "Horas por semana que puede dedicar. 0 = no disponible en todo el plan")
+            @Min(0) @Max(60)
+            Integer hoursPerWeek,
+
+            @Schema(description = "Preferencias y restricciones. Por defecto, su ficha de Miembros")
+            @Size(max = 600)
+            String preferences
+    ) {
+    }
+}

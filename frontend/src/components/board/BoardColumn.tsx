@@ -28,6 +28,7 @@ interface Props {
   draggable?: boolean
   onOpenTask: (task: TaskResponse) => void
   onMoveTask: (task: TaskResponse, columnId: number) => void
+  onDeleteTask: (task: TaskResponse) => void | Promise<unknown>
   onCreateTask: (columnId: number, title: string) => void
   onUpdateColumn: (columnId: number, payload: { name: string; wipLimit?: number | null }) => Promise<unknown>
   onDeleteColumn: (columnId: number) => Promise<unknown>
@@ -39,7 +40,7 @@ interface Props {
  */
 export function BoardColumn({
   column, columns, tasks, isOver, isLast, highlighted, canWrite, canManage,
-  draggable = true, onOpenTask, onMoveTask, onCreateTask, onUpdateColumn, onDeleteColumn,
+  draggable = true, onOpenTask, onMoveTask, onDeleteTask, onCreateTask, onUpdateColumn, onDeleteColumn,
 }: Props) {
   const { setNodeRef } = useDroppable({ id: `column-${column.id}`, data: { columnId: column.id } })
   const [expanded, setExpanded] = useState(false)
@@ -119,6 +120,7 @@ export function BoardColumn({
               highlighted={highlighted === task.id}
               onOpen={onOpenTask}
               onMove={onMoveTask}
+              onDelete={onDeleteTask}
             />
           ))}
         </SortableContext>

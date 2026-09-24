@@ -262,6 +262,7 @@ export function BoardScreen() {
                     boardMutations.updateColumn.mutateAsync({ columnId, payload })
                   }
                   onDeleteColumn={(columnId) => boardMutations.removeColumn.mutateAsync(columnId)}
+                  onDeleteTask={(task) => taskMutations.remove.mutateAsync(task.id)}
                 />
               ))}
             </div>
@@ -275,6 +276,7 @@ export function BoardScreen() {
                   draggable={false}
                   onOpen={() => undefined}
                   onMove={() => undefined}
+                  onDelete={() => undefined}
                 />
               )}
             </DragOverlay>

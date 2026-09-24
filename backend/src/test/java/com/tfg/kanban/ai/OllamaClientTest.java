@@ -76,6 +76,39 @@ class OllamaClientTest {
     }
 
     @Test
+    @DisplayName("Al generar JSON pide temperatura 0.3 y una ventana de contexto de al menos 8192")
+    void sendsTemperatureAndContextWindow() throws Exception {
+        AtomicReference<String> peticion = new AtomicReference<>();
+        OllamaClient client = clientRespondiendo(200,
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"{}\"}}", peticion);
+
+        client.chatJson("sistema", "usuario");
+
+        var options = new ObjectMapper().readTree(peticion.get()).path("options");
+        assertThat(options.path("temperature").asDouble()).isEqualTo(0.3);
+        assertThat(options.path("num_ctx").asInt()).isGreaterThanOrEqualTo(8192);
+    }
+
+    @Test
+    @DisplayName("Una correccion viaja como conversacion: la respuesta anterior y los errores, en orden")
+    void sendsTheWholeConversation() throws Exception {
+        AtomicReference<String> peticion = new AtomicReference<>();
+        OllamaClient client = clientRespondiendo(200,
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"{}\"}}", peticion);
+
+        client.chatJson("sistema", java.util.List.of(
+                new OllamaClient.Message("user", "haz el plan"),
+                new OllamaClient.Message("assistant", "{\"tareas\":[]}"),
+                new OllamaClient.Message("user", "corrige esto")));
+
+        var messages = new ObjectMapper().readTree(peticion.get()).path("messages");
+        assertThat(messages).hasSize(4);
+        assertThat(messages.get(0).path("role").asText()).isEqualTo("system");
+        assertThat(messages.get(2).path("role").asText()).isEqualTo("assistant");
+        assertThat(messages.get(3).path("content").asText()).isEqualTo("corrige esto");
+    }
+
+    @Test
     @DisplayName("Si el modelo devuelve una respuesta vacia se avisa, no se devuelve null")
     void failsOnEmptyResponse() throws Exception {
         OllamaClient client = clientRespondiendo(200, "");

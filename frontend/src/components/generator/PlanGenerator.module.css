@@ -36,6 +36,40 @@
 .proposalHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
 .proposalTitle { font-size: 19px; }
 .proposalRows { display: flex; flex-direction: column; gap: var(--space-2); }
+/* Un sprint de la propuesta: fechas y objetivo encima de sus tareas. */
+.sprint { display: flex; flex-direction: column; gap: var(--space-2); }
+.sprintHead {
+  display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+.sprintTitle { font-size: 14px; font-weight: 700; }
+.sprintDates {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--color-neutral-600);
+}
+.sprintHead .note { margin-left: auto; }
+.sprintGoal { font-size: 13px; color: var(--color-neutral-700); line-height: 1.45; }
+
+/* Avisos: en gris como el resto, lo que los distingue es ir encima de la
+   propuesta y con su icono, no un color que el sistema reserva a otras cosas. */
+.warnings {
+  display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-neutral-100);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+.warningsHead {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 700; color: var(--color-neutral-900);
+}
+.warningsList {
+  margin: 0; padding-left: 20px;
+  display: flex; flex-direction: column; gap: 3px;
+  font-size: 13px; line-height: 1.45; color: var(--color-neutral-700);
+}
+
 .proposalFoot { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .note { font-size: 12px; color: var(--color-neutral-600); }
 
@@ -67,6 +101,12 @@
 .estimate {
   display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
   font-size: 12px; font-weight: 700; color: var(--color-neutral-700); white-space: nowrap;
+}
+/* La epica va junto al tipo, en gris: dice de que bloque es, no como va. */
+.rowEpic {
+  margin-left: 6px; padding-left: 6px;
+  border-left: 1px solid var(--color-neutral-300);
+  color: var(--color-neutral-500);
 }
 .rowDue { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; color: var(--color-neutral-500); }
 
@@ -132,23 +172,74 @@
 }
 .input:focus { outline: none; border-color: var(--color-neutral-900); }
 
-/* Numero de personas ------------------------------------------------------- */
-.people {
-  display: inline-flex; align-items: center; gap: 6px;
+/* Calendario y equipo del reparto ------------------------------------------ */
+/* El calendario automatico es solo una linea informativa: no hay nada que rellenar. */
+.autoNote {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 12px; color: var(--color-neutral-600);
+}
+.autoChange {
+  font-size: 12px; font-weight: 600; color: var(--color-neutral-900);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+
+.team {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  border-top: 1px solid var(--color-neutral-200);
+  padding-top: var(--space-3);
+}
+.teamTitle {
+  display: flex; align-items: center; gap: 6px;
   font-size: 12px; font-weight: 600; color: var(--color-neutral-700);
 }
-.peopleInput {
-  width: 52px;
-  background: var(--color-neutral-100);
-  border: 1px solid var(--color-neutral-300);
-  border-radius: 999px;
-  padding: 5px var(--space-2);
-  font-size: 13px;
-  font-weight: 700;
-  text-align: center;
-  outline: none;
+.teamHead, .teamRow {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(160px, 2.4fr) 76px 28px;
+  gap: var(--space-2);
+  align-items: center;
 }
-.peopleInput:focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.teamHead { font-size: 11px; color: var(--color-neutral-500); }
+.teamRow .input { padding: 7px 9px; font-size: 13px; min-width: 0; }
+.teamName { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.teamRemove {
+  display: grid; place-items: center;
+  width: 26px; height: 26px; border-radius: 999px;
+  color: var(--color-neutral-500);
+  transition: var(--transition);
+}
+.teamRemove:hover { background: var(--color-neutral-200); color: var(--color-neutral-900); }
+
+/* La preferencia y su boton de guardar viven juntos, para que el boton aparezca
+   pegado al texto que lo activa y no como un elemento suelto de la fila. */
+.prefCell { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.prefCell .input { flex: 1; min-width: 0; }
+.prefSave {
+  flex: none;
+  display: grid; place-items: center;
+  width: 26px; height: 26px; border-radius: 999px;
+  color: var(--color-accent-2-700);
+  background: var(--color-accent-2-100);
+  transition: var(--transition);
+}
+.prefSave:hover { background: var(--color-accent-2-200); }
+.prefSave:disabled { opacity: .5; }
+/* Quien se ha quitado queda a mano, sin perder lo que se escribio de el. */
+.teamOut { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.teamAdd {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--color-neutral-600);
+  border: 1px dashed var(--color-neutral-300);
+  border-radius: 999px;
+  padding: 4px 10px;
+  transition: var(--transition);
+}
+.teamAdd:hover { border-color: var(--color-neutral-500); color: var(--color-neutral-900); }
+
+@media (max-width: 720px) {
+  .teamHead { display: none; }
+  .teamRow { grid-template-columns: 1fr 70px 28px; }
+  .teamRow .teamName { grid-column: 1 / -1; }
+}
 
 /* Reparto ------------------------------------------------------------------ */
 .workload {

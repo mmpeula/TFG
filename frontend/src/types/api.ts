@@ -216,18 +216,46 @@ export interface ActivityLogResponse {
 
 export interface ProposedTask {
   title: string
+  /** Que hay que hacer, en concreto. */
+  description?: string
+  /** Por que existe: la parte del documento de la que sale. */
   reason?: string
   type?: TaskType
+  /** Bloque de trabajo al que pertenece. */
+  epic?: string
+  /** Numero de sprint, empezando en 1. */
+  sprint?: number
   priority?: TaskPriority
   estimatedHours?: number
-  /** Calculada por el servidor repartiendo el trabajo de cada persona: el modelo no la propone. */
+  /** Ultimo dia laborable de su sprint. Lo fija el servidor, no el modelo. */
   dueDate?: string
   assigneeId?: number
   assigneeName?: string
-  /** Por que le ha tocado a esa persona. Lo compone el servidor, no el modelo. */
-  assignmentReason?: string
-  /** Nombres que el reparto no debe elegir para esta tarea. */
-  avoid?: string[]
+  /** Titulos de las tareas de las que depende. */
+  dependsOn?: string[]
+}
+
+/** Un sprint del plan: las fechas las pone el servidor, el objetivo el modelo. */
+export interface PlannedSprint {
+  number: number
+  start: string
+  end: string
+  goal?: string | null
+}
+
+/** Una persona tal y como entra en una generacion de plan. */
+export interface PlanTeamSlot {
+  userId: number
+  hoursPerWeek?: number
+  preferences?: string
+}
+
+/** Ajustes de una generacion. Nada de esto se guarda. */
+export interface PlanOptions {
+  startDate?: string | null
+  sprintDays?: number | null
+  indications?: string
+  team?: PlanTeamSlot[]
 }
 
 export interface MemberWorkload {
@@ -238,9 +266,8 @@ export interface MemberWorkload {
 }
 
 /**
- * Fechas y duracion de sprint que el documento menciona explicitamente. Cada
- * campo es independiente (un enunciado real rara vez los da todos juntos) y
- * null si el modelo no ha encontrado nada fiable: nunca se inventan.
+ * Fechas con las que se ha hecho el plan, solo las que no coinciden con las del
+ * workspace. Guardarlas hace que la pestana Plan pinte los mismos sprints.
  */
 export interface SuggestedSchedule {
   startDate?: string | null
@@ -255,11 +282,17 @@ export interface AiPlanResponse {
   /** De donde salio el texto: el guion guardado o el documento subido. */
   source: string
   message: string
+  /** Duracion total del plan en semanas. */
+  durationWeeks?: number | null
+  sprints: PlannedSprint[]
   tasks: ProposedTask[]
+  /** Horas y tareas de cada persona, contadas sobre el plan. */
   workload: MemberWorkload[]
+  /** Avisos del modelo y reglas que el plan no cumple tras los reintentos. */
+  warnings: string[]
   schedule?: SuggestedSchedule | null
-  /** Quien se ha dejado fuera del reparto porque las indicaciones lo pedian. Vacio si no se excluyo a nadie. */
-  excludedMembers?: string[]
+  /** Llamadas al modelo que ha costado: 1 si el primer plan ya era valido. */
+  attempts: number
   generatedAt: string
 }
 

@@ -3,9 +3,9 @@ package com.tfg.kanban.ai;
 import com.tfg.kanban.ai.dto.AiPlanResponse;
 import com.tfg.kanban.ai.dto.ChatRequest;
 import com.tfg.kanban.ai.dto.ChatResponse;
+import com.tfg.kanban.ai.dto.PlanOptions;
 import com.tfg.kanban.common.ApiError;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -61,20 +61,18 @@ public class WorkspaceAiController {
     @PreAuthorize("@access.canManageProject(#workspaceId)")
     @PostMapping("/plan")
     public AiPlanResponse proposeFromText(@PathVariable Long workspaceId,
-                                          @Valid @RequestBody TextRequest request,
-                                          @Parameter(description = "Entre cuantas personas repartir")
-                                          @RequestParam(required = false) Integer people) {
-        return aiPlanService.generateFromText(workspaceId, request.text(), people, request.indications());
+                                          @Valid @RequestBody TextRequest request) {
+        return aiPlanService.generateFromText(workspaceId, request.text(), request.options());
     }
 
-    @Schema(description = "Descripcion libre del trabajo, mas indicaciones opcionales para el reparto", example = """
+    @Schema(description = "Descripcion libre del trabajo, mas los ajustes de esta generacion", example = """
             {"text":"Tenemos que hacer una practica de bases de datos con modelo E/R y consultas SQL",
-             "indications":"Ana esta liada esta semana, dale menos carga que al resto"}
+             "options":{"startDate":"2026-10-01","sprintDays":14,
+                        "indications":"Ana esta liada esta semana, dale menos carga que al resto"}}
             """)
     public record TextRequest(
             @NotBlank(message = "escribe de que va el trabajo") String text,
-            @Schema(description = "Indicaciones a tener en cuenta ademas del texto, con prioridad sobre el si hay conflicto")
-            String indications
+            @Valid PlanOptions options
     ) {
     }
 }

@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Check, MessageSquare, MoreHorizontal, Paperclip, Sparkles } from 'lucide-react'
+import { Check, MessageSquare, MoreHorizontal, Paperclip, Sparkles, Trash2 } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import { Tag } from '@/components/ui/Tag'
 import { Dropdown, DropdownItem } from '@/components/ui/Controls'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SignalBadge } from './SignalBadge'
 import styles from './TaskCard.module.css'
 import { formatDate, daysUntil } from '@/lib/format'
@@ -19,14 +21,16 @@ interface Props {
   canWrite?: boolean
   onOpen: (task: TaskResponse) => void
   onMove: (task: TaskResponse, columnId: number) => void
+  onDelete: (task: TaskResponse) => void | Promise<unknown>
   draggable?: boolean
   overlay?: boolean
 }
 
 export function TaskCard({
   task, columns, badge, done, highlighted, canWrite = true,
-  onOpen, onMove, draggable = true, overlay,
+  onOpen, onMove, onDelete, draggable = true, overlay,
 }: Props) {
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const sortable = useSortable({
     id: task.id,
     data: { columnId: task.columnId },
@@ -91,6 +95,9 @@ export function TaskCard({
                         Mover a {column.name}
                       </DropdownItem>
                     ))}
+                  <DropdownItem onClick={() => { close(); setConfirmOpen(true) }}>
+                    <Trash2 size={13} strokeWidth={2.75} /> Borrar
+                  </DropdownItem>
                 </>
               )}
             </Dropdown>
@@ -135,6 +142,16 @@ export function TaskCard({
           </span>
         </footer>
       </div>
+
+      {!overlay && (
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          title={`Borrar «${task.title}»`}
+          description="Se borraran tambien sus comentarios y adjuntos."
+          onConfirm={() => onDelete(task)}
+        />
+      )}
     </article>
   )
 }

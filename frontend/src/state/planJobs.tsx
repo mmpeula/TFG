@@ -22,15 +22,15 @@ export function PlanJobsProvider({ children }: { children: ReactNode }) {
 
   const start = useCallback(
     (request: PlanGenerateRequest) => {
-      const { workspaceId, workspaceName, file, text, people, indications } = request
+      const { workspaceId, workspaceName, file, text, options } = request
       const sourceLabel = sourceLabelOf(file, text)
       setJobs((current) => ({ ...current, [workspaceId]: { status: 'pending', sourceLabel } }))
 
       const call = file
-        ? projectsApi.aiPlanFromDocument(workspaceId, file, people, indications)
+        ? projectsApi.aiPlanFromDocument(workspaceId, file, options)
         : text.trim()
-          ? workspacesApi.proposeFromText(workspaceId, text, people, indications)
-          : projectsApi.aiPlan(workspaceId, people, indications)
+          ? workspacesApi.proposeFromText(workspaceId, text, options)
+          : projectsApi.aiPlan(workspaceId, options)
 
       const verElPlan = { label: 'Ver', onClick: () => navigate(ROUTES.generarPlanById(workspaceId)) }
 

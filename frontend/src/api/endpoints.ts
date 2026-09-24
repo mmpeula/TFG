@@ -3,9 +3,15 @@ import type {
   ActivityLogResponse, AdminWorkspaceResponse, AiPlanResponse, AttachmentResponse, AuthResponse, BoardResponse,
   ChatResponse, ChatTurn, ColumnResponse, CommentResponse, PageResponse,
   InvitationResponse, MyInvitationResponse,
-  ProjectResponse, Role, ProposedTask, TaskPriority, TaskResponse, TaskType, TeamMemberResponse,
+  PlanOptions, ProjectResponse, Role, ProposedTask, TaskPriority, TaskResponse, TaskType, TeamMemberResponse,
   UserResponse, WorkspaceResponse,
 } from '@/types/api'
+
+/**
+ * Generar un plan puede costar varias llamadas al modelo local: si el primero no
+ * pasa la validacion, se le devuelve para que lo corrija hasta dos veces.
+ */
+const PLAN_TIMEOUT = 600_000
 
 export const auth = {
   login: (payload: { email: string; password: string }) =>
@@ -50,12 +56,11 @@ export const workspaces = {
       })
       .then((r) => r.data),
 
-  /** Convierte una descripcion escrita a mano en una propuesta de tareas. */
-  proposeFromText: (workspaceId: number, text: string, people?: number, indications?: string) =>
+  /** Convierte una descripcion escrita a mano en un plan. */
+  proposeFromText: (workspaceId: number, text: string, options: PlanOptions) =>
     apiClient
-      .post<AiPlanResponse>(`/workspaces/${workspaceId}/ai/plan`, { text, indications }, {
-        params: { people },
-        timeout: 240000,
+      .post<AiPlanResponse>(`/workspaces/${workspaceId}/ai/plan`, { text, options }, {
+        timeout: PLAN_TIMEOUT,
       })
       .then((r) => r.data),
 }
@@ -130,25 +135,22 @@ export const projects = {
     apiClient
       .get<PageResponse<ActivityLogResponse>>(`/projects/${projectId}/activity`, { params: { size: 30 } })
       .then((r) => r.data),
-  /** Pide al modelo local una propuesta a partir del guion guardado. No toca el tablero. */
-  aiPlan: (projectId: number, people?: number, indications?: string) =>
+  /** Pide al modelo local un plan a partir del guion guardado. No toca el tablero. */
+  aiPlan: (projectId: number, options: PlanOptions) =>
     apiClient
-      .post<AiPlanResponse>(`/projects/${projectId}/ai-plan`, null, {
-        params: { people, indications },
-        // Como las otras dos vias de generar: el modelo local puede tardar mas de los 20 s por defecto.
-        timeout: 240000,
-      })
+      .post<AiPlanResponse>(`/projects/${projectId}/ai-plan`, options, { timeout: PLAN_TIMEOUT })
       .then((r) => r.data),
   /** Igual, pero partiendo del documento de la actividad que sube el usuario. */
-  aiPlanFromDocument: (projectId: number, file: File, people?: number, indications?: string) => {
+  aiPlanFromDocument: (projectId: number, file: File, options: PlanOptions) => {
     const form = new FormData()
     form.append('file', file)
+    // Los ajustes van como una parte JSON aparte: el equipo es una lista y no cabe
+    // en parametros de la URL.
+    form.append('options', new Blob([JSON.stringify(options)], { type: 'application/json' }))
     return apiClient
       .post<AiPlanResponse>(`/projects/${projectId}/ai-plan/document`, form, {
-        params: { people, indications },
         headers: { 'Content-Type': undefined },
-        // Leer el documento y generar el plan puede tardar mas que el resto de llamadas.
-        timeout: 240000,
+        timeout: PLAN_TIMEOUT,
       })
       .then((r) => r.data)
   },

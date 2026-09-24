@@ -9,7 +9,7 @@ import java.util.List;
  *
  * <p>Hace falta en dos sitios que comparan cosas escritas por un modelo pequeno:
  * los nombres de las personas a las que dice asignar una tarea
- * ({@link WorkloadBalancer}) y los titulos de las tareas que propone
+ * ({@link PlanTeam}) y los titulos de las tareas que propone
  * ({@link AiPlanService}, para no repetir lo que ya esta en el tablero). En los
  * dos casos el problema es el mismo —«Ana García» y «ana garcia» son la misma
  * persona— y estaba resuelto dos veces por separado, asi que bastaba con tocar

@@ -1,8 +1,8 @@
-import { Navigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
 import {
-  AiErrorCard, AiWorkbench, AppliedTasksSummary, PrivacyNote, ProposalPanel, SuggestedScheduleCard,
+  AiErrorCard, AiWorkbench, AppliedTasksSummary, PlanWarnings, PrivacyNote, ProposalPanel, SuggestedScheduleCard,
   WorkloadSummary,
 } from '@/components/generator/PlanGenerator'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -10,12 +10,16 @@ import { Tag } from '@/components/ui/Tag'
 import styles from './GeneratePlanScreen.module.css'
 import { projects as projectsApi } from '@/api/endpoints'
 import {
-  keys, useProject, useProjectBoards, useTeamMembers, useWorkspace, useWorkspaceMutations,
+  keys, useMemberMutations, useProject, useProjectBoards, useTeamMembers, useWorkspace, useWorkspaceMutations,
 } from '@/hooks/useData'
-import { usePlanDrafts, usePlanJob, usePlanJobs, useUi } from '@/state/context'
+import { usePlanDrafts, usePlanJob, usePlanJobs, useUi, type PlanTeamDraft } from '@/state/context'
 import { toErrorMessage } from '@/lib/api-client'
 import { canManage } from '@/lib/roles'
 import { ROUTES } from '@/app/routes'
+import { isoDate } from '@/lib/sprints'
+
+/** Lo que se asume si no se dice: una asignatura normal, no dedicacion completa. */
+const DEFAULT_HOURS_PER_WEEK = 10
 
 /**
  * Generar plan: crear tareas con IA a partir de un documento o una
@@ -32,6 +36,7 @@ import { ROUTES } from '@/app/routes'
 export function GeneratePlanScreen() {
   const { workspaceId: param } = useParams()
   const workspaceId = Number(param)
+  const navigate = useNavigate()
 
   const { data: workspace } = useWorkspace(workspaceId)
   const { data: project, isPending: loadingProject } = useProject(workspaceId)
@@ -40,11 +45,12 @@ export function GeneratePlanScreen() {
   const { pushToast } = useUi()
   const queryClient = useQueryClient()
   const workspaceMutations = useWorkspaceMutations(workspaceId)
+  const memberMutations = useMemberMutations(workspace?.teamId)
   const planJobs = usePlanJobs()
   const job = usePlanJob(workspaceId)
 
-  // Nada de estado local aqui: el borrador (documento, descripcion,
-  // indicaciones, personas y lo que quede marcado de la propuesta) vive por
+  // Nada de estado local aqui: el borrador (documento, descripcion, calendario,
+  // equipo, indicaciones y lo que quede marcado de la propuesta) vive por
   // encima de las rutas, para que irse un momento al tablero no obligue a
   // volver a subir el enunciado ni a reescribir las indicaciones.
   const { draftOf, patch } = usePlanDrafts()
@@ -62,9 +68,23 @@ export function GeneratePlanScreen() {
   // momentos en los que el plan deja de ser el mismo.
   const selected = draft.selected ?? (plan?.tasks.map((_, index) => index) ?? [])
 
-  // El docente solo mira: no es alumno, no cuenta para el reparto.
-  const teamSize = members?.filter((member) => member.role !== 'DOCENTE').length ?? 0
-  const people = draft.people ?? (teamSize || 1)
+  // El docente solo mira: no es alumno, no entra en el reparto. Lo que se haya
+  // tocado de cada persona se conserva; quien entre o salga del equipo despues
+  // aparece o desaparece sin tener que rehacer el formulario.
+  const team: PlanTeamDraft[] | undefined = members
+    ?.filter((member) => member.role !== 'DOCENTE')
+    .map((member) => draft.team?.find((person) => person.userId === member.user.id) ?? {
+      userId: member.user.id,
+      name: member.user.fullName,
+      hoursPerWeek: DEFAULT_HOURS_PER_WEEK,
+      preferences: member.planNotes ?? '',
+      included: true,
+    })
+  // Automatico siempre que se pueda: si el workspace ya tiene fecha de inicio,
+  // esa manda y no se pregunta nada (ni tampoco la duracion del sprint, que el
+  // servidor toma directamente de sus propios ajustes). Solo cuando el
+  // workspace no tiene fecha de inicio hace falta una a mano.
+  const startDate = workspace?.startDate ?? draft.startDate ?? isoDate(new Date())
 
   const apply = useMutation({
     mutationFn: () => {
@@ -99,14 +119,23 @@ export function GeneratePlanScreen() {
       workspaceName: workspace?.name ?? 'el workspace',
       file,
       text: descripcion,
-      people,
-      indications: indicaciones.trim() || undefined,
+      options: {
+        startDate,
+        // La duracion del sprint no se pregunta: el servidor usa la del
+        // workspace, o dos semanas si tampoco la tiene.
+        indications: indicaciones.trim() || undefined,
+        team: (team ?? [])
+          .filter((person) => person.included)
+          .map(({ userId, hoursPerWeek, preferences }) => ({
+            userId, hoursPerWeek, preferences: preferences.trim(),
+          })),
+      },
     })
   }
 
   /**
-   * Aplica al workspace solo las fechas/duracion que el documento ha propuesto,
-   * conservando lo que ya hubiera en lo demas: aplicar la sugerencia no debe
+   * Guarda en el workspace las fechas con las que se ha hecho el plan, para que la
+   * pestana Plan pinte los mismos sprints. Solo toca lo que difiere: no debe
    * borrar una descripcion, un color o una fecha que el usuario ya puso a mano.
    */
   function applySchedule() {
@@ -155,9 +184,16 @@ export function GeneratePlanScreen() {
         }}
         indications={indicaciones}
         onIndications={(next) => set({ indications: next })}
-        people={people}
-        maxPeople={teamSize || undefined}
-        onPeople={(next) => set({ people: next })}
+        startDate={startDate}
+        onStartDate={(next) => set({ startDate: next })}
+        workspaceStartDate={workspace?.startDate}
+        onGoToSettings={() => navigate(ROUTES.ajustesById(workspaceId))}
+        team={team}
+        members={members}
+        onTeam={(next) => set({ team: next })}
+        onSaveNotes={(userId, preferences) =>
+          memberMutations.updateNotes.mutateAsync({ userId, planNotes: preferences })
+        }
         onRun={runGenerate}
         running={proponiendo}
       >
@@ -187,11 +223,7 @@ export function GeneratePlanScreen() {
               />
             )}
 
-            {plan.excludedMembers && plan.excludedMembers.length > 0 && (
-              <p className={styles.nothing}>
-                Sin tareas para {plan.excludedMembers.join(', ')}: lo pedian tus indicaciones.
-              </p>
-            )}
+            <PlanWarnings warnings={plan.warnings ?? []} />
 
             {plan.tasks.length === 0 ? (
               <p className={styles.nothing}>{plan.message}</p>
@@ -200,6 +232,7 @@ export function GeneratePlanScreen() {
                 <WorkloadSummary workload={plan.workload} />
                 <ProposalPanel
                   tasks={plan.tasks}
+                  sprints={plan.sprints ?? []}
                   selected={selected}
                   model={plan.model}
                   applying={apply.isPending}

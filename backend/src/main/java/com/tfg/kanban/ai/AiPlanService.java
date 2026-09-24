@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tfg.kanban.activity.ActivityService;
 import com.tfg.kanban.ai.dto.AiPlanResponse;
 import com.tfg.kanban.ai.dto.ApplyPlanRequest;
+import com.tfg.kanban.ai.dto.MemberWorkload;
+import com.tfg.kanban.ai.dto.PlanOptions;
+import com.tfg.kanban.ai.dto.PlannedSprint;
 import com.tfg.kanban.ai.dto.ProposedTask;
 import com.tfg.kanban.board.BoardService;
 import com.tfg.kanban.common.BusinessRuleException;
@@ -14,29 +17,31 @@ import com.tfg.kanban.domain.repository.UserRepository;
 import com.tfg.kanban.project.ProjectService;
 import com.tfg.kanban.security.SecurityUtils;
 import com.tfg.kanban.storage.FileStorageService;
-import org.springframework.web.multipart.MultipartFile;
 import com.tfg.kanban.task.TaskMapper;
 import com.tfg.kanban.task.dto.TaskResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Planificacion automatica a partir del guion de la practica.
+ * Planificacion automatica a partir del documento de la practica.
  *
- * El modelo <b>propone</b>: nada se escribe en el tablero hasta que el usuario
- * acepta las tareas que quiere ({@link #apply}). Es la regla de producto del
- * modulo de IA y tambien la razon de separar generar y aplicar en dos endpoints.
+ * <p>El modelo <b>propone</b>: nada se escribe en el tablero hasta que el usuario
+ * acepta las tareas que quiere ({@link #apply}). Es la regla de producto del modulo
+ * de IA y la razon de separar generar y aplicar en dos endpoints.</p>
+ *
+ * <p>El reparto entero lo hace el modelo —que tareas, en que sprint, para quien—,
+ * pero no a ciegas: lo medible se comprueba en {@link PlanValidator} y, si algo
+ * falla, se le devuelven los errores concretos para que corrija el plan, hasta
+ * {@code app.ai.max-retries} veces. Las fechas de los sprints y de las tareas si
+ * las pone el servidor, para que casen con los sprints de la pestana Plan.</p>
  */
 @Slf4j
 @Service
@@ -44,149 +49,18 @@ import java.util.stream.Collectors;
 public class AiPlanService {
 
     /*
-     * Escrito para un modelo pequeno corriendo en local (8B), que es lo que hay al
-     * otro lado. De ahi tres decisiones que no se tomarian con un modelo grande:
-     * un ejemplo completo y relleno en vez del esquema con puntos suspensivos,
-     * porque un modelo pequeno imita mucho mejor de lo que deduce; reglas cortas
-     * agrupadas por bloques con titulo, porque en una lista plana y larga se le
-     * pierden las importantes; y ni una sola regla sobre cosas que el servidor ya
-     * decide solo (las fechas de cada tarea y el equilibrio de horas), porque
-     * pedirselas le gasta atencion y ademas invita a contradecir lo que luego se
-     * va a recalcular igualmente.
-     *
-     * La prohibicion de ceremonias es la regla que mas cambia el resultado: sin
-     * ella el modelo describe el proceso Scrum que ha visto mil veces al
-     * entrenarse ("planificar el sprint 1", "reunion de retrospectiva") en lugar
-     * del trabajo que pide el enunciado que tiene delante.
+     * Fijo: es el texto acordado para el planificador, palabra por palabra. Lo que
+     * cambia en cada ejecucion (fechas, sprints, equipo, indicaciones, documento)
+     * va en el mensaje de usuario, que arma buildUserPrompt.
      */
-    private static final String SYSTEM_PROMPT = """
-            Actuas como un Project Manager senior y Technical Lead con anos repartiendo trabajo en
-            equipos de desarrollo real. Te dan el enunciado de una practica universitaria y lo
-            conviertes en lo que un buen PM entregaria el primer dia: la lista de tareas que hay que
-            hacer, en el orden en que hay que hacerlas, cada una con el nombre de quien del equipo
-            esta en mejores condiciones de sacarla adelante.
+    static final String SYSTEM_PROMPT = """
+            Eres un Project Manager senior y Scrum Master certificado con más de 15 años planificando proyectos de software; conviertes documentos de proyecto en backlogs de Jira realistas y bien repartidos. PROCESO: analiza el documento (duración, fases, objetivos y TODOS los entregables; si no hay duración, propón una razonable), analiza al equipo (número de personas, rol, horas por semana, preferencias y restricciones), define sprints de la duración indicada (2 semanas por defecto) respetando el orden de las fases, y divide el trabajo en tareas concretas de 2 a 8 horas, nunca vagas. REPARTO: cada persona recibe horas en proporción a su disponibilidad y nadie supera su capacidad en ningún sprint; asigna según el perfil; respeta SIEMPRE las restricciones duras (vacaciones, no puede hacer X) y las preferencias blandas siempre que no desequilibren la carga más de un 15 %; la misma persona lleva las funcionalidades relacionadas; todos tienen trabajo en todos los sprints (si una fase es de un solo perfil, da tareas de apoyo como tests, documentación o preparación); ninguna tarea depende de otra de un sprint posterior; deja un 10 % de margen por sprint; si hay más de 3 personas, el líder recibe un 20 % menos de carga técnica. CALIDAD: cada objetivo y entregable tiene al menos una tarea; el motivo cita la parte concreta del documento y corresponde al título; tipo Historia si es funcionalidad visible, Tarea si es técnica, Bug solo si corrige algo; entre 3 y 7 épicas por fase o área; prioridad alta si bloquea o es crítica, media si es importante, baja si es mejora; fecha = último día laborable de su sprint. Antes de responder, comprueba la cobertura de entregables, la capacidad por persona y sprint, las restricciones duras y la coherencia entre título y motivo, y corrige lo que falle. Responde SOLO con JSON válido con esta forma: {resumen:{duracion_semanas,num_sprints,carga_por_persona:[{nombre,horas,tareas}]}, sprints:[{numero,inicio,fin,objetivo}], tareas:[{titulo,descripcion,tipo,epica,sprint,asignado,horas,prioridad,fecha,motivo,depende_de:[]}], avisos:[]}""";
 
-            Lo que te distingue de un reparto automatico ingenuo es esto: no juntas palabras sueltas
-            ("frontend" con "frontend"), entiendes el trabajo. "Montar el endpoint de login" es
-            backend aunque la palabra "backend" no aparezca en ningun sitio, y "una funcionalidad de
-            autenticacion" no es una tarea sino tres o cuatro: el modelo de datos, la API, la pantalla,
-            las pruebas. Cada una con su propio nombre y, casi siempre, con una persona distinta detras.
+    /** Tope de las indicaciones: compiten por el contexto con el documento. */
+    private static final int MAX_INDICATIONS_LENGTH = 1000;
 
-            Respondes SIEMPRE en espanol y SIEMPRE con un unico objeto JSON, sin nada de texto
-            alrededor. Una respuesta valida se ve exactamente asi:
-
-            {"tasks":[
-              {"title":"Disenar el modelo entidad-relacion","reason":"El apartado 2 pide el diagrama E/R antes de crear las tablas","type":"TAREA","priority":"ALTA","estimatedHours":5,"assignee":"Ana Garcia","why":"Lleva bases de datos","avoid":[]},
-              {"title":"Montar la API de autenticacion","reason":"El apartado 3 pide login con JWT","type":"TAREA","priority":"ALTA","estimatedHours":6,"assignee":"Luis Perez","why":"Backend y Java","avoid":["Ana Garcia"]},
-              {"title":"Maquetar la pantalla de login","reason":"El apartado 3 pide una interfaz de acceso","type":"TAREA","priority":"MEDIA","estimatedHours":4,"assignee":"Ana Garcia","why":"React y frontend","avoid":[]},
-              {"title":"Redactar la memoria","reason":"El enunciado la pide como entregable final","type":"TAREA","priority":"MEDIA","estimatedHours":6,"assignee":"Ana Garcia","why":"Reparto: es quien menos carga lleva","avoid":[]}],
-             "schedule":{"startDate":null,"deadline":"2027-01-15","sprintDays":14},
-             "excluded":[]}
-
-            ====================================================================
-            PRIMERO EL TRABAJO: ANALIZA, DESCOMPON, ESTIMA
-            ====================================================================
-            Antes de escribir una sola tarea, lee el enunciado entero y separa que pide de verdad de
-            lo que es contexto o justificacion. Luego, para cada cosa que pide:
-
-            - Un entregable concreto: algo que alguien hace y se puede dar por terminado. No un
-              apartado del enunciado tal cual, sino el trabajo real que ese apartado implica.
-            - El titulo empieza por un verbo, dice QUE se entrega y no pasa de 100 caracteres.
-              MAL: "Backend" (no es una tarea, es un area entera). MAL: "Planificar el sprint 1"
-              (no es un entregable, es gestion). MAL: "Hacer la segunda parte" (no dice que se
-              entrega). BIEN: "Implementar el endpoint de login con JWT".
-            - Nada de ceremonias ni de relleno: no propongas reuniones, planificaciones de sprint,
-              revisiones, retrospectivas ni "documentacion tecnica" generica. Si no sale del
-              enunciado, no va en la lista.
-            - Parte por el trabajo real, no por apartados del enunciado. Una funcionalidad como
-              "login de usuarios" normalmente son varias tareas distintas —el modelo de datos, la
-              API, la pantalla, las pruebas— y cada una la puede hacer una persona distinta. Partirla
-              es lo que permite repartir; dejarla entera obliga a darsela toda a alguien.
-            - Calibra las horas con la dificultad real, no a ojo: 1-2h un cambio pequeno y acotado
-              (un formulario simple, un script puntual); 3-6h una pieza completa con una
-              responsabilidad clara (un endpoint con su validacion, una pantalla con su logica);
-              8-15h algo con varias piezas o que cruza capas (una funcionalidad con backend y
-              persistencia a la vez). Lo que pase de 20 horas no es una tarea, es varias: partelo.
-
-            EL ORDEN DE LA LISTA ES EL ORDEN DEL TRABAJO
-            - Primero lo que hay que hacer antes. El servidor reparte las tareas por iteraciones
-              siguiendo ese orden, asi que una lista desordenada da un calendario desordenado.
-            - Si una tarea depende de otra —no se puede montar la API de login sin el modelo de
-              usuario debajo—, ponla despues. No hay campo de dependencias: el orden ES la
-              dependencia.
-            - No pongas fechas en las tareas: las calcula el servidor.
-
-            ====================================================================
-            DESPUES EL REPARTO: A QUIEN LE TOCA CADA TAREA
-            ====================================================================
-            Para cada tarea pregunta que hace falta saber para hacerla, y mira a quien del equipo le
-            pega mas. No busques coincidencias de palabras: mira el fondo, como en el ejemplo de
-            "montar el endpoint de login" de mas arriba.
-
-            CUANDO LAS INSTRUCCIONES SE CONTRADIGAN, ESTE ES EL ORDEN. Lo de arriba gana:
-
-              1. PROHIBICIONES. Un "no puede" o un "nunca" de las indicaciones de una persona.
-                 No se saltan. Si ademas te piden lo contrario mas abajo, manda la prohibicion:
-                 pon a otra persona y dilo en "why" ("su ficha dice que no hace frontend").
-              2. INDICACIONES DE ESTA EJECUCION. Valen solo para este reparto y pisan a la ficha
-                 de cada persona. Si la ficha de alguien dice que prefiere backend y aqui te dicen
-                 que esta vez lleve la documentacion, lleva la documentacion.
-              3. LA FICHA DE CADA PERSONA. Lo que se le da bien y lo que prefiere. Es el criterio
-                 normal cuando no hay nada mas arriba que diga otra cosa.
-              4. TU CRITERIO DE PM. Si nada de lo anterior decide, reparte tu: dificultad de la
-                 tarea, lo que pide realmente y, sobre todo, que nadie acabe con el doble de trabajo
-                 que los demas.
-
-            Distingue lo que lees. "Evitar darle X si hay alternativa" es una preferencia: se la
-            saltas si no queda mas remedio. "No puede hacer X" es una prohibicion: no se la saltas
-            nunca, ni siquiera si una indicacion de esta ejecucion dice lo contrario.
-
-            EQUILIBRIO: EL CRITERIO QUE MAS SE OLVIDA
-            - Ser el mejor en algo no significa quedarse con todo lo de ese algo. Si hay cuatro
-              tareas de backend y dos personas que pueden hacerlo, no se las des las cuatro a la
-              misma aunque sea la mejor: reparte tambien entre quien lo hace bien, no solo entre
-              quien lo hace mejor.
-              MAL: darle a un unico "especialista en backend" las seis tareas de backend mientras
-              otra persona con perfil similar se queda con dos. BIEN: repartir esas seis entre los
-              dos, aunque una lleve un poco mas por ser mejor encaje.
-            - Mira el total en horas, no el numero de tareas: cinco tareas de una hora no son mas
-              trabajo que una de diez.
-            - Todo el mundo tiene que salir con algo. Si a alguien no le pega nada de lo tecnico,
-              dale lo que si puede hacer (documentacion, pruebas, revision) antes de dejarlo a cero.
-
-            ====================================================================
-            CAMPOS
-            ====================================================================
-            - "reason": por que existe la tarea. Una frase corta, citando el enunciado cuando puedas.
-            - "why": por que se la das a esa persona. Una frase corta y comprobable —lo que dice su
-              ficha, lo que piden las indicaciones, o "reparto" si la has puesto para equilibrar—.
-              No expliques como has razonado, di en que te has apoyado.
-            - "avoid": nombres exactos de quienes NO deben acabar con esta tarea, si alguna
-              prohibicion lo dice. Lista vacia si no hay ninguna. El servidor lo respeta.
-            - "type": TAREA para trabajo tecnico (el caso normal), HISTORIA si aporta valor visible a
-              quien usa lo que se construye, EPICA para un bloque que agrupa varias, BUG o INCIDENCIA
-              solo para arreglar algo que ya existe.
-            - "priority": ALTA es lo que bloquea al resto del trabajo si no esta hecho (la base sobre
-              la que se construye lo demas, o lo que pide explicitamente el enunciado como critico).
-              MEDIA es el grueso del trabajo: importante pero nada se para si va justo despues. BAJA
-              es una mejora o un detalle que no compromete el entregable si se queda para el final.
-            - "assignee": el nombre EXACTO de una de las personas de la lista.
-            - "excluded": lista vacia, salvo que las indicaciones de esta ejecucion pidan dejar a
-              alguien sin tareas esta vez; entonces va ahi su nombre exacto.
-
-            "schedule" ES DEL PROYECTO ENTERO, NO DE UNA TAREA
-            - Rellena cada campo solo si el enunciado lo dice; si no lo dice, null. No calcules fechas
-              por tu cuenta.
-            - Usa el calendario de hoy, cuya fecha se te da en el mensaje: si el enunciado da el dia y
-              el mes pero no el ano, elige el ano que deja la fecha en el futuro. Nunca un plazo vencido.
-            - "sprintDays" es lo que dura UNA iteracion, en dias, entre 7 y 28. No es lo que dura la
-              practica entera.
-
-            Y ADEMAS
-            - Cubre el enunciado de principio a fin, sin inventarte trabajo que no pide.
-            - No repitas ninguna tarea que ya este en el tablero.
-            - Si las indicaciones de esta ejecucion contradicen al enunciado, mandan las indicaciones.
-            """;
+    /** Sin fecha de entrega, cuantos sprints se aceptan como mucho del modelo. */
+    private static final int MAX_SPRINTS = 12;
 
     private final AiProperties properties;
     private final OllamaClient ollamaClient;
@@ -198,121 +72,194 @@ public class AiPlanService {
     private final ActivityService activityService;
     private final TaskMapper taskMapper;
     private final DocumentTextExtractor documentTextExtractor;
-    private final WorkloadBalancer workloadBalancer;
     private final AiTaskScheduler aiTaskScheduler;
 
-    /** Genera la propuesta a partir del guion ya guardado en el proyecto. */
+    /** Genera el plan a partir del guion ya guardado en el proyecto. */
     @Transactional(readOnly = true)
-    public AiPlanResponse generate(Long projectId, Integer people, String indications) {
+    public AiPlanResponse generate(Long projectId, PlanOptions options) {
         Project project = projectService.getProject(projectId);
 
         if (project.getBriefing() == null || project.getBriefing().isBlank()) {
             throw new BusinessRuleException(
                     "El proyecto no tiene guion de la practica: subelo como documento o escribelo en el proyecto");
         }
-        return plan(project, project.getBriefing(), "guion del proyecto", people, indications);
+        return plan(project, project.getBriefing(), "guion del proyecto", options);
     }
 
     /**
-     * Genera la propuesta a partir de un documento subido. El texto extraido se
-     * guarda ademas como guion del proyecto: es la fuente de verdad de la practica.
+     * Genera el plan a partir de un documento subido. El texto extraido se guarda
+     * ademas como guion del proyecto: es la fuente de verdad de la practica.
      */
     @Transactional
-    public AiPlanResponse generateFromDocument(Long projectId, MultipartFile file, Integer people, String indications) {
+    public AiPlanResponse generateFromDocument(Long projectId, MultipartFile file, PlanOptions options) {
         Project project = projectService.getProject(projectId);
         String text = documentTextExtractor.extract(file);
 
         project.setBriefing(text);
 
         return plan(project, text, "documento: " + FileStorageService.cleanFilename(file.getOriginalFilename()),
-                people, indications);
+                options);
     }
 
     /**
-     * Genera la propuesta a partir de un texto escrito a mano en Generar plan
-     * («tenemos que hacer una practica de...»). No toca el guion guardado: eso
-     * queda reservado al documento oficial de la actividad.
+     * Genera el plan a partir de un texto escrito a mano («tenemos que hacer una
+     * practica de...»). No toca el guion guardado: eso queda reservado al
+     * documento oficial de la actividad.
      */
     @Transactional(readOnly = true)
-    public AiPlanResponse generateFromText(Long projectId, String text, Integer people, String indications) {
+    public AiPlanResponse generateFromText(Long projectId, String text, PlanOptions options) {
         Project project = projectService.getProject(projectId);
         if (text == null || text.isBlank()) {
             throw new BusinessRuleException("Escribe de que va el trabajo para que pueda proponerte tareas");
         }
-        return plan(project, text.trim(), "descripcion escrita", people, indications);
+        return plan(project, text.trim(), "descripcion escrita", options);
     }
 
-    /** Nunca a ciegas: se recorta para que no desplace el resto del contexto del prompt. */
-    private static final int MAX_INDICATIONS_LENGTH = 500;
+    /** Lo que salio de una llamada al modelo que se pudo interpretar. */
+    private record Attempt(ParsedPlan parsed, List<ProposedTask> tasks, List<AiTaskScheduler.Window> sprints,
+                           int duplicates, List<String> errors) {
+    }
 
-    private AiPlanResponse plan(Project project, String text, String source, Integer people, String indications) {
+    private AiPlanResponse plan(Project project, String text, String source, PlanOptions requested) {
         if (!properties.isEnabled()) {
             throw new AiUnavailableException("El modulo de IA esta desactivado en la configuracion del servidor");
         }
+        PlanOptions options = requested == null ? PlanOptions.defaults() : requested;
 
-        // El DOCENTE solo sigue el equipo: no cuenta para el
-        // reparto ni para el maximo de personas entre las que repartir.
-        List<TeamMember> members = project.getTeam().getMembers().stream()
-                .filter(member -> member.getRole() != Role.DOCENTE)
-                .toList();
+        PlanTeam team = PlanTeam.resolve(project.getTeam().getMembers(), options.team());
+        LocalDate start = options.startDate() != null ? options.startDate()
+                : project.getStartDate() != null ? project.getStartDate() : LocalDate.now();
+        int sprintDays = AiTaskScheduler.daysOrDefault(
+                options.sprintDays() != null ? options.sprintDays() : project.getSprintDays());
+
+        // Con fecha de entrega los sprints salen de ahi y el modelo solo los rellena;
+        // sin ella, cuantos hacen falta lo propone el modelo.
+        LocalDate deadline = project.getDeadline();
+        List<AiTaskScheduler.Window> fixedSprints = deadline != null && deadline.isAfter(start)
+                ? aiTaskScheduler.sprintsOf(new AiTaskScheduler.Window(start, deadline), sprintDays)
+                : null;
+
         List<Task> existing = existingTasks(project);
-        String notas = indications == null || indications.isBlank() ? null
-                : indications.strip().length() > MAX_INDICATIONS_LENGTH
-                        ? indications.strip().substring(0, MAX_INDICATIONS_LENGTH)
-                        : indications.strip();
+        String userPrompt = buildUserPrompt(text, team, start, sprintDays, fixedSprints,
+                recortar(options.indications()), existing);
 
-        String content = ollamaClient.chatJson(SYSTEM_PROMPT,
-                buildUserPrompt(project, text, existing, members, people, notas));
+        List<OllamaClient.Message> conversation = List.of(new OllamaClient.Message("user", userPrompt));
+        Attempt best = null;
+        int attempts = 0;
 
-        ParsedResponse parsed = parse(content);
-        List<ProposedTask> tasks = withoutDuplicates(parsed.tasks(), existing);
-        int duplicates = parsed.tasks().size() - tasks.size();
+        for (int intento = 0; intento <= properties.getMaxRetries(); intento++) {
+            attempts++;
+            String raw = ollamaClient.chatJson(SYSTEM_PROMPT, conversation);
+            List<String> errors;
 
-        // Se resuelve aqui, con la lista completa, y no dentro de WorkloadBalancer:
-        // este ya garantiza que nadie se queda sin tareas, asi que si a alguien
-        // excluido se le dejara en la lista igualmente acabaria con una. La unica
-        // forma fiable de excluir a alguien es que no este ni siquiera en el reparto.
-        List<String> excludedNames = new ArrayList<>();
-        List<TeamMember> activeMembers = new ArrayList<>(members);
-        for (String raw : parsed.excluded()) {
-            WorkloadBalancer.matchName(raw, activeMembers).ifPresent(id -> {
-                activeMembers.removeIf(member -> member.getUser().getId().equals(id));
-                members.stream()
-                        .filter(member -> member.getUser().getId().equals(id))
-                        .findFirst()
-                        .ifPresent(member -> excludedNames.add(member.getUser().getFullName()));
-            });
+            try {
+                ParsedPlan parsed = parse(raw);
+                List<AiTaskScheduler.Window> sprints = fixedSprints != null ? fixedSprints
+                        : aiTaskScheduler.consecutiveSprints(start, sprintCount(parsed), sprintDays);
+                List<ProposedTask> tasks = withoutDuplicates(parsed.tasks(), existing);
+                errors = PlanValidator.validate(tasks, team, sprints);
+                best = new Attempt(parsed, tasks, sprints, parsed.tasks().size() - tasks.size(), errors);
+            } catch (InvalidPlanException ex) {
+                // Un JSON roto no sustituye a un plan anterior que si se pudo leer.
+                errors = List.of(ex.getMessage());
+                log.warn("IA: respuesta no interpretable en el intento {}: {}", attempts, abbreviate(raw));
+            }
+
+            if (errors.isEmpty()) break;
+            log.info("IA: el plan del intento {} no pasa la validacion ({} errores)", attempts, errors.size());
+
+            // Solo el ultimo plan y sus errores: arrastrar todos los intentos llenaria
+            // el contexto con planes descartados.
+            conversation = List.of(
+                    new OllamaClient.Message("user", userPrompt),
+                    new OllamaClient.Message("assistant", raw),
+                    new OllamaClient.Message("user", correctionPrompt(errors)));
         }
 
-        // Si el documento acaba de decir las fechas, son la fuente de verdad para
-        // ESTA propuesta: usar en su lugar las que ya tuviera guardadas el workspace
-        // (normalmente ninguna, si es la primera vez) es lo que hacia que las tareas
-        // cayeran en una ventana que no tenia nada que ver con lo que el propio
-        // aviso de "el documento dice..." acababa de mostrar. Las fechas del
-        // workspace no cambian aqui: eso solo pasa si el usuario pulsa "Usar estos
-        // datos" en esa tarjeta.
-        LocalDate startDate = fechaPropuestaOGuardada(parsed.schedule() == null ? null : parsed.schedule().startDate(),
-                project.getStartDate());
-        LocalDate deadline = fechaPropuestaOGuardada(parsed.schedule() == null ? null : parsed.schedule().deadline(),
-                project.getDeadline());
+        if (best == null) {
+            throw new AiUnavailableException(
+                    "El modelo no ha devuelto un plan que se pueda leer tras %d intentos. Vuelve a intentarlo."
+                            .formatted(attempts));
+        }
+        return toResponse(project, source, team, start, sprintDays, fixedSprints != null, best, attempts);
+    }
 
-        // La duracion de sprint con la que se fechan las tareas es la misma que va a
-        // acabar teniendo el workspace: la que dice el documento si la dice, y si no
-        // la que ya tenga guardada. Con otra, las tareas caerian entre los sprints
-        // que luego pinta el plan.
-        Integer sprintDays = parsed.schedule() != null && parsed.schedule().sprintDays() != null
-                ? parsed.schedule().sprintDays()
-                : project.getSprintDays();
+    /** Lo que el modelo devolvio ya como plan del servidor: fechas, personas y avisos. */
+    private AiPlanResponse toResponse(Project project, String source, PlanTeam team, LocalDate start,
+                                      int sprintDays, boolean sprintsFijos, Attempt best, int attempts) {
+        List<AiTaskScheduler.Window> ventanas = best.sprints();
 
-        WorkloadBalancer.Result reparto = workloadBalancer.distribute(tasks, activeMembers, people);
-        List<ProposedTask> agendadas = aiTaskScheduler.schedule(reparto.tasks(), startDate, deadline, sprintDays);
+        List<PlannedSprint> sprints = new ArrayList<>();
+        for (int i = 0; i < ventanas.size(); i++) {
+            sprints.add(new PlannedSprint(i + 1, ventanas.get(i).start(), ventanas.get(i).end(),
+                    best.parsed().goals().get(i + 1)));
+        }
 
-        log.info("IA: {} tareas para el proyecto {} repartidas entre {} personas ({} descartadas por repetidas, "
-                        + "{} excluidas por indicacion)",
-                agendadas.size(), project.getId(), reparto.workload().size(), duplicates, excludedNames.size());
+        List<ProposedTask> tasks = best.tasks().stream().map(task -> {
+            var persona = team.match(task.assigneeName());
+            boolean sprintValido = task.sprint() != null && task.sprint() >= 1 && task.sprint() <= ventanas.size();
+            return new ProposedTask(task.title(), task.description(), task.reason(), task.type(), task.epic(),
+                    task.sprint(), task.priority(), task.estimatedHours(),
+                    // La fecha la pone el servidor: el ultimo dia laborable del sprint.
+                    sprintValido ? aiTaskScheduler.lastWorkingDay(ventanas.get(task.sprint() - 1)) : null,
+                    persona.map(PlanTeam.Member::userId).orElse(null),
+                    persona.map(PlanTeam.Member::name).orElse(task.assigneeName()),
+                    task.dependsOnOrEmpty());
+        }).toList();
 
-        return AiPlanResponse.of(project.getId(), properties.getModel(), source,
-                agendadas, reparto.workload(), duplicates, parsed.schedule(), excludedNames);
+        List<String> warnings = new ArrayList<>(best.parsed().warnings());
+        if (!best.errors().isEmpty()) {
+            warnings.add("Tras %d %s, el plan sigue sin cumplir estas reglas; revisalo antes de aplicarlo:"
+                    .formatted(attempts, attempts == 1 ? "intento" : "intentos"));
+            warnings.addAll(best.errors());
+        }
+
+        LocalDate fin = ventanas.get(ventanas.size() - 1).end();
+        long dias = new AiTaskScheduler.Window(start, fin).days();
+        Integer semanas = best.parsed().durationWeeks() != null ? best.parsed().durationWeeks()
+                : (int) Math.ceil(dias / 7.0);
+
+        // Solo se ofrece guardar en el workspace lo que difiere de lo que ya tiene,
+        // para que la pestana Plan pinte exactamente estos sprints.
+        AiPlanResponse.SuggestedSchedule schedule = new AiPlanResponse.SuggestedSchedule(
+                start.equals(project.getStartDate()) ? null : start,
+                sprintsFijos ? null : fin,
+                Objects.equals(sprintDays, project.getSprintDays()) ? null : sprintDays);
+
+        log.info("IA: {} tareas en {} sprints para el proyecto {} ({} intentos, {} avisos)",
+                tasks.size(), sprints.size(), project.getId(), attempts, warnings.size());
+
+        return AiPlanResponse.of(project.getId(), properties.getModel(), source, semanas, sprints, tasks,
+                workload(tasks, team), warnings, best.duplicates(), schedule, attempts);
+    }
+
+    /** Horas y tareas de cada persona, contadas sobre el plan: no sobre lo que dice el modelo de si mismo. */
+    private List<MemberWorkload> workload(List<ProposedTask> tasks, PlanTeam team) {
+        return team.members().stream().map(member -> {
+            List<ProposedTask> suyas = tasks.stream()
+                    .filter(task -> member.userId().equals(task.assigneeId()))
+                    .toList();
+            BigDecimal horas = suyas.stream()
+                    .map(task -> task.estimatedHours() == null ? BigDecimal.ZERO : task.estimatedHours())
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return new MemberWorkload(member.userId(), member.name(), suyas.size(), horas);
+        }).toList();
+    }
+
+    /** Sin fecha de entrega: los que diga el modelo, dentro de lo razonable. */
+    private int sprintCount(ParsedPlan parsed) {
+        int propuestos = parsed.numSprints() != null ? parsed.numSprints()
+                : parsed.tasks().stream().map(ProposedTask::sprint).filter(Objects::nonNull)
+                        .max(Integer::compare).orElse(1);
+        return Math.max(1, Math.min(MAX_SPRINTS, propuestos));
+    }
+
+    private String correctionPrompt(List<String> errors) {
+        StringBuilder prompt = new StringBuilder("Tu plan tiene estos problemas:\n");
+        errors.forEach(error -> prompt.append("- ").append(error).append('\n'));
+        prompt.append("\nCorrigelos y devuelve el plan COMPLETO otra vez, con la misma forma JSON. ")
+              .append("No cambies lo que ya estaba bien.");
+        return prompt.toString();
     }
 
     /** Lleva al tablero solo las tareas que el usuario ha aceptado. */
@@ -325,7 +272,7 @@ public class AiPlanService {
             throw new BusinessRuleException("El tablero indicado no pertenece a este proyecto");
         }
         BoardColumn column = board.getColumns().stream()
-                .min((a, b) -> Integer.compare(a.getPosition(), b.getPosition()))
+                .min(Comparator.comparingInt(BoardColumn::getPosition))
                 .orElseThrow(() -> new BusinessRuleException("El tablero no tiene columnas"));
 
         User creator = SecurityUtils.currentUserId().flatMap(userRepository::findById).orElse(null);
@@ -344,8 +291,9 @@ public class AiPlanService {
 
             created.add(taskRepository.save(Task.builder()
                     .title(proposed.title().trim())
-                    .description(proposed.reason())
+                    .description(descripcion(proposed))
                     .type(proposed.type() == null ? TaskType.TAREA : proposed.type())
+                    .epic(proposed.epic() == null || proposed.epic().isBlank() ? null : proposed.epic().strip())
                     .priority(proposed.priority() == null ? TaskPriority.MEDIA : proposed.priority())
                     .estimatedHours(proposed.estimatedHours())
                     .dueDate(proposed.dueDate())
@@ -364,9 +312,13 @@ public class AiPlanService {
         return taskMapper.toResponses(created);
     }
 
-    /** La que acaba de proponer el documento si hay una; si no, la que ya tuviera guardada. */
-    private LocalDate fechaPropuestaOGuardada(LocalDate propuesta, LocalDate guardada) {
-        return propuesta != null ? propuesta : guardada;
+    /** Lo que se hace y de donde sale, en la descripcion de la tarea del tablero. */
+    private String descripcion(ProposedTask proposed) {
+        boolean hayDescripcion = proposed.description() != null && !proposed.description().isBlank();
+        boolean hayMotivo = proposed.reason() != null && !proposed.reason().isBlank();
+        if (hayDescripcion && hayMotivo) return proposed.description().strip() + "\n\nMotivo: " + proposed.reason().strip();
+        if (hayDescripcion) return proposed.description().strip();
+        return hayMotivo ? proposed.reason().strip() : null;
     }
 
     private List<Task> existingTasks(Project project) {
@@ -375,7 +327,7 @@ public class AiPlanService {
     }
 
     /**
-     * Al modelo se le pide que no repita tareas, pero un modelo pequeno lo ignora a
+     * Al modelo se le dice que no repita tareas, pero un modelo pequeno lo ignora a
      * menudo: la comprobacion se hace tambien aqui, que es determinista.
      */
     private List<ProposedTask> withoutDuplicates(List<ProposedTask> proposed, List<Task> existing) {
@@ -396,305 +348,225 @@ public class AiPlanService {
         return result;
     }
 
+    private String recortar(String indications) {
+        if (indications == null || indications.isBlank()) return null;
+        String limpio = indications.strip();
+        return limpio.length() > MAX_INDICATIONS_LENGTH ? limpio.substring(0, MAX_INDICATIONS_LENGTH) : limpio;
+    }
+
     /**
-     * Contexto real: documento, fecha, personas concretas y lo que ya hay en el tablero.
-     *
-     * <p>Va por apartados con titulo, y cada fuente en el suyo, porque el modelo
-     * tiene que poder distinguirlas para aplicar la jerarquia que le pide el
-     * prompt de sistema: lo que dice el enunciado, lo que sabemos de cada persona
-     * y lo que se ha pedido solo para esta vez son tres cosas con distinto peso, y
-     * mezcladas en un parrafo corrido un modelo pequeno las trata como una sola.</p>
+     * El mensaje de usuario: todo lo que cambia de una ejecucion a otra, por
+     * apartados, para que el modelo distinga el calendario, el equipo, lo pedido
+     * solo para esta vez y el documento.
      */
-    private String buildUserPrompt(Project project, String text, List<Task> existing,
-                                   List<TeamMember> members, Integer people, String indications) {
+    String buildUserPrompt(String text, PlanTeam team, LocalDate start, int sprintDays,
+                           List<AiTaskScheduler.Window> fixedSprints, String indications, List<Task> existing) {
         StringBuilder prompt = new StringBuilder();
-        // Sin esto el modelo planifica en el ano en que se entreno y propone un curso
-        // ya terminado: las fechas quedan vencidas y no encajan con ningun sprint real.
-        prompt.append("Hoy es ").append(LocalDate.now()).append('\n');
-        prompt.append("\n## LA PRACTICA\n");
-        prompt.append("Nombre: ").append(project.getName()).append('\n');
+        // Sin esto el modelo planifica en el ano en que se entreno.
+        prompt.append("Fecha de hoy: ").append(LocalDate.now()).append('\n');
+        prompt.append("Fecha de inicio: ").append(start).append('\n');
+        prompt.append("Duracion del sprint: ").append(sprintDays).append(" dias")
+              .append(sprintDays % 7 == 0 ? " (" + sprintDays / 7 + (sprintDays == 7 ? " semana)" : " semanas)") : "")
+              .append('\n');
 
-        if (project.getDescription() != null && !project.getDescription().isBlank()) {
-            prompt.append("Descripcion: ").append(project.getDescription()).append('\n');
-        }
-        if (project.getDeadline() != null) {
-            // ChronoUnit y no Period: el componente getDays() de un Period solo lleva el
-            // resto de dias del ultimo mes e ignora los anos, asi que una entrega a mas
-            // de un ano vista le llegaba al modelo con un plazo mucho mas corto del real.
-            long dias = ChronoUnit.DAYS.between(LocalDate.now(), project.getDeadline());
-            prompt.append("Fecha de entrega: ").append(project.getDeadline())
-                    .append(dias >= 0 ? " (quedan unos " + dias + " dias)" : " (ya vencida)")
-                    .append('\n');
-
-            // Cuantas iteraciones caben de verdad. Saberlo le da la escala del plan: si
-            // solo hay dos, no tiene sentido proponer trabajo para medio curso.
-            int iteraciones = aiTaskScheduler.sprintsOf(
-                    aiTaskScheduler.resolveWindow(project.getStartDate(), project.getDeadline()),
-                    project.getSprintDays()).size();
-            prompt.append("El trabajo se repartira en ").append(iteraciones)
-                    .append(iteraciones == 1 ? " iteracion" : " iteraciones").append('\n');
+        prompt.append("\nSPRINTS\n");
+        if (fixedSprints != null) {
+            prompt.append("Son fijos: usa exactamente estos numeros y fechas, no crees otros.\n");
+            for (int i = 0; i < fixedSprints.size(); i++) {
+                AiTaskScheduler.Window sprint = fixedSprints.get(i);
+                prompt.append("- Sprint ").append(i + 1).append(": ").append(sprint.start())
+                      .append(" a ").append(sprint.end()).append(" · capacidad: ")
+                      .append(team.members().stream()
+                              .map(member -> member.name() + " " + plano(member.capacityFor(sprint.days())) + " h")
+                              .collect(Collectors.joining(", ")))
+                      .append('\n');
+            }
+        } else {
+            prompt.append("No hay fecha de entrega fijada: pon en \"resumen.num_sprints\" cuantos hacen falta ")
+                  .append("(entre 1 y ").append(MAX_SPRINTS).append("). Empiezan el ").append(start)
+                  .append(" y cada uno dura ").append(sprintDays).append(" dias.\n");
         }
 
-        List<TeamMember> reparto = (people != null && people > 0 && people < members.size())
-                ? members.subList(0, people)
-                : members;
+        prompt.append("\nEQUIPO (").append(team.members().size())
+              .append(team.members().size() == 1 ? " persona)\n" : " personas)\n");
+        for (PlanTeam.Member member : team.members()) {
+            prompt.append("- ").append(member.name());
+            if (member.leader()) prompt.append(" (lider)");
+            prompt.append(" | ").append(member.hoursPerWeek()).append(" h/semana");
+            if (fixedSprints == null) {
+                prompt.append(" (capacidad por sprint: ").append(plano(member.capacityFor(sprintDays))).append(" h)");
+            }
+            prompt.append(" | preferencias: ")
+                  .append(member.preferences().isBlank() ? "ninguna" : member.preferences().replace('\n', ' '))
+                  .append('\n');
+        }
 
-        prompt.append("\n## EL EQUIPO (").append(reparto.size())
-              .append(reparto.size() == 1 ? " persona)\n" : " personas)\n");
-        appendTeam(prompt, reparto);
-
-        if (indications != null && !indications.isBlank()) {
-            // Su propio apartado, y nombrado como lo que es: el prompt de sistema
-            // le da mas peso que a la ficha de cada persona, y para poder aplicar
-            // esa regla el modelo tiene que ver cual es cual.
-            prompt.append("\n## INDICACIONES SOLO PARA ESTE REPARTO\n")
-                  .append("Mandan sobre la ficha de cada persona, pero no sobre una prohibicion suya.\n")
-                  .append(indications).append('\n');
+        if (indications != null) {
+            prompt.append("\nINDICACIONES ADICIONALES (solo para este plan)\n").append(indications).append('\n');
         }
 
         if (!existing.isEmpty()) {
-            prompt.append("\n## YA ESTA EN EL TABLERO (no lo repitas)\n");
+            prompt.append("\nYA ESTA EN EL TABLERO (no lo repitas)\n");
             existing.forEach(task -> prompt.append("- ").append(task.getTitle()).append('\n'));
         }
 
-        prompt.append("\n## DOCUMENTO DE LA ACTIVIDAD\n").append(text).append('\n');
-
-        prompt.append("\n## LO QUE TIENES QUE DEVOLVER\n")
-              .append("Como maximo ").append(properties.getMaxTasks())
-              .append(" tareas, en el orden en que hay que hacerlas, que cubran el documento entero, ")
-              .append("cada una asignada a una de las ").append(reparto.size())
-              .append(" personas de arriba y con una frase de por que es esa persona. Solo ")
-              .append("entregables del documento: ni reuniones ni planificaciones ni titulos genericos.");
-
+        prompt.append("\nDOCUMENTO DEL PROYECTO\n").append(text).append('\n');
         return prompt.toString();
     }
 
-    /**
-     * Quien es cada cual, con su ficha si la tiene.
-     *
-     * <p>A quien no tenga nada escrito se le dice explicitamente que no hay ficha,
-     * en vez de listarlo a secas: callarlo hace que el modelo lo lea como «de este
-     * no hay nada que contar» y acabe dandole solo las sobras. Diciendolo, entiende
-     * que es una persona valida para cualquier tarea y no un comodin de segunda.</p>
-     */
-    private void appendTeam(StringBuilder prompt, List<TeamMember> members) {
-        for (TeamMember member : members) {
-            prompt.append("\n### ").append(member.getUser().getFullName()).append('\n');
-            String notes = member.getPlanNotes();
-            if (notes != null && !notes.isBlank()) {
-                prompt.append("Ficha: ").append(notes.strip().replace('\n', ' ')).append('\n');
-            } else {
-                prompt.append("Ficha: sin indicaciones. Puede encargarse de cualquier cosa.\n");
-            }
+    private static String plano(BigDecimal value) {
+        return value.stripTrailingZeros().toPlainString();
+    }
+
+    // ---------------------------------------------------------------------
+    // Interpretar la respuesta
+    // ---------------------------------------------------------------------
+
+    /** Lo que se pudo leer de una respuesta, todavia sin fechas ni personas resueltas. */
+    record ParsedPlan(List<ProposedTask> tasks, Integer durationWeeks, Integer numSprints,
+                      Map<Integer, String> goals, List<String> warnings) {
+    }
+
+    /** La respuesta no es un plan: se le devuelve al modelo como error a corregir. */
+    static class InvalidPlanException extends RuntimeException {
+        InvalidPlanException(String message) {
+            super(message);
         }
     }
 
     /**
-     * Tareas propuestas, mas las fechas/duracion de sprint que el documento
-     * menciona y a quien hay que dejar fuera del reparto esta vez, si las
-     * indicaciones lo piden. "excluded" son los nombres tal cual los da el
-     * modelo, todavia sin resolver contra el equipo real.
+     * Lee el JSON del modelo. Se aceptan las claves en espanol que pide el prompt y
+     * sus equivalentes en ingles, porque un modelo pequeno las cambia a veces; lo
+     * que no se acepta es algo sin lista de tareas.
      */
-    private record ParsedResponse(
-            List<ProposedTask> tasks, AiPlanResponse.SuggestedSchedule schedule, List<String> excluded) {
-    }
-
-    /**
-     * El modelo devuelve JSON, pero no siempre con la forma pedida: se acepta tanto
-     * {"tasks":[...]} como un array suelto, y se descarta lo que no sea utilizable.
-     */
-    private ParsedResponse parse(String content) {
+    ParsedPlan parse(String content) {
+        JsonNode root;
         try {
-            JsonNode root = objectMapper.readTree(content);
-            JsonNode array = root.isArray() ? root : root.path("tasks");
-            if (!array.isArray()) {
-                array = root.path("tareas");
-            }
-            if (!array.isArray()) {
-                throw new AiUnavailableException("El modelo no ha devuelto una lista de tareas");
-            }
-
-            List<ProposedTask> tasks = new ArrayList<>();
-            for (JsonNode node : array) {
-                String title = node.path("title").asText(node.path("titulo").asText("")).trim();
-                if (title.isBlank()) continue;
-
-                tasks.add(new ProposedTask(
-                        title.length() > 200 ? title.substring(0, 200) : title,
-                        text(node, "reason", "motivo", 300),
-                        type(node.path("type").asText(node.path("tipo").asText(""))),
-                        priority(node.path("priority").asText(node.path("prioridad").asText(""))),
-                        hours(node),
-                        null,
-                        null,
-                        text(node, "assignee", "asignado", 150),
-                        // Lo que el modelo alega para esa persona. Es provisional: si el
-                        // reparto acaba cambiando de duena la tarea, WorkloadBalancer lo
-                        // sustituye por el motivo de verdad.
-                        text(node, "why", "porque", 300),
-                        names(node.path("avoid"))));
-
-                if (tasks.size() >= properties.getMaxTasks()) break;
-            }
-            // Un array suelto (sin objeto raiz) no puede traer "schedule" ni "excluded": no hay donde leerlos.
-            return new ParsedResponse(
-                    tasks,
-                    root.isArray() ? null : schedule(root.path("schedule")),
-                    root.isArray() ? List.of() : names(root.path("excluded")));
-
-        } catch (AiUnavailableException ex) {
-            throw ex;
+            root = objectMapper.readTree(content == null ? "" : content);
         } catch (Exception ex) {
-            log.warn("Respuesta del modelo no interpretable: {}", abbreviate(content));
-            throw new AiUnavailableException(
-                    "El modelo ha respondido algo que no se ha podido interpretar. Vuelve a intentarlo.", ex);
+            throw new InvalidPlanException("La respuesta no era JSON valido. Responde solo con el objeto JSON.");
         }
-    }
-
-    private String text(JsonNode node, String field, String alias, int max) {
-        String value = node.path(field).asText(node.path(alias).asText("")).trim();
-        if (value.isBlank()) return null;
-        return value.length() > max ? value.substring(0, max) : value;
-    }
-
-    private TaskPriority priority(String raw) {
-        if (raw == null || raw.isBlank()) return TaskPriority.MEDIA;
-        try {
-            return TaskPriority.valueOf(raw.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            return TaskPriority.MEDIA;
-        }
-    }
-
-    /** Si el modelo no dice el tipo o inventa uno que no existe, se deja en blanco: se lee como TAREA. */
-    private TaskType type(String raw) {
-        if (raw == null || raw.isBlank()) return null;
-        try {
-            return TaskType.valueOf(raw.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
-    }
-
-    private BigDecimal hours(JsonNode node) {
-        JsonNode value = node.has("estimatedHours") ? node.path("estimatedHours") : node.path("horas");
-        if (value.isMissingNode() || value.isNull()) return null;
-        double hours = value.asDouble(0);
-        if (hours <= 0 || hours > 100) return null;
-        return BigDecimal.valueOf(hours);
-    }
-
-    /**
-     * A diferencia de tipo o prioridad, aqui no hay un valor por defecto seguro:
-     * una fecha inventada es activamente enganosa, asi que cualquier cosa que no
-     * se pueda interpretar con confianza se deja en null en vez de adivinar.
-     */
-    private AiPlanResponse.SuggestedSchedule schedule(JsonNode node) {
-        if (node == null || node.isMissingNode() || node.isNull()) {
-            return null;
-        }
-        LocalDate startDate = date(node, "startDate", "fechaInicio");
-        LocalDate deadline = date(node, "deadline", "fechaEntrega");
-
-        Ventana ventana = alCalendarioActual(startDate, deadline);
-        return new AiPlanResponse.SuggestedSchedule(ventana.inicio(), ventana.entrega(), sprintDays(node));
-    }
-
-    /** Fechas del proyecto ya llevadas al calendario en curso. Cualquiera de las dos puede faltar. */
-    private record Ventana(LocalDate inicio, LocalDate entrega) {
-    }
-
-    /**
-     * Corrige el ano de las fechas que propone el modelo.
-     *
-     * <p>El dia y el mes salen del enunciado («entregar el 16 de diciembre»), pero
-     * el ano lo pone el modelo de su cosecha y un modelo pequeno tira del curso que
-     * vio al entrenarse, asi que propone un plazo ya vencido. Descartarlo sin mas
-     * perderia lo unico que el documento si dice; en su lugar se adelanta en anos
-     * enteros hasta caer en el futuro, que es lo que el usuario quiere decir cuando
-     * escribe una fecha sin ano.</p>
-     *
-     * <p>El desplazamiento se calcula una sola vez y se aplica a las dos fechas para
-     * no romper el intervalo: un curso que va de diciembre a enero cruza el cambio
-     * de ano, y moverlas por separado dejaria la entrega antes del inicio.</p>
-     */
-    private Ventana alCalendarioActual(LocalDate inicio, LocalDate entrega) {
-        LocalDate hoy = LocalDate.now();
-        LocalDate referencia = entrega != null ? entrega : inicio;
-        if (referencia == null) {
-            return new Ventana(null, null);
+        JsonNode array = root == null ? null : root.isArray() ? root : first(root, "tareas", "tasks");
+        if (array == null || !array.isArray()) {
+            throw new InvalidPlanException("La respuesta no tenia la lista \"tareas\". Usa exactamente la forma pedida.");
         }
 
-        int anos = 0;
-        while (referencia.plusYears(anos).isBefore(hoy)) {
-            anos++;
-        }
-        if (anos > 0) {
-            log.debug("IA: fechas propuestas en un curso ya pasado, adelantadas {} ano(s)", anos);
+        List<ProposedTask> tasks = new ArrayList<>();
+        for (JsonNode node : array) {
+            String title = text(node, 200, "titulo", "title");
+            if (title == null) continue;
+
+            tasks.add(new ProposedTask(
+                    title,
+                    text(node, 2000, "descripcion", "description"),
+                    text(node, 500, "motivo", "reason"),
+                    type(text(node, 40, "tipo", "type")),
+                    text(node, 100, "epica", "epic"),
+                    integer(first(node, "sprint")),
+                    priority(text(node, 20, "prioridad", "priority")),
+                    hours(first(node, "horas", "estimatedHours", "hours")),
+                    null,
+                    null,
+                    text(node, 150, "asignado", "assignee"),
+                    names(first(node, "depende_de", "dependsOn"))));
+
+            if (tasks.size() >= properties.getMaxTasks()) break;
         }
 
-        LocalDate nuevoInicio = inicio == null ? null : inicio.plusYears(anos);
-        LocalDate nuevaEntrega = entrega == null ? null : entrega.plusYears(anos);
-
-        // Si aun asi la entrega no queda despues del inicio, la pareja no describe
-        // ninguna ventana de trabajo y la fecha de inicio es la que sobra.
-        if (nuevoInicio != null && nuevaEntrega != null && !nuevaEntrega.isAfter(nuevoInicio)) {
-            return new Ventana(null, nuevaEntrega);
+        JsonNode resumen = root.isArray() ? null : first(root, "resumen", "summary");
+        Map<Integer, String> goals = new HashMap<>();
+        JsonNode sprints = root.isArray() ? null : first(root, "sprints");
+        if (sprints != null && sprints.isArray()) {
+            for (JsonNode sprint : sprints) {
+                Integer numero = integer(first(sprint, "numero", "number"));
+                String objetivo = text(sprint, 300, "objetivo", "goal");
+                if (numero != null && objetivo != null) goals.put(numero, objetivo);
+            }
         }
-        return new Ventana(nuevoInicio, nuevaEntrega);
+
+        return new ParsedPlan(
+                tasks,
+                resumen == null ? null : integer(first(resumen, "duracion_semanas", "durationWeeks")),
+                resumen == null ? null : integer(first(resumen, "num_sprints", "numSprints")),
+                goals,
+                root.isArray() ? List.of() : names(first(root, "avisos", "warnings")));
     }
 
-    private LocalDate date(JsonNode node, String field, String alias) {
-        String raw = node.path(field).asText(node.path(alias).asText("")).trim();
-        if (raw.isBlank()) return null;
-        try {
-            return LocalDate.parse(raw);
-        } catch (DateTimeParseException ex) {
-            log.debug("IA: fecha de planificacion no interpretable, se ignora: {}", raw);
-            return null;
+    /** El primer campo presente de los que se le pasan, o null. */
+    private static JsonNode first(JsonNode node, String... fields) {
+        for (String field : fields) {
+            JsonNode value = node.get(field);
+            if (value != null && !value.isNull() && !value.isMissingNode()) return value;
         }
+        return null;
     }
 
-    /** Lo que dura un sprint de verdad: de una a cuatro semanas. */
-    private static final int MIN_SPRINT_DAYS = 7;
-    private static final int MAX_SPRINT_DAYS = 28;
-
-    /**
-     * Una iteracion de dos meses no es un sprint, es el proyecto entero: el modelo
-     * confunde a menudo la duracion del sprint con la del trabajo y devuelve cosas
-     * como 56 o 90 dias. Fuera del rango razonable se ignora, y el plan se queda
-     * con la duracion que ya tuviera el workspace (o las dos semanas por defecto).
-     */
-    private Integer sprintDays(JsonNode node) {
-        JsonNode value = node.has("sprintDays") ? node.path("sprintDays") : node.path("duracionSprint");
-        if (value.isMissingNode() || value.isNull()) return null;
-        int days = value.asInt(0);
-        if (days < MIN_SPRINT_DAYS || days > MAX_SPRINT_DAYS) {
-            log.debug("IA: duracion de sprint fuera de rango ({} dias), se ignora", days);
-            return null;
-        }
-        return days;
+    private static String text(JsonNode node, int max, String... fields) {
+        JsonNode value = first(node, fields);
+        if (value == null || value.isContainerNode()) return null;
+        String limpio = value.asText("").strip();
+        if (limpio.isBlank()) return null;
+        return limpio.length() > max ? limpio.substring(0, max) : limpio;
     }
 
-    /**
-     * Una lista de nombres del modelo, tal cual: sin resolver contra el equipo
-     * real, que es cosa de {@link #plan} y de {@link WorkloadBalancer}.
-     *
-     * <p>La usan los dos sitios donde el modelo nombra personas: a quien dejar
-     * fuera del reparto entero ("excluded") y a quien no debe tocarle una tarea
-     * concreta ("avoid").</p>
-     */
-    private List<String> names(JsonNode node) {
-        if (!node.isArray()) return List.of();
+    /** Un numero, venga como numero o como texto ("Sprint 2", "4h"). */
+    private static Integer integer(JsonNode value) {
+        if (value == null) return null;
+        if (value.isNumber()) return value.asInt();
+        String digitos = value.asText("").replaceAll("[^0-9]", "");
+        if (digitos.isEmpty() || digitos.length() > 6) return null;
+        return Integer.parseInt(digitos);
+    }
+
+    private static BigDecimal hours(JsonNode value) {
+        if (value == null) return null;
+        double horas;
+        if (value.isNumber()) {
+            horas = value.asDouble();
+        } else {
+            String limpio = value.asText("").replace(',', '.').replaceAll("[^0-9.]", "");
+            try {
+                horas = limpio.isEmpty() ? 0 : Double.parseDouble(limpio);
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+        if (horas <= 0 || horas > 100) return null;
+        return BigDecimal.valueOf(horas).stripTrailingZeros();
+    }
+
+    /** "Alta", "ALTA" o "alta" son lo mismo. Lo que no se entiende, media. */
+    private static TaskPriority priority(String raw) {
+        String valor = TextNormalizer.plain(raw);
+        if (valor.startsWith("crit")) return TaskPriority.CRITICA;
+        if (valor.startsWith("alt") || valor.startsWith("high")) return TaskPriority.ALTA;
+        if (valor.startsWith("baj") || valor.startsWith("low")) return TaskPriority.BAJA;
+        return TaskPriority.MEDIA;
+    }
+
+    /** "Historia de usuario", "Tarea", "Bug"... Si no se entiende, se deja en blanco: se lee como TAREA. */
+    private static TaskType type(String raw) {
+        String valor = TextNormalizer.plain(raw);
+        if (valor.startsWith("historia") || valor.startsWith("story")) return TaskType.HISTORIA;
+        if (valor.startsWith("tarea") || valor.startsWith("task")) return TaskType.TAREA;
+        if (valor.startsWith("bug")) return TaskType.BUG;
+        if (valor.startsWith("epica") || valor.startsWith("epic")) return TaskType.EPICA;
+        if (valor.startsWith("incidencia")) return TaskType.INCIDENCIA;
+        return null;
+    }
+
+    /** Una lista de textos del modelo, sin los vacios. */
+    private static List<String> names(JsonNode node) {
+        if (node == null || !node.isArray()) return List.of();
         List<String> names = new ArrayList<>();
         for (JsonNode item : node) {
-            String name = item.asText("").trim();
-            if (!name.isBlank()) names.add(name);
+            String value = item.isTextual() ? item.asText("").strip() : item.toString();
+            if (!value.isBlank()) names.add(value);
         }
         return names;
     }
 
-    private String abbreviate(String value) {
+    private static String abbreviate(String value) {
         if (value == null) return "";
         return value.length() <= 300 ? value : value.substring(0, 300) + "…";
     }

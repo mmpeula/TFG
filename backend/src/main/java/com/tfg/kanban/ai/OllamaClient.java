@@ -54,7 +54,15 @@ public class OllamaClient {
 
     /** Devuelve el contenido del mensaje del modelo, que se espera que sea JSON. */
     public String chatJson(String systemPrompt, String userPrompt) {
-        return chat(systemPrompt, List.of(new Message("user", userPrompt)), true, properties.getTemperature());
+        return chatJson(systemPrompt, List.of(new Message("user", userPrompt)));
+    }
+
+    /**
+     * Igual, pero con varios turnos: es como se le pide que corrija un plan, con
+     * su respuesta anterior y los errores que tiene a continuacion.
+     */
+    public String chatJson(String systemPrompt, List<Message> messages) {
+        return chat(systemPrompt, messages, true, properties.getTemperature());
     }
 
     /**
@@ -79,7 +87,7 @@ public class OllamaClient {
         Map<String, Object> body = new LinkedHashMap<>(Map.of(
                 "model", properties.getModel(),
                 "stream", false,
-                "options", Map.of("temperature", temperature),
+                "options", Map.of("temperature", temperature, "num_ctx", properties.getNumCtx()),
                 "messages", turns));
         if (json) {
             body.put("format", "json");

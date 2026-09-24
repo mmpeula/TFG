@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Skeleton } from '@/components/ui/Skeleton'
 import styles from './PlanScreen.module.css'
-import { useBoard, useProjectBoards, useTeamMembers, useWorkspace } from '@/hooks/useData'
+import { useBoard, useProjectBoards, useTaskMutations, useTeamMembers, useWorkspace } from '@/hooks/useData'
 import { buildPlan, DEFAULT_SPRINT_DAYS, isoDate, sprintRange, type Sprint } from '@/lib/sprints'
 import { STATE_COLORS } from '@/lib/planStatus'
 import { canWrite } from '@/lib/roles'
@@ -69,6 +69,7 @@ export function PlanScreen() {
   const { data: boards, isPending: loadingBoards } = useProjectBoards(workspaceId)
   const { data: detail, isPending } = useBoard(boards?.[0]?.id)
   const { data: members } = useTeamMembers(workspace?.teamId)
+  const taskMutations = useTaskMutations(boards?.[0]?.id, workspaceId)
 
   // El alcance elegido se recuerda: nadie quiere volver a fijarlo cada vez.
   const [scope, setScope] = useState<'mine' | 'team'>(
@@ -189,7 +190,13 @@ export function PlanScreen() {
           ) : (
             <div className={styles.sprints}>
               {sprintsVisibles.map((sprint) => (
-                <SprintColumn key={sprint.number} sprint={sprint} onOpen={setOpenTask} />
+                <SprintColumn
+                  key={sprint.number}
+                  sprint={sprint}
+                  canWrite={writable}
+                  onOpen={setOpenTask}
+                  onDelete={(task) => taskMutations.remove.mutate(task.id)}
+                />
               ))}
             </div>
           )}
@@ -209,7 +216,9 @@ export function PlanScreen() {
                     task={item.task}
                     done={item.state === 'terminada'}
                     state={STATE_COLORS[item.state]}
+                    canWrite={writable}
                     onOpen={setOpenTask}
+                    onDelete={(task) => taskMutations.remove.mutate(task.id)}
                   />
                 ))}
               </div>
@@ -242,7 +251,14 @@ function columnsOf(columns?: ColumnResponse[]): ColumnResponse[] {
  * estado. Los contadores salen de las mismas listas que se pintan, asi que no
  * pueden discrepar de lo que se ve.
  */
-function SprintColumn({ sprint, onOpen }: { sprint: Sprint; onOpen: (task: TaskResponse) => void }) {
+function SprintColumn({
+  sprint, canWrite, onOpen, onDelete,
+}: {
+  sprint: Sprint
+  canWrite: boolean
+  onOpen: (task: TaskResponse) => void
+  onDelete: (task: TaskResponse) => void
+}) {
   return (
     <section
       className={[styles.sprint, sprint.current && styles.currentSprint].filter(Boolean).join(' ')}
@@ -277,7 +293,9 @@ function SprintColumn({ sprint, onOpen }: { sprint: Sprint; onOpen: (task: TaskR
               task={item.task}
               done={item.state === 'terminada'}
               state={STATE_COLORS[item.state]}
+              canWrite={canWrite}
               onOpen={onOpen}
+              onDelete={onDelete}
             />
           ))}
         </div>
