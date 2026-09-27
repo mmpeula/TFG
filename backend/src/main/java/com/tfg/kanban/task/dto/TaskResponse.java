@@ -9,12 +9,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 
 @Schema(description = "Tarjeta del tablero", example = """
         {"id":7,"title":"Redactar la memoria","description":"Apartados 1 a 3","position":0,
          "type":"HISTORIA","priority":"ALTA","dueDate":"2026-12-01","estimatedHours":6.5,"aiGenerated":false,
          "columnId":11,"columnName":"En curso","boardId":3,"projectId":5,
-         "assignee":{"id":2,"fullName":"Luis Perez","email":"luis@uni.es"},
+         "assignees":[{"id":2,"fullName":"Luis Perez","email":"luis@uni.es"}],
          "createdBy":{"id":1,"fullName":"Ana Garcia","email":"ana@uni.es"},
          "commentCount":2,"attachmentCount":1,
          "createdAt":"2026-08-21T10:15:30Z","updatedAt":"2026-08-21T11:00:00Z"}
@@ -33,7 +34,7 @@ public record TaskResponse(
         String columnName,
         Long boardId,
         Long projectId,
-        UserSummary assignee,
+        @Schema(description = "Miembros del equipo responsables; vacio si no tiene ninguno") List<UserSummary> assignees,
         UserSummary createdBy,
         long commentCount,
         long attachmentCount,
@@ -49,7 +50,7 @@ public record TaskResponse(
                 task.getPriority(), task.getDueDate(), task.getEstimatedHours(), task.isAiGenerated(),
                 column.getId(), column.getName(), column.getBoard().getId(),
                 column.getBoard().getProject().getId(),
-                UserSummary.from(task.getAssignee()), UserSummary.from(task.getCreatedBy()),
+                UserSummary.fromAll(task.getAssignees()), UserSummary.from(task.getCreatedBy()),
                 commentCount, attachmentCount, task.getCreatedAt(), task.getUpdatedAt());
     }
 }

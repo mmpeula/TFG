@@ -33,10 +33,6 @@ public class UserService {
                 UserResponse::from);
     }
 
-    public UserResponse findById(Long id) {
-        return UserResponse.from(getUser(id));
-    }
-
     @Transactional
     public UserResponse update(Long id, UpdateUserRequest request) {
         User user = getUser(id);

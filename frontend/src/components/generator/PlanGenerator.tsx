@@ -5,18 +5,17 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Tag'
 import styles from './PlanGenerator.module.css'
-import type { MemberWorkload, PlannedSprint, ProposedTask, SuggestedSchedule, TeamMemberResponse } from '@/types/api'
+import type { MemberWorkload, PlannedSprint, ProposedTask, TeamMemberResponse } from '@/types/api'
 import type { PlanTeamDraft } from '@/state/context'
 import { PRIORITY_LABELS } from '@/lib/roles'
 import { typeOf } from '@/lib/taskTypes'
 import { formatDate } from '@/lib/format'
-import { SPRINT_DURATIONS } from '@/lib/sprints'
 
 export function PrivacyNote() {
   return (
     <p className={styles.privacy}>
-      El modelo corre en tu maquina: el enunciado, las tareas y las fechas de este workspace no salen
-      de ella y no se usa ningun servicio externo. Nada se escribe en el tablero sin que lo confirmes.
+      El enunciado, el equipo y las tareas se envian a Groq para generar el plan. Nada se escribe en
+      el tablero sin que lo confirmes.
     </p>
   )
 }
@@ -34,11 +33,12 @@ export function AiWorkbench({
   onFile,
   text,
   onText,
-  indications,
-  onIndications,
   startDate,
+  deadline,
   onStartDate,
+  onDeadline,
   workspaceStartDate,
+  workspaceDeadline,
   onGoToSettings,
   team,
   members,
@@ -56,18 +56,19 @@ export function AiWorkbench({
   /** Descripcion escrita a mano, alternativa al documento. */
   text: string
   onText: (text: string) => void
-  /** Indicaciones aparte de la fuente (documento, descripcion o guion guardado): a tener en cuenta, no a reemplazarla. */
-  indications: string
-  onIndications: (indications: string) => void
-  /** Fecha de inicio con la que se va a generar: la del workspace, o la elegida a mano. */
+  /** Fecha de inicio efectiva (del workspace o elegida a mano). Vacia si falta por rellenar. */
   startDate: string
-  onStartDate: (startDate: string) => void
+  /** Fecha de fin efectiva. Vacia si falta por rellenar. */
+  deadline: string
+  onStartDate: (value: string) => void
+  onDeadline: (value: string) => void
   /**
-   * Fecha de inicio del workspace, si la tiene. Con ella, el calendario entero
-   * (inicio y duracion del sprint) es automatico y no se pregunta nada; sin
-   * ella, hace falta un inicio a mano porque no hay de donde sacarlo.
+   * Fechas ya fijadas en el workspace. Con ambas, el calendario entero es
+   * automatico y no se pregunta nada; si falta alguna, se piden las dos aqui
+   * mismo, antes de poder generar (ver {@link DateFields}).
    */
   workspaceStartDate?: string | null
+  workspaceDeadline?: string | null
   onGoToSettings: () => void
   /** Todas las personas del equipo, incluidas o no en este reparto. undefined mientras carga. */
   team?: PlanTeamDraft[]
@@ -85,6 +86,7 @@ export function AiWorkbench({
   const sinFuente = !file && !text.trim() && !briefing.trim()
   const incluidos = team?.filter((person) => person.included) ?? []
   const sinEquipo = incluidos.length === 0
+  const sinFechas = !startDate || !deadline
 
   // Sin titulo propio: la pestana de arriba ya dice «Generar plan» y repetirlo
   // dentro de la tarjeta solo gasta la primera pantalla sin decir nada nuevo.
@@ -171,49 +173,23 @@ export function AiWorkbench({
           </p>
         )}
 
-        {/* El calendario es automatico siempre que se pueda: la fecha de inicio y la
-            duracion del sprint son las que ya tiene el workspace, sin preguntar nada.
-            Solo hace falta un dato a mano cuando de verdad falta —el workspace no
-            tiene fecha de inicio—, y basta con esa: cuantos sprints hacen falta y
-            donde acaba cada tarea lo reparte el modelo solo. */}
-        {workspaceStartDate ? (
+        {/* Las fechas son lo primero que hace falta resolver, antes de generar nada:
+            con las dos ya fijadas en el workspace el calendario es automatico; si
+            falta alguna, se piden aqui mismo y no se genera hasta tenerlas. */}
+        {workspaceStartDate && workspaceDeadline ? (
           <p className={styles.autoNote}>
             <CalendarDays size={13} strokeWidth={2.5} />
-            Calendario automatico: empieza el {formatDate(workspaceStartDate)}, con la duracion de
-            sprint del workspace.
+            Calendario automatico: de {formatDate(workspaceStartDate)} a {formatDate(workspaceDeadline)}, con
+            la duracion de sprint del workspace.
             <button type="button" className={styles.autoChange} onClick={onGoToSettings}>
               Cambiar en Ajustes
             </button>
           </p>
         ) : (
-          <label className={styles.label}>
-            Fecha de inicio <span className={styles.optional}>este workspace no tiene una fijada</span>
-            <input
-              type="date"
-              className={styles.input}
-              value={startDate}
-              onChange={(event) => event.target.value && onStartDate(event.target.value)}
-            />
-          </label>
+          <DateFields startDate={startDate} deadline={deadline} onStartDate={onStartDate} onDeadline={onDeadline} />
         )}
 
         <TeamEditor team={team} members={members} onTeam={onTeam} onSaveNotes={onSaveNotes} />
-
-        <label className={styles.label}>
-          Indicaciones para este reparto <span className={styles.optional}>opcional</span>
-          <input
-            className={styles.input}
-            value={indications}
-            placeholder="P. ej.: que Ana lleve menos carga esta semana, o que Luis se centre en el backend"
-            onChange={(event) => onIndications(event.target.value)}
-          />
-          {/* Lo dice aqui porque es justo la duda que produce tener dos campos de texto
-              parecidos uno encima del otro: este se olvida al generar, la ficha de
-              arriba se queda. */}
-          <span className={styles.optional}>
-            Solo valen para esta vez. Lo que sea siempre cierto de alguien va en su ficha, arriba.
-          </span>
-        </label>
 
         <div className={styles.contextFoot}>
           <span className={styles.note}>
@@ -224,7 +200,7 @@ export function AiWorkbench({
                 : `Se repartira entre ${incluidos.length} ${incluidos.length === 1 ? 'persona' : 'personas'}`}
           </span>
           <span className={styles.spacer} />
-          <Button onClick={onRun} disabled={running || loading || sinFuente || sinEquipo}>
+          <Button onClick={onRun} disabled={running || loading || sinFuente || sinEquipo || sinFechas}>
             {running ? 'Generando…' : 'Generar y repartir'}
           </Button>
         </div>
@@ -367,10 +343,13 @@ function TeamEditor({
   )
 }
 
-/** Reparto resultante: cuantas tareas y cuantas horas le tocan a cada persona. */
+/**
+ * Reparto resultante: cuantas tareas y horas le tocan a cada persona, contra las
+ * horas de las que dispone. La barra es cuanto de su tiempo ocupa, no cuanto
+ * lleva frente a los demas: quien tiene la mitad de horas debe llevar la mitad.
+ */
 export function WorkloadSummary({ workload }: { workload: MemberWorkload[] }) {
   if (workload.length === 0) return null
-  const max = Math.max(...workload.map((item) => item.hours), 1)
   // Si salen menos tareas que personas, alguien se queda a cero: mejor decirlo que
   // dejar una barra vacia sin explicacion.
   const sinTareas = workload.filter((item) => item.tasks === 0).length
@@ -379,17 +358,22 @@ export function WorkloadSummary({ workload }: { workload: MemberWorkload[] }) {
   return (
     <div className={styles.workload}>
       <span className={styles.workloadTitle}>Reparto del trabajo</span>
-      {workload.map((item) => (
-        <div key={item.memberId} className={styles.workloadRow}>
-          <span className={styles.workloadName}>{item.memberName}</span>
-          <span className={styles.workloadBar}>
-            <span className={styles.workloadFill} style={{ width: `${(item.hours / max) * 100}%` }} />
-          </span>
-          <span className={styles.workloadValue}>
-            {item.tasks} {item.tasks === 1 ? 'tarea' : 'tareas'} · {item.hours} h
-          </span>
-        </div>
-      ))}
+      {workload.map((item) => {
+        const pasado = item.hours > item.capacityHours
+        const uso = item.capacityHours > 0 ? Math.min(item.hours / item.capacityHours, 1) : pasado ? 1 : 0
+        return (
+          <div key={item.memberId} className={[styles.workloadRow, pasado && styles.workloadOver]
+            .filter(Boolean).join(' ')}>
+            <span className={styles.workloadName}>{item.memberName}</span>
+            <span className={styles.workloadBar}>
+              <span className={styles.workloadFill} style={{ width: `${uso * 100}%` }} />
+            </span>
+            <span className={styles.workloadValue}>
+              {item.tasks} {item.tasks === 1 ? 'tarea' : 'tareas'} · {item.hours} h de {item.capacityHours} h
+            </span>
+          </div>
+        )
+      })}
       {sinTareas > 0 && (
         <span className={styles.workloadNote}>
           {total < workload.length
@@ -401,45 +385,46 @@ export function WorkloadSummary({ workload }: { workload: MemberWorkload[] }) {
   )
 }
 
-/** «2 semanas» si encaja con las duraciones habituales; si no, los dias tal cual. */
-function sprintDaysLabel(days: number) {
-  return SPRINT_DURATIONS.find((option) => option.value === String(days))?.label ?? `${days} dias`
-}
-
 /**
- * Las fechas con las que se ha hecho el plan que no coinciden con las guardadas
- * en el workspace. Guardarlas hace que la pestana Plan pinte exactamente estos
- * sprints; si no, las tareas caerian entre dos.
+ * Fecha de inicio y de fin del plan, lo primero que hace falta resolver antes
+ * de poder generar nada: sin las dos, no se sabe entre que ventana repartir
+ * las tareas y habria que adivinar (y luego regenerar si la adivinanza
+ * fallaba, una segunda llamada entera al modelo). Siempre editables, aunque
+ * vengan prerellenas de lo detectado en el documento.
  */
-export function SuggestedScheduleCard({
-  schedule,
-  onApply,
-  applying,
-  applied,
+function DateFields({
+  startDate,
+  deadline,
+  onStartDate,
+  onDeadline,
 }: {
-  schedule: SuggestedSchedule
-  onApply: () => void
-  applying: boolean
-  applied: boolean
+  startDate: string
+  deadline: string
+  onStartDate: (value: string) => void
+  onDeadline: (value: string) => void
 }) {
-  const partes: string[] = []
-  if (schedule.startDate) partes.push(`empieza el ${formatDate(schedule.startDate)}`)
-  if (schedule.deadline) partes.push(`termina el ${formatDate(schedule.deadline)}`)
-  if (schedule.sprintDays) partes.push(`usa sprints de ${sprintDaysLabel(schedule.sprintDays)}`)
-  if (partes.length === 0) return null
-
   return (
-    <div className={styles.schedule}>
-      <span className={styles.scheduleIcon}>
-        <CalendarDays size={14} strokeWidth={2.75} />
-      </span>
-      <span className={styles.scheduleText}>
-        Este plan {partes.join(', ')}. Guardalo en el workspace para que la pestana Plan muestre los
-        mismos sprints.
-      </span>
-      <Button variant="secondary" small disabled={applying || applied} onClick={onApply}>
-        {applied ? 'Guardado' : applying ? 'Guardando…' : 'Guardar en el workspace'}
-      </Button>
+    <div className={styles.dates}>
+      <label className={styles.label}>
+        Fecha de inicio
+        <input
+          type="date"
+          className={styles.input}
+          value={startDate}
+          onChange={(event) => onStartDate(event.target.value)}
+        />
+        {!startDate && <span className={styles.dateMissing}>Falta la fecha de inicio</span>}
+      </label>
+      <label className={styles.label}>
+        Fecha de fin
+        <input
+          type="date"
+          className={styles.input}
+          value={deadline}
+          onChange={(event) => onDeadline(event.target.value)}
+        />
+        {!deadline && <span className={styles.dateMissing}>Falta la fecha de fin</span>}
+      </label>
     </div>
   )
 }
@@ -474,11 +459,11 @@ function ProposedTaskRow({
         </span>
         {task.reason && <span className={styles.rowReason}>{task.reason}</span>}
       </span>
-      {task.assigneeName && (
-        <Tag small variant={selected ? 'accent2' : 'neutral'}>
-          {task.assigneeName}
+      {task.assigneeNames.map((name) => (
+        <Tag key={name} small variant={selected ? 'accent2' : 'neutral'}>
+          {name}
         </Tag>
-      )}
+      ))}
       <span className={styles.estimate}>
         {task.estimatedHours ? `${task.estimatedHours} h` : ''}
         {task.priority ? ` · ${PRIORITY_LABELS[task.priority].toLowerCase()}` : ''}

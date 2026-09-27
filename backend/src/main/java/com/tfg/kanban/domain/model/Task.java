@@ -9,7 +9,9 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /** Tarjeta del tablero Kanban. Es la unidad de trabajo asignable a un miembro del equipo. */
 @Entity
@@ -19,7 +21,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"boardColumn", "assignee", "createdBy", "comments", "attachments"})
+@ToString(exclude = {"boardColumn", "assignees", "createdBy", "comments", "attachments"})
 @EqualsAndHashCode(of = "id")
 public class Task extends Auditable {
 
@@ -82,10 +84,17 @@ public class Task extends Auditable {
     @JoinColumn(name = "COLUMN_ID", nullable = false, foreignKey = @ForeignKey(name = "FK_TASKS_COLUMN"))
     private BoardColumn boardColumn;
 
-    /** Miembro del equipo responsable de la tarea (puede estar sin asignar). */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ASSIGNEE_ID", foreignKey = @ForeignKey(name = "FK_TASKS_ASSIGNEE"))
-    private User assignee;
+    /** Miembros del equipo responsables de la tarea (puede no tener ninguno). */
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "TASK_ASSIGNEES",
+            joinColumns = @JoinColumn(name = "TASK_ID", foreignKey = @ForeignKey(name = "FK_TASK_ASSIGNEES_TASK")),
+            inverseJoinColumns = @JoinColumn(name = "USER_ID",
+                    foreignKey = @ForeignKey(name = "FK_TASK_ASSIGNEES_USER")),
+            uniqueConstraints = @UniqueConstraint(name = "UQ_TASK_ASSIGNEES", columnNames = {"TASK_ID", "USER_ID"}))
+    @OrderBy("fullName ASC")
+    @Builder.Default
+    private Set<User> assignees = new LinkedHashSet<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "CREATED_BY_ID", foreignKey = @ForeignKey(name = "FK_TASKS_CREATOR"))

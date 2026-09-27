@@ -79,8 +79,8 @@ export function PlanTaskCard({ task, done, state, canWrite = true, onOpen, onDel
         </span>
 
         <span className={styles.foot}>
-          {task.assignee ? (
-            <Avatar user={task.assignee} size={20} />
+          {task.assignees.length > 0 ? (
+            task.assignees.map((assignee) => <Avatar key={assignee.id} user={assignee} size={20} />)
           ) : (
             <span className={styles.unassigned}>Sin asignar</span>
           )}

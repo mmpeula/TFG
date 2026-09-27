@@ -124,7 +124,9 @@ export function TaskCard({
         )}
 
         <footer className={styles.foot}>
-          <Avatar user={task.assignee} size={22} />
+          {task.assignees.length === 0
+            ? <Avatar size={22} />
+            : task.assignees.map((assignee) => <Avatar key={assignee.id} user={assignee} size={22} />)}
           {task.commentCount > 0 && (
             <span className={styles.stat}>
               <MessageSquare size={12} strokeWidth={2.75} />

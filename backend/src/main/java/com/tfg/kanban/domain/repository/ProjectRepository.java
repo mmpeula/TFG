@@ -9,6 +9,4 @@ import java.util.List;
 public interface ProjectRepository extends JpaRepository<Project, Long>, JpaSpecificationExecutor<Project> {
 
     List<Project> findByTeam_Id(Long teamId);
-
-    boolean existsByTeam_IdAndNameIgnoreCase(Long teamId, String name);
 }

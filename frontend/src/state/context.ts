@@ -29,11 +29,11 @@ export interface AuthValue {
 }
 
 /**
- * Generar una planificacion con el modelo local tarda: si dependiera de que
- * Generar plan siguiera montada, cambiar de pestana mientras piensa perderia el
- * resultado. Este contexto vive por encima de las rutas (junto a Auth/Ui) para
- * que la generacion siga aunque el usuario se vaya a mirar el tablero, y el
- * resultado (o el error) le espere cuando vuelva.
+ * Generar una planificacion con Groq tarda: si dependiera de que Generar plan
+ * siguiera montada, cambiar de pestana mientras piensa perderia el resultado.
+ * Este contexto vive por encima de las rutas (junto a Auth/Ui) para que la
+ * generacion siga aunque el usuario se vaya a mirar el tablero, y el resultado
+ * (o el error) le espere cuando vuelva.
  */
 export type PlanJobStatus = 'pending' | 'done' | 'error'
 
@@ -51,7 +51,7 @@ export interface PlanGenerateRequest {
   workspaceName: string
   file: File | null
   text: string
-  /** Calendario, equipo e indicaciones de esta generacion. */
+  /** Calendario y equipo de esta generacion. */
   options: PlanOptions
 }
 
@@ -80,22 +80,23 @@ export interface AssistantMessage {
 /**
  * Lo que hay escrito y elegido en la pantalla de Generar plan, por workspace.
  *
- * Vive fuera de la pantalla por lo mismo que la generacion: subir un documento,
- * escribir las indicaciones y luego pasarse al tablero a mirar algo no puede
- * costar tener que volver a subirlo todo. El fichero se guarda tal cual —es una
+ * Vive fuera de la pantalla por lo mismo que la generacion: subir un documento
+ * y luego pasarse al tablero a mirar algo no puede costar tener que volver a
+ * subirlo todo. El fichero se guarda tal cual —es una
  * referencia en memoria, sigue valiendo—; lo que no sobrevive es recargar la
  * pagina, y ahi no hay nada que hacer sin volver a elegirlo.
  */
 export interface PlanDraft {
   file: File | null
   text: string
-  indications: string
   /**
    * Fecha de inicio elegida a mano, solo para cuando el workspace no tiene una
    * propia. Si el workspace ya tiene fecha de inicio, esta se ignora: siempre
    * manda la del workspace.
    */
   startDate: string | null
+  /** Igual que {@link startDate}, pero la fecha de entrega. */
+  deadline: string | null
   /**
    * Quien entra en este reparto y con que datos. null es «todo el equipo con sus
    * valores por defecto»; en cuanto se toca algo, la lista completa.
@@ -105,7 +106,6 @@ export interface PlanDraft {
   selected: number[] | null
   /** Titulos de la ultima tanda llevada al tablero, para el resumen de confirmacion. */
   appliedTitles: string[] | null
-  scheduleApplied: boolean
 }
 
 /** Una fila del equipo en el formulario. `included` a false la deja fuera sin perder lo escrito. */
@@ -125,12 +125,11 @@ export interface PlanDraftsValue {
 export const EMPTY_PLAN_DRAFT: PlanDraft = {
   file: null,
   text: '',
-  indications: '',
   startDate: null,
+  deadline: null,
   team: null,
   selected: null,
   appliedTitles: null,
-  scheduleApplied: false,
 }
 
 export interface AssistantValue {

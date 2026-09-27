@@ -24,9 +24,8 @@ interface Props {
  * identidad del workspace, no hay motivo para posponerlos. Lo que si se pospone
  * son las fechas y la duracion del sprint, porque esas normalmente ya estan
  * escritas en el guion de la practica: se piden solo al editar, y al crear se
- * rellenan despues por dos caminos — al generar el plan se proponen solas si el
- * documento las dice (ver `SuggestedScheduleCard` en `GeneratePlanScreen`), o se
- * ajustan aqui mismo, en modo edicion, desde Ajustes.
+ * rellenan despues por dos caminos — se piden al generar el plan (ver
+ * `GeneratePlanScreen`), o se ajustan aqui mismo, en modo edicion, desde Ajustes.
  */
 export function WorkspaceFormModal({ open, workspace, isPending, onClose, onSubmit }: Props) {
   // El formulario solo existe mientras el dialogo esta abierto: asi se rellena al

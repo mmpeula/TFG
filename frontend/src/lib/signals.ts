@@ -82,7 +82,7 @@ export function deriveSignals(board?: BoardResponse): Signal[] {
   // 4. Tareas en curso sin responsable
   for (const column of workColumns) {
     for (const task of column.tasks ?? []) {
-      if (task.assignee) continue
+      if (task.assignees.length > 0) continue
       signals.push({
         id: `bloqueo-${task.id}`,
         kind: 'bloqueo',
@@ -111,7 +111,7 @@ export function taskBadge(task: TaskResponse, columns: ColumnResponse[]): string
   if (isWorkColumn) {
     const stale = daysSince(task.updatedAt ?? task.createdAt)
     if (stale >= DIAS_PARADA) return `${stale} d sin avance`
-    if (!task.assignee) return 'sin responsable'
+    if (task.assignees.length === 0) return 'sin responsable'
   }
   return undefined
 }

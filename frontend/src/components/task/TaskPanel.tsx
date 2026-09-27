@@ -4,6 +4,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Tag'
 import { Dropdown, DropdownItem } from '@/components/ui/Controls'
+import { AssigneePicker } from './AssigneePicker'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import styles from './TaskPanel.module.css'
 import {
@@ -60,7 +61,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
   const responsable = canManage(role)
 
   function patch(values: Partial<Pick<TaskResponse, 'title' | 'description' | 'type' | 'priority' | 'columnId'>> & {
-    assigneeId?: number | null
+    assigneeIds?: number[]
   }) {
     taskMutations.update.mutate({
       taskId: task!.id,
@@ -71,7 +72,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
         priority: values.priority ?? task!.priority,
         dueDate: task!.dueDate ?? null,
         estimatedHours: task!.estimatedHours ?? null,
-        assigneeId: values.assigneeId !== undefined ? values.assigneeId : (task!.assignee?.id ?? null),
+        assigneeIds: values.assigneeIds ?? task!.assignees.map((assignee) => assignee.id),
       },
     })
   }
@@ -127,39 +128,23 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
           />
 
           <div className={styles.props}>
-            <span className={styles.propLabel}>Responsable</span>
+            <span className={styles.propLabel}>Responsables</span>
             {writable ? (
-              <Dropdown
+              <AssigneePicker
+                members={members}
+                selected={task.assignees}
+                onChange={(assigneeIds) => patch({ assigneeIds })}
                 align="left"
-                trigger={({ toggle }) => (
-                  <button className={styles.propValue} onClick={toggle}>
-                    <Avatar user={task.assignee} size={20} />
-                    {task.assignee?.fullName ?? 'Sin asignar'}
-                  </button>
-                )}
-              >
-                {(close) => (
-                  <>
-                    <DropdownItem onClick={() => { close(); patch({ assigneeId: null }) }}>
-                      Sin asignar
-                    </DropdownItem>
-                    {members.map((member) => (
-                      <DropdownItem
-                        key={member.user.id}
-                        active={member.user.id === task.assignee?.id}
-                        onClick={() => { close(); patch({ assigneeId: member.user.id }) }}
-                      >
-                        <Avatar user={member.user} size={20} />
-                        {member.user.fullName}
-                      </DropdownItem>
-                    ))}
-                  </>
-                )}
-              </Dropdown>
+                className={styles.propValue}
+              />
             ) : (
               <span className={styles.propValue}>
-                <Avatar user={task.assignee} size={20} />
-                {task.assignee?.fullName ?? 'Sin asignar'}
+                {task.assignees.length === 0
+                  ? <Avatar size={20} />
+                  : task.assignees.map((assignee) => <Avatar key={assignee.id} user={assignee} size={20} />)}
+                {task.assignees.length === 0
+                  ? 'Sin asignar'
+                  : task.assignees.map((assignee) => assignee.fullName).join(', ')}
               </span>
             )}
 

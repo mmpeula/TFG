@@ -23,7 +23,7 @@
         <jjwt.version>0.13.0</jjwt.version>
         <jacoco.version>0.8.13</jacoco.version>
         <pdfbox.version>3.0.8</pdfbox.version>
-        <poi.version>5.5.1</poi.version>
+        <tika.version>3.0.0</tika.version>
         <!-- Umbrales minimos de cobertura: 80% exigido en lineas y ramas
              (ver scripts/qa.sh y .claude/agents/qa.md) -->
         <jacoco.line.coverage>0.80</jacoco.line.coverage>
@@ -100,16 +100,26 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Lectura del documento de la practica que se envia al modulo de IA -->
+        <!-- Lectura del documento de la practica que se envia al modulo de IA.
+             El PDF se lee con PDFBox (texto plano; un PDF no tiene tablas de
+             verdad que extraer, asi que Tika no aportaria nada ahi). El Word
+             (.docx) se lee con Tika a HTML: sus tablas si son estructura real
+             (<w:tbl> en el XML de Word), y Tika las convierte en <table> de
+             verdad, en vez del texto plano y aplanado que daba POI antes. -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
             <version>${pdfbox.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.poi</groupId>
-            <artifactId>poi-ooxml</artifactId>
-            <version>${poi.version}</version>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parser-microsoft-module</artifactId>
+            <version>${tika.version}</version>
         </dependency>
 
         <!-- Utilidades de desarrollo -->

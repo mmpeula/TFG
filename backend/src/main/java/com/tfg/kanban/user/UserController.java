@@ -40,21 +40,6 @@ public class UserController {
         return userService.search(search, pageable);
     }
 
-    @Operation(summary = "Obtener un usuario por id",
-            description = "La propia cuenta o, si es el administrador de la plataforma, cualquiera. "
-                    + "Los nombres y las caras del resto del equipo no salen de aqui sino de "
-                    + "/api/teams/{id}/members, que solo ve quien pertenece a ese equipo.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Usuario encontrado"),
-            @ApiResponse(responseCode = "403", description = "No es tu cuenta"),
-            @ApiResponse(responseCode = "404", description = "No existe")
-    })
-    @PreAuthorize("@access.isSelf(#id) or hasRole('ADMIN')")
-    @GetMapping("/{id}")
-    public UserResponse findById(@PathVariable Long id) {
-        return userService.findById(id);
-    }
-
     @Operation(summary = "Actualizar el perfil",
             description = "Solo el propio usuario o el administrador de la plataforma pueden modificar una cuenta.")
     @PreAuthorize("@access.isSelf(#id) or hasRole('ADMIN')")

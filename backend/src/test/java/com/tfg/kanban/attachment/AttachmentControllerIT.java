@@ -22,9 +22,9 @@ class AttachmentControllerIT extends AbstractApiIT {
     @DisplayName("Subir, listar, descargar y borrar un adjunto")
     void attachmentLifecycle() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo adjuntos");
-        Long projectId = createProject(responsable, teamId, "Practica adjuntos");
-        Long boardId = createBoard(responsable, projectId, "Tablero adjuntos");
+        Workspace workspace = createWorkspace(responsable, "Equipo adjuntos");
+        Long teamId = workspace.teamId();
+        Long boardId = workspace.boardId();
         Long taskId = createTask(responsable, columnIds(responsable, boardId)[0], "Tarea con adjunto");
 
         Long attachmentId = json(mockMvc.perform(multipart("/api/tasks/{id}/attachments", taskId)
@@ -54,9 +54,9 @@ class AttachmentControllerIT extends AbstractApiIT {
     @DisplayName("Se rechaza un tipo de fichero no permitido")
     void rejectsForbiddenContentType() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo tipos");
-        Long projectId = createProject(responsable, teamId, "Practica tipos");
-        Long boardId = createBoard(responsable, projectId, "Tablero tipos");
+        Workspace workspace = createWorkspace(responsable, "Equipo tipos");
+        Long teamId = workspace.teamId();
+        Long boardId = workspace.boardId();
         Long taskId = createTask(responsable, columnIds(responsable, boardId)[0], "Tarea tipos");
 
         MockMultipartFile executable = new MockMultipartFile("file", "virus.exe",
@@ -74,10 +74,10 @@ class AttachmentControllerIT extends AbstractApiIT {
     void observerCannotUpload() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser observador = registerUser(Role.DOCENTE);
-        Long teamId = createTeam(responsable, "Equipo adjuntos lectura");
+        Workspace workspace = createWorkspace(responsable, "Equipo adjuntos lectura");
+        Long teamId = workspace.teamId();
         addMember(responsable, teamId, observador, Role.DOCENTE);
-        Long projectId = createProject(responsable, teamId, "Practica adjuntos lectura");
-        Long boardId = createBoard(responsable, projectId, "Tablero adjuntos lectura");
+        Long boardId = workspace.boardId();
         Long taskId = createTask(responsable, columnIds(responsable, boardId)[0], "Tarea adjuntos lectura");
 
         mockMvc.perform(multipart("/api/tasks/{id}/attachments", taskId)

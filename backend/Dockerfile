@@ -28,7 +28,10 @@ RUN mkdir -p /app/uploads && chown -R kanban:kanban /app
 USER kanban
 
 EXPOSE 8080
-ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
+# preferIPv4Stack: sin esto, la JVM prueba primero la direccion IPv6 de Groq y,
+# en redes Docker sin salida IPv6 de verdad, la primera llamada falla o se hace
+# lenta antes de caer a IPv4.
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -Djava.net.preferIPv4Stack=true"
 ENV SPRING_PROFILES_ACTIVE=docker
 
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

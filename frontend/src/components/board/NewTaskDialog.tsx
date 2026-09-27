@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { AssigneePicker } from '@/components/task/AssigneePicker'
 import styles from './NewTaskDialog.module.css'
 import type { TaskPayload } from '@/api/endpoints'
 import { TASK_TYPES, TASK_TYPE_IDS } from '@/lib/taskTypes'
@@ -39,7 +40,7 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
   const [type, setType] = useState<TaskType>('TAREA')
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState('')
-  const [assigneeId, setAssigneeId] = useState('')
+  const [assigneeIds, setAssigneeIds] = useState<number[]>([])
   const [columnId, setColumnId] = useState(String(columns[0]?.id ?? ''))
 
   const valido = title.trim().length > 0 && columnId !== ''
@@ -51,7 +52,7 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
       type,
       description: description.trim() || undefined,
       dueDate: dueDate || null,
-      assigneeId: assigneeId ? Number(assigneeId) : null,
+      assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined,
     })
     onClose()
   }
@@ -128,19 +129,13 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
           </label>
 
           <label className={styles.label}>
-            Responsable <span className={styles.optional}>opcional</span>
-            <select
+            Responsables <span className={styles.optional}>opcional</span>
+            <AssigneePicker
+              members={members}
+              selected={members.filter((member) => assigneeIds.includes(member.user.id)).map((member) => member.user)}
+              onChange={setAssigneeIds}
               className={styles.input}
-              value={assigneeId}
-              onChange={(event) => setAssigneeId(event.target.value)}
-            >
-              <option value="">Sin asignar</option>
-              {members.map((member) => (
-                <option key={member.user.id} value={member.user.id}>
-                  {member.user.fullName}
-                </option>
-              ))}
-            </select>
+            />
           </label>
         </div>
 

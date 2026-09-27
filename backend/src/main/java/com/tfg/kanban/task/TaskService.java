@@ -20,7 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Tareas del tablero.
@@ -75,7 +78,7 @@ public class TaskService {
                 .dueDate(request.dueDate())
                 .estimatedHours(request.estimatedHours())
                 .boardColumn(column)
-                .assignee(resolveAssignee(column, request.assigneeId()))
+                .assignees(resolveAssignees(column, request.assigneeIds()))
                 .createdBy(creator)
                 .position((int) tasksInColumn)
                 .build();
@@ -90,7 +93,7 @@ public class TaskService {
     @Transactional
     public TaskResponse update(Long taskId, TaskRequest request) {
         Task task = getTask(taskId);
-        User previousAssignee = task.getAssignee();
+        Set<Long> previousIds = task.getAssignees().stream().map(User::getId).collect(Collectors.toSet());
 
         task.setTitle(request.title().trim());
         task.setDescription(request.description());
@@ -98,18 +101,19 @@ public class TaskService {
         task.setPriority(request.priority() == null ? TaskPriority.MEDIA : request.priority());
         task.setDueDate(request.dueDate());
         task.setEstimatedHours(request.estimatedHours());
-        task.setAssignee(resolveAssignee(task.getBoardColumn(), request.assigneeId()));
+        // Se muta la coleccion gestionada por Hibernate, no se reasigna: asi el
+        // @ManyToMany refleja el cambio sobre la misma referencia que observa.
+        task.getAssignees().clear();
+        task.getAssignees().addAll(resolveAssignees(task.getBoardColumn(), request.assigneeIds()));
 
         Project project = projectOf(task.getBoardColumn());
         activityService.record(project, ActivityAction.ACTUALIZACION, "Task", task.getId(),
                 "Actualizo la tarea '%s'".formatted(task.getTitle()));
 
-        if (!sameUser(previousAssignee, task.getAssignee())) {
+        Set<Long> newIds = task.getAssignees().stream().map(User::getId).collect(Collectors.toSet());
+        if (!previousIds.equals(newIds)) {
             activityService.record(project, ActivityAction.ASIGNACION, "Task", task.getId(),
-                    task.getAssignee() == null
-                            ? "Dejo sin asignar la tarea '%s'".formatted(task.getTitle())
-                            : "Asigno la tarea '%s' a %s".formatted(task.getTitle(),
-                                    task.getAssignee().getFullName()));
+                    assignmentMessage(task));
         }
 
         return taskMapper.toResponse(task);
@@ -182,17 +186,31 @@ public class TaskService {
         }
     }
 
-    /** Solo se puede asignar una tarea a alguien que pertenezca al equipo del proyecto. */
-    private User resolveAssignee(BoardColumn column, Long assigneeId) {
-        if (assigneeId == null) {
-            return null;
+    /** Solo se puede asignar una tarea a gente que pertenezca al equipo del proyecto. */
+    private Set<User> resolveAssignees(BoardColumn column, List<Long> assigneeIds) {
+        if (assigneeIds == null || assigneeIds.isEmpty()) {
+            return new LinkedHashSet<>();
         }
         Long teamId = projectOf(column).getTeam().getId();
-        if (!teamMemberRepository.existsByTeam_IdAndUser_Id(teamId, assigneeId)) {
-            throw new BusinessRuleException("El usuario asignado no pertenece al equipo del proyecto");
+        Set<Long> unicos = new LinkedHashSet<>(assigneeIds);
+        Set<User> resueltos = new LinkedHashSet<>();
+        for (Long id : unicos) {
+            if (!teamMemberRepository.existsByTeam_IdAndUser_Id(teamId, id)) {
+                throw new BusinessRuleException("El usuario asignado no pertenece al equipo del proyecto");
+            }
+            resueltos.add(userRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuario", id)));
         }
-        return userRepository.findById(assigneeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario", assigneeId));
+        return resueltos;
+    }
+
+    /** El mensaje de actividad segun cuantos responsables quedan tras el cambio. */
+    private String assignmentMessage(Task task) {
+        List<String> nombres = task.getAssignees().stream().map(User::getFullName).toList();
+        if (nombres.isEmpty()) {
+            return "Dejo sin asignar la tarea '%s'".formatted(task.getTitle());
+        }
+        return "Asigno la tarea '%s' a %s".formatted(task.getTitle(), String.join(", ", nombres));
     }
 
     private Project projectOf(BoardColumn column) {
@@ -203,13 +221,6 @@ public class TaskService {
         for (int i = 0; i < tasks.size(); i++) {
             tasks.get(i).setPosition(i);
         }
-    }
-
-    private boolean sameUser(User a, User b) {
-        if (a == null || b == null) {
-            return a == b;
-        }
-        return a.getId().equals(b.getId());
     }
 
 }

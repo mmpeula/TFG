@@ -1,14 +1,14 @@
 import { apiClient } from '@/lib/api-client'
 import type {
   ActivityLogResponse, AdminWorkspaceResponse, AiPlanResponse, AttachmentResponse, AuthResponse, BoardResponse,
-  ChatResponse, ChatTurn, ColumnResponse, CommentResponse, PageResponse,
+  ChatResponse, ChatTurn, ColumnResponse, CommentResponse, DetectedDateResponse, PageResponse,
   InvitationResponse, MyInvitationResponse,
   PlanOptions, ProjectResponse, Role, ProposedTask, TaskPriority, TaskResponse, TaskType, TeamMemberResponse,
   UserResponse, WorkspaceResponse,
 } from '@/types/api'
 
 /**
- * Generar un plan puede costar varias llamadas al modelo local: si el primero no
+ * Generar un plan puede costar varias llamadas a Groq: si el primero no
  * pasa la validacion, se le devuelve para que lo corrija hasta dos veces.
  */
 const PLAN_TIMEOUT = 600_000
@@ -51,7 +51,7 @@ export const workspaces = {
   ask: (workspaceId: number, message: string, history: ChatTurn[]) =>
     apiClient
       .post<ChatResponse>(`/workspaces/${workspaceId}/ai/chat`, { message, history }, {
-        // El modelo local tarda; el resto de llamadas no deberian esperar tanto.
+        // Generar un plan tarda; el resto de llamadas no deberian esperar tanto.
         timeout: 240000,
       })
       .then((r) => r.data),
@@ -78,8 +78,7 @@ export const teams = {
 
   /**
    * Lo que hay que tener en cuenta de esa persona al repartir. Se guarda
-   * y vale para todas las ejecuciones siguientes, al reves que las indicaciones
-   * que se escriben justo antes de generar un plan.
+   * y vale para todas las ejecuciones siguientes.
    */
   updateMemberNotes: (teamId: number, userId: number, planNotes: string) =>
     apiClient
@@ -89,7 +88,7 @@ export const teams = {
     apiClient.delete(`/teams/${teamId}/members/${userId}`).then(() => undefined),
 
   /** Invitar no mete a nadie: deja la invitacion pendiente y manda el correo. */
-  invite: (teamId: number, payload: { email: string; role: Role }) =>
+  invite: (teamId: number, payload: { email: string }) =>
     apiClient.post<InvitationResponse>(`/teams/${teamId}/invitations`, payload).then((r) => r.data),
   invitations: (teamId: number) =>
     apiClient.get<InvitationResponse[]>(`/teams/${teamId}/invitations`).then((r) => r.data),
@@ -135,7 +134,7 @@ export const projects = {
     apiClient
       .get<PageResponse<ActivityLogResponse>>(`/projects/${projectId}/activity`, { params: { size: 30 } })
       .then((r) => r.data),
-  /** Pide al modelo local un plan a partir del guion guardado. No toca el tablero. */
+  /** Pide a Groq un plan a partir del guion guardado. No toca el tablero. */
   aiPlan: (projectId: number, options: PlanOptions) =>
     apiClient
       .post<AiPlanResponse>(`/projects/${projectId}/ai-plan`, options, { timeout: PLAN_TIMEOUT })
@@ -159,6 +158,16 @@ export const projects = {
     apiClient
       .post<TaskResponse[]>(`/projects/${projectId}/ai-plan/apply`, { boardId, tasks })
       .then((r) => r.data),
+  /** Busca una fecha de inicio en el documento sin generar nada: no llama a Groq. */
+  detectStartDate: (projectId: number, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiClient
+      .post<DetectedDateResponse>(`/projects/${projectId}/ai-plan/detect-start-date`, form, {
+        headers: { 'Content-Type': undefined },
+      })
+      .then((r) => r.data)
+  },
 }
 
 export const boards = {
@@ -180,7 +189,7 @@ export interface TaskPayload {
   priority?: TaskPriority
   dueDate?: string | null
   estimatedHours?: number | null
-  assigneeId?: number | null
+  assigneeIds?: number[]
 }
 
 export const tasks = {

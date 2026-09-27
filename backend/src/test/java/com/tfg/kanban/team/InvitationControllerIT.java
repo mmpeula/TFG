@@ -32,7 +32,8 @@ class InvitationControllerIT extends AbstractApiIT {
     void theInvitedOneJoinsOnlyAfterAccepting() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser invitado = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Grupo con invitaciones");
+        Workspace workspace = createWorkspace(responsable, "Grupo con invitaciones");
+        Long teamId = workspace.teamId();
 
         invitar(responsable, teamId, invitado, Role.MIEMBRO);
 
@@ -44,7 +45,7 @@ class InvitationControllerIT extends AbstractApiIT {
                 .andExpect(jsonPath("$[0].status").value("PENDIENTE"));
 
         // Y el invitado todavia no ve el equipo.
-        mockMvc.perform(authorized(get("/api/teams/{id}", teamId), invitado))
+        mockMvc.perform(authorized(get("/api/teams/{id}/members", teamId), invitado))
                 .andExpect(status().isForbidden());
 
         String token = json(mockMvc.perform(authorized(get("/api/invitations/mine"), invitado))
@@ -66,7 +67,8 @@ class InvitationControllerIT extends AbstractApiIT {
     @DisplayName("Invitar a un email sin cuenta responde 404 explicando que no existe")
     void unknownEmailIsReported() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Grupo 4");
+        Workspace workspace = createWorkspace(responsable, "Grupo 4");
+        Long teamId = workspace.teamId();
 
         mockMvc.perform(authorized(post("/api/teams/{id}/invitations", teamId), responsable)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -81,7 +83,8 @@ class InvitationControllerIT extends AbstractApiIT {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
         TestUser otro = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Grupo 4");
+        Workspace workspace = createWorkspace(responsable, "Grupo 4");
+        Long teamId = workspace.teamId();
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
 
         mockMvc.perform(authorized(post("/api/teams/{id}/invitations", teamId), miembro)
@@ -96,7 +99,8 @@ class InvitationControllerIT extends AbstractApiIT {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser invitado = registerUser(Role.MIEMBRO);
         TestUser curioso = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Grupo 4");
+        Workspace workspace = createWorkspace(responsable, "Grupo 4");
+        Long teamId = workspace.teamId();
         invitar(responsable, teamId, invitado, Role.MIEMBRO);
 
         String token = json(mockMvc.perform(authorized(get("/api/invitations/mine"), invitado)).andReturn())
@@ -113,7 +117,8 @@ class InvitationControllerIT extends AbstractApiIT {
     void theResponsableCanCancel() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser invitado = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Grupo 4");
+        Workspace workspace = createWorkspace(responsable, "Grupo 4");
+        Long teamId = workspace.teamId();
         String id = invitar(responsable, teamId, invitado, Role.MIEMBRO);
 
         mockMvc.perform(authorized(delete("/api/teams/{id}/invitations/{inv}", teamId, id), responsable))
@@ -128,7 +133,8 @@ class InvitationControllerIT extends AbstractApiIT {
     void cannotInviteTwiceWhilePending() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser invitado = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Grupo 4");
+        Workspace workspace = createWorkspace(responsable, "Grupo 4");
+        Long teamId = workspace.teamId();
         invitar(responsable, teamId, invitado, Role.MIEMBRO);
 
         mockMvc.perform(authorized(post("/api/teams/{id}/invitations", teamId), responsable)

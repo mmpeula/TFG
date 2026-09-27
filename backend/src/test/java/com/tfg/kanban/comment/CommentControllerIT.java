@@ -17,10 +17,10 @@ class CommentControllerIT extends AbstractApiIT {
     void commentLifecycle() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo comentarios");
+        Workspace workspace = createWorkspace(responsable, "Equipo comentarios");
+        Long teamId = workspace.teamId();
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
-        Long projectId = createProject(responsable, teamId, "Practica comentarios");
-        Long boardId = createBoard(responsable, projectId, "Tablero comentarios");
+        Long boardId = workspace.boardId();
         Long taskId = createTask(miembro, columnIds(responsable, boardId)[0], "Tarea comentada");
 
         Long commentId = json(mockMvc.perform(authorized(post("/api/tasks/{id}/comments", taskId), miembro)
@@ -52,11 +52,11 @@ class CommentControllerIT extends AbstractApiIT {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser autor = registerUser(Role.MIEMBRO);
         TestUser otro = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo moderacion");
+        Workspace workspace = createWorkspace(responsable, "Equipo moderacion");
+        Long teamId = workspace.teamId();
         addMember(responsable, teamId, autor, Role.MIEMBRO);
         addMember(responsable, teamId, otro, Role.MIEMBRO);
-        Long projectId = createProject(responsable, teamId, "Practica moderacion");
-        Long boardId = createBoard(responsable, projectId, "Tablero moderacion");
+        Long boardId = workspace.boardId();
         Long taskId = createTask(autor, columnIds(responsable, boardId)[0], "Tarea moderada");
 
         Long commentId = json(mockMvc.perform(authorized(post("/api/tasks/{id}/comments", taskId), autor)
@@ -80,10 +80,10 @@ class CommentControllerIT extends AbstractApiIT {
     void observerCannotComment() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser observador = registerUser(Role.DOCENTE);
-        Long teamId = createTeam(responsable, "Equipo lectura");
+        Workspace workspace = createWorkspace(responsable, "Equipo lectura");
+        Long teamId = workspace.teamId();
         addMember(responsable, teamId, observador, Role.DOCENTE);
-        Long projectId = createProject(responsable, teamId, "Practica lectura");
-        Long boardId = createBoard(responsable, projectId, "Tablero lectura");
+        Long boardId = workspace.boardId();
         Long taskId = createTask(responsable, columnIds(responsable, boardId)[0], "Tarea leida");
 
         mockMvc.perform(authorized(get("/api/tasks/{id}/comments", taskId), observador))

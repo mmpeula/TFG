@@ -2,6 +2,7 @@ package com.tfg.kanban.ai;
 
 import com.tfg.kanban.ai.dto.AiPlanResponse;
 import com.tfg.kanban.ai.dto.ApplyPlanRequest;
+import com.tfg.kanban.ai.dto.DetectedDateResponse;
 import com.tfg.kanban.ai.dto.PlanOptions;
 import com.tfg.kanban.common.ApiError;
 import com.tfg.kanban.task.dto.TaskResponse;
@@ -24,7 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 /**
- * Planificacion automatica con un modelo que corre en local (Ollama).
+ * Planificacion automatica con un modelo alojado en Groq.
  *
  * Son dos pasos a proposito: <b>generar</b> no toca el tablero y <b>aplicar</b>
  * crea solo las tareas que el usuario ha aceptado. El modelo nunca escribe
@@ -40,11 +41,12 @@ public class AiPlanController {
 
     @Operation(summary = "Generar una propuesta de planificacion",
             description = """
-                    Envia al modelo local el guion de la practica, el calendario, el equipo con
+                    Envia a Groq el guion de la practica completo, el calendario, el equipo con
                     sus horas y preferencias y las tareas que ya existen, y devuelve un plan por
-                    sprints. El plan se valida en el servidor y, si incumple alguna regla, se le
-                    devuelve al modelo para que lo corrija. No crea nada: para llevar las tareas
-                    al tablero hay que aceptarlas con POST /api/projects/{projectId}/ai-plan/apply.
+                    sprints, con objetivos y dependencias entre tareas. Lo medible (horas por
+                    persona y sprint, dependencias validas) se comprueba en el servidor. No crea
+                    nada: para llevar las tareas al tablero hay que aceptarlas con
+                    POST /api/projects/{projectId}/ai-plan/apply.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Propuesta generada"),
@@ -52,7 +54,7 @@ public class AiPlanController {
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "409", description = "El proyecto no tiene guion de la practica",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "El modelo local no esta disponible",
+            @ApiResponse(responseCode = "503", description = "Groq no esta disponible",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PreAuthorize("@access.canManageProject(#projectId)")
@@ -85,7 +87,7 @@ public class AiPlanController {
             @ApiResponse(responseCode = "200", description = "Propuesta generada a partir del documento"),
             @ApiResponse(responseCode = "409", description = "Formato no admitido o documento sin texto legible",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "El modelo local no esta disponible",
+            @ApiResponse(responseCode = "503", description = "Groq no esta disponible",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PreAuthorize("@access.canManageProject(#projectId)")
@@ -95,6 +97,23 @@ public class AiPlanController {
             @RequestPart("file") MultipartFile file,
             @Valid @RequestPart(value = "options", required = false) PlanOptions options) {
         return aiPlanService.generateFromDocument(projectId, file, options);
+    }
+
+    @Operation(summary = "Detectar la fecha de inicio en un documento",
+            description = """
+                    Solo busca una fecha de inicio en el texto del documento, sin generar nada:
+                    no llama al modelo. Sirve para rellenar el calendario antes de generar, en
+                    vez de tener que adivinarlo y regenerar despues si la fecha era otra.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "startDate a null si no se ha encontrado ninguna"),
+            @ApiResponse(responseCode = "409", description = "Formato no admitido o documento sin texto legible",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @PreAuthorize("@access.canManageProject(#projectId)")
+    @PostMapping(value = "/detect-start-date", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public DetectedDateResponse detectStartDate(@PathVariable Long projectId, @RequestPart("file") MultipartFile file) {
+        return new DetectedDateResponse(aiPlanService.detectStartDate(file).orElse(null));
     }
 
     @Operation(summary = "Llevar al tablero las tareas aceptadas",

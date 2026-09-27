@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -64,7 +65,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    /** El modelo local esta apagado o no responde: no es culpa del cliente ni un fallo interno. */
+    /** Groq no responde: no es culpa del cliente ni un fallo interno. */
     @ExceptionHandler(AiUnavailableException.class)
     public ResponseEntity<ApiError> handleAiUnavailable(AiUnavailableException ex, HttpServletRequest request) {
         log.warn("Modulo de IA no disponible: {}", ex.getMessage());
@@ -119,6 +120,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
     public ResponseEntity<ApiError> handleNoHandler(Exception ex, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, "ENDPOINT_NOT_FOUND", "El endpoint solicitado no existe", request);
+    }
+
+    /** La ruta existe pero no con ese metodo (p. ej. un POST donde solo hay GET): es un error del cliente. */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex,
+                                                           HttpServletRequest request) {
+        return build(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
+                "El endpoint no admite el metodo " + ex.getMethod(), request);
     }
 
     /** Red de seguridad: cualquier error no contemplado se devuelve como 500 sin filtrar detalles internos. */

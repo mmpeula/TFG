@@ -10,10 +10,11 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Schema(description = "Datos de una tarea", example = """
         {"title":"Redactar la memoria","description":"Apartados 1 a 3","type":"TAREA","priority":"ALTA",
-         "dueDate":"2026-12-01","estimatedHours":6.5,"assigneeId":2}
+         "dueDate":"2026-12-01","estimatedHours":6.5,"assigneeIds":[2]}
         """)
 public record TaskRequest(
 
@@ -35,7 +36,7 @@ public record TaskRequest(
         @Digits(integer = 4, fraction = 2)
         BigDecimal estimatedHours,
 
-        @Schema(description = "Id del miembro asignado; null para dejarla sin asignar")
-        Long assigneeId
+        @Schema(description = "Ids de los miembros asignados; vacio o null para dejarla sin asignar")
+        List<Long> assigneeIds
 ) {
 }

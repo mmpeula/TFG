@@ -82,10 +82,6 @@ public class AccessService {
         return roleInProject(projectId).isPresent();
     }
 
-    public boolean canWriteProject(Long projectId) {
-        return roleInProject(projectId).filter(WRITERS::contains).isPresent();
-    }
-
     public boolean canManageProject(Long projectId) {
         return roleInProject(projectId).filter(Role.RESPONSABLE::equals).isPresent();
     }

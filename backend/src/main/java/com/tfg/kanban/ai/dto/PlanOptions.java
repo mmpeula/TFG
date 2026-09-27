@@ -14,12 +14,10 @@ import java.util.List;
  *
  * <p>Todo es opcional: lo que no venga se toma del workspace (fecha de inicio y
  * duracion del sprint) o del equipo (quien entra en el reparto, con su ficha como
- * preferencias). Nada de esto se guarda: vale para esta generacion y se acaba ahi,
- * igual que las indicaciones.</p>
+ * preferencias). Nada de esto se guarda: vale para esta generacion y se acaba ahi.</p>
  */
 @Schema(description = "Ajustes de esta generacion de plan", example = """
         {"startDate":"2026-10-01","sprintDays":14,
-         "indications":"Ana tiene examenes la segunda semana",
          "team":[{"userId":2,"hoursPerWeek":12,"preferences":"Backend; Java y Spring"},
                  {"userId":3,"hoursPerWeek":10,"preferences":"Frontend; React"}]}
         """)
@@ -28,14 +26,14 @@ public record PlanOptions(
         @Schema(description = "Cuando empieza el primer sprint. Por defecto, la del workspace o hoy")
         LocalDate startDate,
 
+        @Schema(description = "Fecha de entrega. Por defecto, la del workspace; sin ninguna, el numero de "
+                + "sprints lo decide el modelo")
+        LocalDate deadline,
+
         @Schema(description = "Dias de cada sprint. Por defecto, los del workspace o 14")
         @Min(value = 7, message = "un sprint dura al menos una semana")
         @Max(value = 28, message = "un sprint dura como mucho cuatro semanas")
         Integer sprintDays,
-
-        @Schema(description = "Indicaciones adicionales solo para esta generacion")
-        @Size(max = 1000, message = "las indicaciones no pueden pasar de 1000 caracteres")
-        String indications,
 
         @Schema(description = "Quien entra en el reparto. Vacio o ausente: todo el equipo menos el docente")
         @Valid

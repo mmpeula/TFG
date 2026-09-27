@@ -20,7 +20,7 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
     @DisplayName("El administrador ve todos los workspaces, tambien los que no son suyos")
     void theAdminSeesEveryWorkspace() throws Exception {
         TestUser duena = registerUser(Role.MIEMBRO);
-        Long workspaceId = createProject(duena, createTeam(duena, "Equipo ajeno"), "Practica ajena");
+        Long workspaceId = createWorkspace(duena, "Practica ajena").id();
         TestUser admin = registerUser(Role.ADMIN);
 
         mockMvc.perform(authorized(get("/api/admin/workspaces"), admin))
@@ -43,7 +43,7 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
     @DisplayName("Ver un workspace desde soporte no da acceso a su tablero ni a sus tareas")
     void supportDoesNotOpenTheBoard() throws Exception {
         TestUser duena = registerUser(Role.MIEMBRO);
-        Long workspaceId = createProject(duena, createTeam(duena, "Equipo privado"), "Practica privada");
+        Long workspaceId = createWorkspace(duena, "Equipo privado").id();
         TestUser admin = registerUser(Role.ADMIN);
 
         // Sale en el panel de soporte...
@@ -62,8 +62,9 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
     void supportUnblocksATeamWithoutResponsable() throws Exception {
         TestUser duena = registerUser(Role.MIEMBRO);
         TestUser companero = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(duena, "Equipo atascado");
-        Long workspaceId = createProject(duena, teamId, "Practica atascada");
+        Workspace workspace = createWorkspace(duena, "Equipo atascado");
+        Long teamId = workspace.teamId();
+        Long workspaceId = workspace.id();
         addMember(duena, teamId, companero, Role.MIEMBRO);
 
         TestUser admin = registerUser(Role.ADMIN);
@@ -95,7 +96,7 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
     void supportCannotAddOutsiders() throws Exception {
         TestUser duena = registerUser(Role.MIEMBRO);
         TestUser extrano = registerUser(Role.MIEMBRO);
-        Long workspaceId = createProject(duena, createTeam(duena, "Equipo cerrado"), "Practica cerrada");
+        Long workspaceId = createWorkspace(duena, "Equipo cerrado").id();
         TestUser admin = registerUser(Role.ADMIN);
 
         mockMvc.perform(authorized(
@@ -111,7 +112,7 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
     @DisplayName("Soporte puede borrar un workspace ajeno")
     void supportCanDeleteAWorkspace() throws Exception {
         TestUser duena = registerUser(Role.MIEMBRO);
-        Long workspaceId = createProject(duena, createTeam(duena, "Equipo a borrar"), "Practica a borrar");
+        Long workspaceId = createWorkspace(duena, "Equipo a borrar").id();
         TestUser admin = registerUser(Role.ADMIN);
 
         mockMvc.perform(authorized(delete("/api/admin/workspaces/{id}", workspaceId), admin))
@@ -125,8 +126,9 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
     @DisplayName("Suspender un workspace deja al equipo sin poder abrirlo, pero sin perder nada")
     void suspendingFreezesTheWorkspace() throws Exception {
         TestUser duena = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(duena, "Equipo que se para");
-        Long workspaceId = createProject(duena, teamId, "Practica parada");
+        Workspace workspace = createWorkspace(duena, "Equipo que se para");
+        Long teamId = workspace.teamId();
+        Long workspaceId = workspace.id();
         TestUser admin = registerUser(Role.ADMIN);
 
         // Antes de suspenderlo, su equipo trabaja con normalidad.
@@ -162,8 +164,9 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
     void supportChangesAnyRole() throws Exception {
         TestUser duena = registerUser(Role.MIEMBRO);
         TestUser companero = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(duena, "Equipo con dos responsables");
-        Long workspaceId = createProject(duena, teamId, "Practica");
+        Workspace workspace = createWorkspace(duena, "Equipo con dos responsables");
+        Long teamId = workspace.teamId();
+        Long workspaceId = workspace.id();
         addMember(duena, teamId, companero, Role.RESPONSABLE);
         TestUser admin = registerUser(Role.ADMIN);
 
@@ -181,8 +184,9 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
     @DisplayName("Ni desde soporte se deja al equipo sin ninguna persona responsable")
     void supportCannotLeaveTheTeamWithoutResponsable() throws Exception {
         TestUser duena = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(duena, "Equipo de una sola responsable");
-        Long workspaceId = createProject(duena, teamId, "Practica");
+        Workspace workspace = createWorkspace(duena, "Equipo de una sola responsable");
+        Long teamId = workspace.teamId();
+        Long workspaceId = workspace.id();
         TestUser admin = registerUser(Role.ADMIN);
 
         mockMvc.perform(authorized(
@@ -198,8 +202,9 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
     void supportStillWorksOnASuspendedWorkspace() throws Exception {
         TestUser duena = registerUser(Role.MIEMBRO);
         TestUser companero = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(duena, "Equipo suspendido");
-        Long workspaceId = createProject(duena, teamId, "Practica suspendida");
+        Workspace workspace = createWorkspace(duena, "Equipo suspendido");
+        Long teamId = workspace.teamId();
+        Long workspaceId = workspace.id();
         addMember(duena, teamId, companero, Role.MIEMBRO);
         TestUser admin = registerUser(Role.ADMIN);
 

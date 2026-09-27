@@ -130,7 +130,7 @@ export function useInvitationMutations(teamId?: number) {
 
   return {
     invite: useMutation({
-      mutationFn: (payload: { email: string; role: Role }) => teams.invite(teamId!, payload),
+      mutationFn: (payload: { email: string }) => teams.invite(teamId!, payload),
       onSuccess: (invitation) => {
         if (teamId) queryClient.invalidateQueries({ queryKey: keys.invitations(teamId) })
         pushToast(invitation.emailSent

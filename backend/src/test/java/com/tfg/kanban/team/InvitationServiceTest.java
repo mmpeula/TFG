@@ -82,7 +82,7 @@ class InvitationServiceTest {
     @Test
     @DisplayName("Invitar deja la invitacion pendiente y manda el correo, pero no mete a nadie en el equipo")
     void invitingDoesNotAddAnyoneYet() {
-        var response = service.invite(5L, new InviteRequest("luis@uni.es", Role.MIEMBRO));
+        var response = service.invite(5L, new InviteRequest("luis@uni.es"));
 
         assertThat(response.status()).isEqualTo(InvitationStatus.PENDIENTE);
         assertThat(response.invited().email()).isEqualTo("luis@uni.es");
@@ -94,7 +94,7 @@ class InvitationServiceTest {
     @Test
     @DisplayName("El correo lleva el enlace con el token para responder")
     void theMailCarriesTheLink() {
-        service.invite(5L, new InviteRequest("luis@uni.es", Role.MIEMBRO));
+        service.invite(5L, new InviteRequest("luis@uni.es"));
 
         ArgumentCaptor<String> cuerpo = ArgumentCaptor.forClass(String.class);
         verify(mailService).send(anyString(), anyString(), cuerpo.capture());
@@ -107,7 +107,7 @@ class InvitationServiceTest {
     void unknownEmailIsReported() {
         when(userRepository.findByEmailIgnoreCase("nadie@uni.es")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("nadie@uni.es", Role.MIEMBRO)))
+        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("nadie@uni.es")))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("No hay ninguna cuenta")
                 .hasMessageContaining("nadie@uni.es");
@@ -118,7 +118,7 @@ class InvitationServiceTest {
     void cannotInviteSomeoneAlreadyIn() {
         when(teamMemberRepository.existsByTeam_IdAndUser_Id(5L, 2L)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es", Role.MIEMBRO)))
+        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es")))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("ya esta en el equipo");
     }
@@ -129,17 +129,27 @@ class InvitationServiceTest {
         when(invitationRepository.existsByTeam_IdAndInvited_IdAndStatus(5L, 2L, InvitationStatus.PENDIENTE))
                 .thenReturn(true);
 
-        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es", Role.MIEMBRO)))
+        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es")))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("invitacion pendiente");
     }
 
     @Test
-    @DisplayName("No se puede invitar a una cuenta de estudiante como docente")
-    void roleMustMatchTheAccount() {
-        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es", Role.DOCENTE)))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("cuenta DOCENTE");
+    @DisplayName("El rol no lo elige quien invita: una cuenta MIEMBRO entra siempre como alumno")
+    void memberAccountsAreInvitedAsMiembro() {
+        var response = service.invite(5L, new InviteRequest("luis@uni.es"));
+
+        assertThat(response.role()).isEqualTo(Role.MIEMBRO);
+    }
+
+    @Test
+    @DisplayName("A una cuenta DOCENTE se le invita como docente, nunca como alumno")
+    void docenteAccountsAreInvitedAsDocente() {
+        invitada.setRole(Role.DOCENTE);
+
+        var response = service.invite(5L, new InviteRequest("luis@uni.es"));
+
+        assertThat(response.role()).isEqualTo(Role.DOCENTE);
     }
 
     @Test
@@ -147,7 +157,7 @@ class InvitationServiceTest {
     void theInvitationSurvivesAFailingMailServer() {
         when(mailService.send(anyString(), anyString(), anyString())).thenReturn(false);
 
-        var response = service.invite(5L, new InviteRequest("luis@uni.es", Role.MIEMBRO));
+        var response = service.invite(5L, new InviteRequest("luis@uni.es"));
 
         assertThat(response.emailSent()).isFalse();
         assertThat(response.status()).isEqualTo(InvitationStatus.PENDIENTE);

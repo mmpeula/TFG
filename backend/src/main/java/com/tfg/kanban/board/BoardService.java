@@ -3,14 +3,12 @@ package com.tfg.kanban.board;
 import com.tfg.kanban.activity.ActivityService;
 import com.tfg.kanban.board.dto.*;
 import com.tfg.kanban.common.BusinessRuleException;
-import com.tfg.kanban.common.CountByEntity;
 import com.tfg.kanban.common.ResourceNotFoundException;
 import com.tfg.kanban.domain.model.*;
 import com.tfg.kanban.domain.repository.BoardColumnRepository;
 import com.tfg.kanban.domain.repository.BoardRepository;
 import com.tfg.kanban.domain.repository.TaskRepository;
 import com.tfg.kanban.domain.repository.TeamMemberRepository;
-import com.tfg.kanban.project.ProjectService;
 import com.tfg.kanban.security.SecurityUtils;
 import com.tfg.kanban.task.TaskMapper;
 import com.tfg.kanban.task.dto.TaskResponse;
@@ -18,16 +16,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Tableros y sus columnas.
- *
- * Al crear un tablero se generan las tres columnas clasicas de un Kanban
- * ("Por hacer", "En progreso", "Hecho") para que sea usable desde el primer momento.
+ * El tablero de cada workspace y sus columnas. El tablero nace con su workspace
+ * (ver {@link DefaultBoard}); aqui se lee, se borra y se editan sus columnas.
  */
 @Service
 @RequiredArgsConstructor
@@ -38,7 +33,6 @@ public class BoardService {
     private final BoardColumnRepository columnRepository;
     private final TaskRepository taskRepository;
     private final TeamMemberRepository teamMemberRepository;
-    private final ProjectService projectService;
     private final ActivityService activityService;
     private final TaskMapper taskMapper;
 
@@ -66,40 +60,11 @@ public class BoardService {
     }
 
     @Transactional
-    public BoardResponse create(Long projectId, BoardRequest request) {
-        Project project = projectService.getProject(projectId);
-
-        Board saved = boardRepository.save(
-                DefaultBoard.of(request.name().trim(), request.description(), project));
-        activityService.record(project, ActivityAction.CREACION, "Board", saved.getId(),
-                "Creo el tablero '%s'".formatted(saved.getName()));
-
-        return BoardResponse.summary(saved, roleInBoard(saved));
-    }
-
-    @Transactional
-    public BoardResponse update(Long boardId, BoardRequest request) {
-        Board board = getBoard(boardId);
-        board.setName(request.name().trim());
-        board.setDescription(request.description());
-
-        activityService.record(board.getProject(), ActivityAction.ACTUALIZACION, "Board", board.getId(),
-                "Actualizo el tablero '%s'".formatted(board.getName()));
-
-        return BoardResponse.summary(board, roleInBoard(board));
-    }
-
-    @Transactional
     public void delete(Long boardId) {
         Board board = getBoard(boardId);
         activityService.record(board.getProject(), ActivityAction.BORRADO, "Board", board.getId(),
                 "Borro el tablero '%s'".formatted(board.getName()));
         boardRepository.delete(board);
-    }
-
-    public List<ColumnResponse> findColumns(Long boardId) {
-        getBoard(boardId);
-        return summaries(columnRepository.findByBoard_IdOrderByPositionAsc(boardId));
     }
 
     @Transactional
@@ -138,47 +103,6 @@ public class BoardService {
                 "BoardColumn", column.getId(), "Actualizo la columna '%s'".formatted(column.getName()));
 
         return ColumnResponse.summary(column, (int) tasks);
-    }
-
-    /** Reordena una columna dentro del tablero (arrastrar y soltar cabeceras). */
-    @Transactional
-    public List<ColumnResponse> moveColumn(Long columnId, MovePositionRequest request) {
-        BoardColumn column = getColumn(columnId);
-        Long boardId = column.getBoard().getId();
-
-        List<BoardColumn> columns = new ArrayList<>(columnRepository.findByBoard_IdOrderByPositionAsc(boardId));
-        columns.removeIf(candidate -> candidate.getId().equals(columnId));
-
-        int target = Math.min(Math.max(request.position(), 0), columns.size());
-        columns.add(target, column);
-        reindex(columns);
-
-        activityService.record(column.getBoard().getProject(), ActivityAction.MOVIMIENTO,
-                "BoardColumn", column.getId(),
-                "Movio la columna '%s' a la posicion %d".formatted(column.getName(), target));
-
-        return summaries(columns);
-    }
-
-    /**
-     * Las columnas con su numero de tareas, contadas en una sola consulta.
-     *
-     * Una consulta por columna es barato con tres y deja de serlo en cuanto un
-     * equipo se hace su propio flujo; ademas es el mismo lote que ya resuelven asi
-     * el tablero y la pantalla de inicio.
-     */
-    private List<ColumnResponse> summaries(List<BoardColumn> columns) {
-        if (columns.isEmpty()) {
-            return List.of();
-        }
-        Map<Long, Long> tasksByColumn = taskRepository
-                .countByColumnIds(columns.stream().map(BoardColumn::getId).toList()).stream()
-                .collect(Collectors.toMap(CountByEntity::entityId, CountByEntity::total));
-
-        return columns.stream()
-                .map(column -> ColumnResponse.summary(column,
-                        tasksByColumn.getOrDefault(column.getId(), 0L).intValue()))
-                .toList();
     }
 
     @Transactional

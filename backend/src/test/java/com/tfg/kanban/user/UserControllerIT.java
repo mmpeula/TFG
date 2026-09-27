@@ -38,28 +38,20 @@ class UserControllerIT extends AbstractApiIT {
     }
 
     @Test
-    @DisplayName("GET /api/users/{id} devuelve la ficha propia y 404 si no existe")
-    void findByIdAndNotFound() throws Exception {
+    @DisplayName("Cada uno lee su propia ficha en /api/auth/me; editar una cuenta que no existe da 404")
+    void ownAccountAndNotFound() throws Exception {
         TestUser admin = registerUser(Role.ADMIN);
         TestUser user = registerUser(Role.MIEMBRO);
 
-        mockMvc.perform(authorized(get("/api/users/{id}", user.id()), user))
+        mockMvc.perform(authorized(get("/api/auth/me"), user))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(user.id()));
 
-        mockMvc.perform(authorized(get("/api/users/{id}", 999999), admin))
+        mockMvc.perform(authorized(put("/api/users/{id}", 999999), admin)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Nadie\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
-    }
-
-    @Test
-    @DisplayName("La ficha de otra persona no se lee, ni siquiera siendo de su equipo")
-    void cannotReadSomeoneElsesAccount() throws Exception {
-        TestUser user = registerUser(Role.MIEMBRO);
-        TestUser other = registerUser(Role.MIEMBRO);
-
-        mockMvc.perform(authorized(get("/api/users/{id}", other.id()), user))
-                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -190,11 +182,14 @@ class UserControllerIT extends AbstractApiIT {
     void adminCannotBeATeamRole() throws Exception {
         TestUser owner = registerUser(Role.MIEMBRO);
         TestUser invitee = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(owner, "Equipo de prueba");
+        Workspace workspace = createWorkspace(owner, "Equipo de prueba");
+        Long teamId = workspace.teamId();
 
-        mockMvc.perform(authorized(post("/api/teams/{id}/members", teamId), owner)
+        addMember(owner, teamId, invitee, Role.MIEMBRO);
+
+        mockMvc.perform(authorized(patch("/api/teams/{id}/members/{userId}", teamId, invitee.id()), owner)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"%s\",\"role\":\"ADMIN\"}".formatted(invitee.email())))
+                        .content("{\"role\":\"ADMIN\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
     }
@@ -212,9 +207,9 @@ class UserControllerIT extends AbstractApiIT {
         mockMvc.perform(authorized(delete("/api/users/{id}", victim.id()), admin))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(authorized(get("/api/users/{id}", victim.id()), admin))
+        mockMvc.perform(authorized(get("/api/users").param("search", victim.email()), admin))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.enabled").value(false));
+                .andExpect(jsonPath("$.content[0].enabled").value(false));
 
         // Una cuenta deshabilitada ya no puede iniciar sesion
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)

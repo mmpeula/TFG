@@ -5,11 +5,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
-import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.tika.exception.TikaException;
+import org.apache.tika.metadata.Metadata;
+import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.parser.ParseContext;
+import org.apache.tika.sax.ToXMLContentHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.xml.sax.SAXException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,16 +23,31 @@ import java.util.List;
 /**
  * Saca el texto del documento de la actividad para poder enviarselo al modelo.
  *
- * Se admiten los formatos en los que suele venir un guion de practicas: PDF,
+ * <p>Se admiten los formatos en los que suele venir un guion de practicas: PDF,
  * Word (.docx) y texto plano. No se hace OCR: un PDF escaneado no tiene texto
- * que extraer y se avisa de ello en vez de mandar una cadena vacia al modelo.
+ * que extraer y se avisa de ello en vez de mandar una cadena vacia al modelo.</p>
+ *
+ * <p>El PDF se lee con PDFBox, en texto plano: un PDF no tiene tablas de verdad,
+ * solo texto colocado por coordenadas, asi que no hay estructura de filas y
+ * columnas que preservar por mucho que cambie la herramienta. El Word (.docx)
+ * si la tiene —una tabla en Word es un elemento real en su XML—, y por eso se
+ * lee con Apache Tika pidiendole HTML: sus {@code <table>/<tr>/<td>} dejan claro
+ * que dato va en que celda (por ejemplo, una tabla de plazos de entrega), en vez
+ * de aplanarla a texto suelto como hacia la extraccion anterior.</p>
  */
 @Slf4j
 @Service
 public class DocumentTextExtractor {
 
-    /** Tope de caracteres que se envian al modelo: mas no cabe en su contexto. */
-    private static final int MAX_CHARS = 12_000;
+    /**
+     * Tope de caracteres, solo como red de seguridad ante un fichero descomunal o
+     * corrupto: un guion de practica normal no se acerca ni de lejos. No se pone
+     * mas bajo porque el documento entero hace falta para cosas que no pasan por
+     * el modelo, como buscar la fecha de inicio, que puede estar en cualquier
+     * parte, no solo al principio; lo que si va acotado por su cuenta es lo que
+     * se manda en cada llamada al modelo (ver AiPlanService).
+     */
+    private static final int MAX_CHARS = 80_000;
 
     private static final List<String> TEXT_EXTENSIONS = List.of("txt", "md", "markdown", "csv", "text");
 
@@ -77,11 +96,32 @@ public class DocumentTextExtractor {
         }
     }
 
+    /**
+     * A HTML, no a texto plano: {@link ToXMLContentHandler} vuelca los elementos
+     * SAX tal cual, tablas incluidas. Se parsea directo, sin {@code BodyContentHandler}
+     * por delante: ese filtro corta el documento a lo de dentro de {@code <body>},
+     * pero de paso se come el {@code startPrefixMapping} del espacio de nombres
+     * XHTML que Tika declara una sola vez al principio, y sin el, {@code <table>}
+     * revienta con "Namespace ... not declared". Se filtra igual la cabecera con
+     * metadatos, pero a mano, con {@link #bodyOf}.
+     */
     private String fromDocx(InputStream input) throws IOException {
-        try (XWPFDocument document = new XWPFDocument(input);
-             XWPFWordExtractor extractor = new XWPFWordExtractor(document)) {
-            return extractor.getText();
+        ToXMLContentHandler html = new ToXMLContentHandler();
+        try {
+            new AutoDetectParser().parse(input, html, new Metadata(), new ParseContext());
+        } catch (TikaException | SAXException ex) {
+            throw new IOException(ex);
         }
+        return bodyOf(html.toString());
+    }
+
+    /** Solo lo de dentro de {@code <body>}: fuera se queda la cabecera con metadatos, que no aporta nada. */
+    private String bodyOf(String html) {
+        int desde = html.indexOf("<body");
+        int hasta = html.lastIndexOf("</body>");
+        if (desde == -1 || hasta == -1) return html;
+        desde = html.indexOf('>', desde) + 1;
+        return html.substring(desde, hasta);
     }
 
     /** Normaliza espacios y corta por el tope, avisando en el propio texto. */

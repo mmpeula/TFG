@@ -48,7 +48,7 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
     onError: (err) => {
       const status = axios.isAxiosError(err) ? err.response?.status : undefined
       const content = status === 503
-        ? `${toErrorMessage(err)} El modelo corre en tu maquina: comprueba que Ollama esta arrancado.`
+        ? `${toErrorMessage(err)} Revisa la conexion con Groq y su API key.`
         : toErrorMessage(err)
       append(workspaceId, { role: 'assistant', content, error: true })
     },

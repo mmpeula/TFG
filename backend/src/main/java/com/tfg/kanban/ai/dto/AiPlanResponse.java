@@ -1,18 +1,15 @@
 package com.tfg.kanban.ai.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 
-@Schema(description = "Plan propuesto por el modelo local: sprints, tareas repartidas y avisos",
+@Schema(description = "Plan propuesto por Groq: sprints, tareas repartidas y avisos",
         example = """
-        {"status":"ok","projectId":5,"model":"llama3","source":"documento: guion-practica2.pdf",
+        {"status":"ok","projectId":5,"model":"openai/gpt-oss-120b","source":"documento: guion-practica2.pdf",
          "message":"18 tareas en 3 sprints, repartidas entre 3 personas",
          "durationWeeks":6,"sprints":[],"tasks":[],"workload":[],"warnings":[],
-         "schedule":{"startDate":"2026-10-01","deadline":"2026-11-11","sprintDays":14},
          "attempts":1,"generatedAt":"2026-09-23T18:40:00Z"}
         """)
 public record AiPlanResponse(
@@ -31,23 +28,10 @@ public record AiPlanResponse(
         List<MemberWorkload> workload,
         @Schema(description = "Avisos del modelo y reglas que el plan sigue sin cumplir tras los reintentos")
         List<String> warnings,
-        @Schema(description = "Fechas con las que se ha hecho el plan, cuando no coinciden con las guardadas "
-                + "en el workspace. Guardarlas hace que la pestana Plan pinte los mismos sprints.")
-        SuggestedSchedule schedule,
         @Schema(description = "Llamadas al modelo que ha costado: 1 si el primer plan era valido")
         int attempts,
         Instant generatedAt
 ) {
-
-    /** Inicio, fin y duracion de sprint de un plan. Cualquiera puede faltar. */
-    public record SuggestedSchedule(LocalDate startDate, LocalDate deadline, Integer sprintDays) {
-
-        // Sin @JsonIgnore, Jackson trata isEmpty() como si fuera el campo "empty".
-        @JsonIgnore
-        public boolean isEmpty() {
-            return startDate == null && deadline == null && sprintDays == null;
-        }
-    }
 
     /**
      * @param duplicates tareas que el modelo propuso pero que ya estaban en el
@@ -57,11 +41,10 @@ public record AiPlanResponse(
     public static AiPlanResponse of(Long projectId, String model, String source, Integer durationWeeks,
                                     List<PlannedSprint> sprints, List<ProposedTask> tasks,
                                     List<MemberWorkload> workload, List<String> warnings, int duplicates,
-                                    SuggestedSchedule schedule, int attempts) {
+                                    int attempts) {
         return new AiPlanResponse("ok", projectId, model, source,
                 message(tasks.size(), sprints.size(), workload.size(), duplicates),
-                durationWeeks, sprints, tasks, workload, warnings,
-                schedule == null || schedule.isEmpty() ? null : schedule, attempts, Instant.now());
+                durationWeeks, sprints, tasks, workload, warnings, attempts, Instant.now());
     }
 
     private static String message(int propuestas, int sprints, int personas, int duplicadas) {

@@ -23,8 +23,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Base de los tests de integracion de la API.
  *
  * Levanta la aplicacion completa contra el Oracle de Testcontainers y ofrece
- * atajos para registrar usuarios, autenticarse y montar el arbol
- * equipo -> proyecto -> tablero -> columna -> tarea que necesitan casi todos.
+ * atajos para registrar usuarios, autenticarse, crear un workspace (equipo,
+ * proyecto y tablero de una vez), invitar a gente y crear tareas.
  *
  * Cada test usa emails aleatorios y crea sus propios datos, asi que no hace
  * falta limpiar la base de datos entre pruebas.
@@ -102,44 +102,51 @@ public abstract class AbstractApiIT extends AbstractOracleContainerTest {
 
     // ---------------------------------------------------------- atajos de dominio
 
-    protected Long createTeam(TestUser owner, String name) throws Exception {
-        return json(mockMvc.perform(authorized(post("/api/teams"), owner)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"name":"%s","description":"Equipo de prueba"}
-                                """.formatted(name)))
-                .andExpect(status().isCreated())
-                .andReturn()).path("id").asLong();
+    /**
+     * Un workspace recien creado. Su id es tambien el de su proyecto: por debajo
+     * son la misma fila, y las rutas de /api/projects lo reciben asi.
+     */
+    protected record Workspace(Long id, Long teamId, Long boardId) {
     }
 
+    /** Equipo, proyecto y tablero de una vez, como los crea la aplicacion; quien lo crea queda RESPONSABLE. */
+    protected Workspace createWorkspace(TestUser owner, String name) throws Exception {
+        JsonNode workspace = json(mockMvc.perform(authorized(post("/api/workspaces"), owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"%s","description":"Practica de prueba"}
+                                """.formatted(name)))
+                .andExpect(status().isCreated())
+                .andReturn());
+        return new Workspace(workspace.path("id").asLong(), workspace.path("teamId").asLong(),
+                workspace.path("boardId").asLong());
+    }
+
+    /**
+     * Mete a alguien en el equipo como la aplicacion: invitacion y aceptacion. Entra
+     * con el rol de su cuenta (alumno o docente); si se pide RESPONSABLE, se le
+     * sube despues, que es tambien como se hace de verdad.
+     */
     protected void addMember(TestUser responsable, Long teamId, TestUser member, Role role) throws Exception {
-        mockMvc.perform(authorized(post("/api/teams/{id}/members", teamId), responsable)
+        mockMvc.perform(authorized(post("/api/teams/{id}/invitations", teamId), responsable)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"%s","role":"%s"}
-                                """.formatted(member.email(), role.name())))
+                                {"email":"%s"}
+                                """.formatted(member.email())))
                 .andExpect(status().isCreated());
-    }
 
-    protected Long createProject(TestUser responsable, Long teamId, String name) throws Exception {
-        return json(mockMvc.perform(authorized(post("/api/projects"), responsable)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"teamId":%d,"name":"%s","description":"Practica de prueba",
-                                 "briefing":"Guion de la practica","deadline":"2026-12-15"}
-                                """.formatted(teamId, name)))
-                .andExpect(status().isCreated())
-                .andReturn()).path("id").asLong();
-    }
+        String token = json(mockMvc.perform(authorized(get("/api/invitations/mine"), member))
+                .andExpect(status().isOk())
+                .andReturn()).get(0).path("token").asText();
+        mockMvc.perform(authorized(post("/api/invitations/{token}/accept", token), member))
+                .andExpect(status().isOk());
 
-    protected Long createBoard(TestUser responsable, Long projectId, String name) throws Exception {
-        return json(mockMvc.perform(authorized(post("/api/projects/{id}/boards", projectId), responsable)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"name":"%s","description":"Tablero de prueba"}
-                                """.formatted(name)))
-                .andExpect(status().isCreated())
-                .andReturn()).path("id").asLong();
+        if (role == Role.RESPONSABLE) {
+            mockMvc.perform(authorized(patch("/api/teams/{id}/members/{userId}", teamId, member.id()), responsable)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"role\":\"RESPONSABLE\"}"))
+                    .andExpect(status().isOk());
+        }
     }
 
     /** Devuelve los ids de las columnas por defecto del tablero, en orden. */

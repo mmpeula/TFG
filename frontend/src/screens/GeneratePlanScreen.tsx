@@ -2,8 +2,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
 import {
-  AiErrorCard, AiWorkbench, AppliedTasksSummary, PlanWarnings, PrivacyNote, ProposalPanel, SuggestedScheduleCard,
-  WorkloadSummary,
+  AiErrorCard, AiWorkbench, AppliedTasksSummary, PlanWarnings, PrivacyNote, ProposalPanel, WorkloadSummary,
 } from '@/components/generator/PlanGenerator'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
@@ -16,7 +15,6 @@ import { usePlanDrafts, usePlanJob, usePlanJobs, useUi, type PlanTeamDraft } fro
 import { toErrorMessage } from '@/lib/api-client'
 import { canManage } from '@/lib/roles'
 import { ROUTES } from '@/app/routes'
-import { isoDate } from '@/lib/sprints'
 
 /** Lo que se asume si no se dice: una asignatura normal, no dedicacion completa. */
 const DEFAULT_HOURS_PER_WEEK = 10
@@ -50,12 +48,12 @@ export function GeneratePlanScreen() {
   const job = usePlanJob(workspaceId)
 
   // Nada de estado local aqui: el borrador (documento, descripcion, calendario,
-  // equipo, indicaciones y lo que quede marcado de la propuesta) vive por
+  // equipo y lo que quede marcado de la propuesta) vive por
   // encima de las rutas, para que irse un momento al tablero no obligue a
-  // volver a subir el enunciado ni a reescribir las indicaciones.
+  // volver a subir el enunciado.
   const { draftOf, patch } = usePlanDrafts()
   const draft = draftOf(workspaceId)
-  const { file, text: descripcion, indications: indicaciones, appliedTitles, scheduleApplied } = draft
+  const { file, text: descripcion, appliedTitles } = draft
   const set = (cambios: Partial<typeof draft>) => patch(workspaceId, cambios)
 
   const plan = job?.status === 'done' ? job.plan : undefined
@@ -80,11 +78,15 @@ export function GeneratePlanScreen() {
       preferences: member.planNotes ?? '',
       included: true,
     })
-  // Automatico siempre que se pueda: si el workspace ya tiene fecha de inicio,
-  // esa manda y no se pregunta nada (ni tampoco la duracion del sprint, que el
-  // servidor toma directamente de sus propios ajustes). Solo cuando el
-  // workspace no tiene fecha de inicio hace falta una a mano.
-  const startDate = workspace?.startDate ?? draft.startDate ?? isoDate(new Date())
+  // Automatico siempre que se pueda: si el workspace ya tiene ambas fechas,
+  // esas mandan (ni tampoco se pregunta la duracion del sprint, que el servidor
+  // toma directamente de sus propios ajustes). Si falta alguna, hay que
+  // resolverla antes de generar nada: vacia hasta entonces, nunca "hoy" por
+  // defecto, para no acabar generando con una fecha adivinada y tener que
+  // repetir la llamada al modelo si resultaba estar mal.
+  const effectiveStartDate = workspace?.startDate ?? draft.startDate ?? ''
+  const effectiveDeadline = workspace?.deadline ?? draft.deadline ?? ''
+  const fechasResueltas = Boolean(effectiveStartDate && effectiveDeadline)
 
   const apply = useMutation({
     mutationFn: () => {
@@ -111,19 +113,43 @@ export function GeneratePlanScreen() {
     onError: (err) => pushToast(toErrorMessage(err)),
   })
 
-  /** Documento si lo hay, si no la descripcion, si tampoco el guion ya guardado del proyecto. */
+  /**
+   * Documento si lo hay, si no la descripcion, si tampoco el guion ya guardado
+   * del proyecto. Las fechas ya estan resueltas para cuando esto se puede
+   * llamar (ver `sinFechas` en `AiWorkbench`): si alguna no estaba guardada en
+   * el workspace, se guarda aqui mismo, para no tener que volver a pedirla en
+   * la proxima generacion ni dejar la pestana Plan con otro calendario.
+   */
   function runGenerate() {
-    set({ appliedTitles: null, scheduleApplied: false, selected: null })
+    if (!fechasResueltas) return
+    set({ appliedTitles: null, selected: null })
+
+    if (workspace && (effectiveStartDate !== (workspace.startDate ?? '')
+        || effectiveDeadline !== (workspace.deadline ?? ''))) {
+      workspaceMutations.update.mutate(
+        {
+          name: workspace.name,
+          description: workspace.description,
+          color: workspace.color,
+          icon: workspace.icon,
+          startDate: effectiveStartDate,
+          deadline: effectiveDeadline,
+          sprintDays: workspace.sprintDays,
+        },
+        { onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.project(workspaceId) }) },
+      )
+    }
+
     planJobs.start({
       workspaceId,
       workspaceName: workspace?.name ?? 'el workspace',
       file,
       text: descripcion,
       options: {
-        startDate,
+        startDate: effectiveStartDate,
+        deadline: effectiveDeadline,
         // La duracion del sprint no se pregunta: el servidor usa la del
         // workspace, o dos semanas si tampoco la tiene.
-        indications: indicaciones.trim() || undefined,
         team: (team ?? [])
           .filter((person) => person.included)
           .map(({ userId, hoursPerWeek, preferences }) => ({
@@ -131,32 +157,6 @@ export function GeneratePlanScreen() {
           })),
       },
     })
-  }
-
-  /**
-   * Guarda en el workspace las fechas con las que se ha hecho el plan, para que la
-   * pestana Plan pinte los mismos sprints. Solo toca lo que difiere: no debe
-   * borrar una descripcion, un color o una fecha que el usuario ya puso a mano.
-   */
-  function applySchedule() {
-    if (!workspace || !plan?.schedule) return
-    workspaceMutations.update.mutate(
-      {
-        name: workspace.name,
-        description: workspace.description,
-        color: workspace.color,
-        icon: workspace.icon,
-        startDate: plan.schedule.startDate ?? workspace.startDate ?? null,
-        deadline: plan.schedule.deadline ?? workspace.deadline ?? null,
-        sprintDays: plan.schedule.sprintDays ?? workspace.sprintDays,
-      },
-      {
-        onSuccess: () => {
-          set({ scheduleApplied: true })
-          queryClient.invalidateQueries({ queryKey: keys.project(workspaceId) })
-        },
-      },
-    )
   }
 
   if (workspace && !canManage(workspace.myRole)) {
@@ -176,17 +176,25 @@ export function GeneratePlanScreen() {
           // descarta un resultado o error ya terminado, que ahora si quedaria
           // desactualizado.
           if (job?.status !== 'pending') planJobs.clear(workspaceId)
+          // Deteccion por texto, no llamada al modelo: se puede pedir de una vez,
+          // al subir el documento, sin esperar a generar para saber si trae fecha.
+          if (next && !workspace?.startDate && !draft.startDate) {
+            projectsApi.detectStartDate(workspaceId, next).then((result) => {
+              if (result.startDate) set({ startDate: result.startDate })
+            }).catch(() => {})
+          }
         }}
         text={descripcion}
         onText={(next) => {
           set({ text: next, appliedTitles: null })
           if (job?.status !== 'pending') planJobs.clear(workspaceId)
         }}
-        indications={indicaciones}
-        onIndications={(next) => set({ indications: next })}
-        startDate={startDate}
-        onStartDate={(next) => set({ startDate: next })}
+        startDate={effectiveStartDate}
+        deadline={effectiveDeadline}
+        onStartDate={(next) => set({ startDate: next || null })}
+        onDeadline={(next) => set({ deadline: next || null })}
         workspaceStartDate={workspace?.startDate}
+        workspaceDeadline={workspace?.deadline}
         onGoToSettings={() => navigate(ROUTES.ajustesById(workspaceId))}
         team={team}
         members={members}
@@ -213,15 +221,6 @@ export function GeneratePlanScreen() {
               <Tag variant="outline">{plan.source}</Tag>
               <Tag variant="outline">modelo {plan.model}</Tag>
             </div>
-
-            {plan.schedule && (
-              <SuggestedScheduleCard
-                schedule={plan.schedule}
-                applying={workspaceMutations.update.isPending}
-                applied={scheduleApplied}
-                onApply={applySchedule}
-              />
-            )}
 
             <PlanWarnings warnings={plan.warnings ?? []} />
 

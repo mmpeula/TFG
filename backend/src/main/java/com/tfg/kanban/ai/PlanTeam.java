@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -27,9 +28,12 @@ final class PlanTeam {
     /** Lo que se asume si no se dice: una asignatura normal, no dedicacion completa. */
     static final int DEFAULT_HOURS_PER_WEEK = 10;
 
+    /** Lo que se reserva de cada sprint para imprevistos: el modelo planifica sobre el resto. */
+    private static final BigDecimal USEFUL_SHARE = new BigDecimal("0.9");
+
     /**
      * Una persona del reparto. {@code leader} marca a quien coordina el equipo: el
-     * prompt le pide al modelo que le quite carga tecnica cuando el equipo es grande.
+     * prompt le pasa la gestion y, con equipos grandes, le quita carga tecnica.
      */
     record Member(Long userId, String name, int hoursPerWeek, String preferences, boolean leader) {
 
@@ -38,6 +42,19 @@ final class PlanTeam {
             return BigDecimal.valueOf(hoursPerWeek)
                     .multiply(BigDecimal.valueOf(sprintDays))
                     .divide(BigDecimal.valueOf(7), 1, RoundingMode.HALF_UP);
+        }
+
+        /**
+         * Lo que se le pide al modelo que no supere: la capacidad sin el margen
+         * para imprevistos. Se calcula aqui y no se le deja al modelo, que en
+         * aritmetica se equivoca mas que en repartir.
+         */
+        BigDecimal usefulCapacityFor(long sprintDays) {
+            return capacityFor(sprintDays).multiply(USEFUL_SHARE).setScale(1, RoundingMode.HALF_UP);
+        }
+
+        boolean available() {
+            return hoursPerWeek > 0;
         }
     }
 
@@ -114,7 +131,12 @@ final class PlanTeam {
                 .findFirst();
     }
 
-    String names() {
-        return String.join(", ", members.stream().map(Member::name).toList());
+    /** Cada nombre se resuelve por separado con {@link #match}; sin duplicados, en el orden en que aparecen. */
+    List<Member> matchAll(List<String> names) {
+        LinkedHashSet<Member> resultado = new LinkedHashSet<>();
+        for (String name : names) {
+            match(name).ifPresent(resultado::add);
+        }
+        return List.copyOf(resultado);
     }
 }

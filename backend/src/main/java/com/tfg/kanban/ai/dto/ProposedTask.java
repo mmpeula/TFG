@@ -16,7 +16,7 @@ import java.util.List;
          "description":"Endpoint POST /api/auth/login que devuelve un token firmado",
          "reason":"El apartado 3 pide autenticacion con JWT","type":"TAREA","epic":"Autenticacion",
          "sprint":1,"priority":"ALTA","estimatedHours":6,"dueDate":"2026-10-14",
-         "assigneeId":2,"assigneeName":"Luis Perez","dependsOn":["Disenar el modelo de usuario"]}
+         "assigneeIds":[2],"assigneeNames":["Luis Perez"],"dependsOn":["Disenar el modelo de usuario"]}
         """)
 public record ProposedTask(
 
@@ -49,18 +49,28 @@ public record ProposedTask(
         @Schema(description = "Ultimo dia laborable de su sprint. Lo fija el servidor, no el modelo")
         LocalDate dueDate,
 
-        @Schema(description = "Miembro del equipo al que se reparte la tarea")
-        Long assigneeId,
+        @Schema(description = "Miembros del equipo a los que se reparte la tarea. Normalmente uno; "
+                + "mas de uno solo cuando la IA ha decidido que la colaboracion aporta algo real")
+        List<Long> assigneeIds,
 
-        @Schema(description = "Nombre del miembro, para poder mostrarlo sin otra consulta")
-        String assigneeName,
+        @Schema(description = "Nombres de los miembros, para poder mostrarlos sin otra consulta")
+        List<String> assigneeNames,
 
-        @Schema(description = "Titulos de las tareas de las que depende")
+        @Schema(description = "Titulos de las tareas de las que depende. Ya validadas: apuntan a una tarea real "
+                + "en su sprint o en uno anterior")
         List<String> dependsOn
 ) {
 
     /** Nunca null, para no tener que comprobarlo en cada sitio que la recorre. */
     public List<String> dependsOnOrEmpty() {
         return dependsOn == null ? List.of() : dependsOn;
+    }
+
+    public List<Long> assigneeIdsOrEmpty() {
+        return assigneeIds == null ? List.of() : assigneeIds;
+    }
+
+    public List<String> assigneeNamesOrEmpty() {
+        return assigneeNames == null ? List.of() : assigneeNames;
     }
 }

@@ -83,18 +83,17 @@ app:
     # Donde vive la interfaz: con esto se compone el enlace de la invitacion.
     base-url: ${APP_BASE_URL:http://localhost:3000}
   ai:
-    # Planificacion automatica con un modelo que corre en local (Ollama).
-    # Nada sale de la maquina: no hay servicios externos ni claves de API.
+    # Planificacion automatica con un modelo alojado en Groq: el documento y los
+    # datos del equipo salen de esta maquina hacia sus servidores para generar el plan.
     enabled: ${AI_ENABLED:true}
-    base-url: ${OLLAMA_URL:http://localhost:11434}
-    model: ${OLLAMA_MODEL:llama3}
-    timeout: ${AI_TIMEOUT:3m}
+    base-url: ${GROQ_URL:https://api.groq.com/openai/v1}
+    api-key: ${GROQ_API_KEY:}
+    model: ${GROQ_MODEL:openai/gpt-oss-120b}
+    timeout: ${AI_TIMEOUT:2m}
     max-tasks: ${AI_MAX_TASKS:60}
-    temperature: ${AI_TEMPERATURE:0.3}
-    # Minimo 8192: con menos, un backlog completo en JSON sale cortado. No mas por
-    # defecto: es el contexto nativo de llama3. Subirlo solo con modelos de mas.
-    num-ctx: ${AI_NUM_CTX:8192}
+    temperature: ${AI_TEMPERATURE:0.2}
     max-retries: ${AI_MAX_RETRIES:2}
+    max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:6000}
   storage:
     # Directorio de los ficheros adjuntos (volumen de Docker en despliegue).
     upload-dir: ${UPLOAD_DIR:./uploads}

@@ -19,7 +19,16 @@ import { relativeTime } from '@/lib/format'
 import { ROUTES } from '@/app/routes'
 import type { Role } from '@/types/api'
 
-const ROLES: Role[] = ['RESPONSABLE', 'MIEMBRO', 'DOCENTE']
+/**
+ * A que puede cambiarse el rol de alguien ya en el equipo: nunca a DOCENTE ni
+ * desde DOCENTE, porque eso depende del tipo de cuenta (Alumno/Docente elegido
+ * al registrarse), no de una eleccion dentro del equipo. Una cuenta Docente no
+ * tiene nada que elegir aqui; una cuenta Alumno puede pasar de alumno a
+ * responsable y viceversa.
+ */
+function rolesDisponiblesPara(actual: Role): Role[] {
+  return actual === 'DOCENTE' ? ['DOCENTE'] : ['MIEMBRO', 'RESPONSABLE']
+}
 
 /**
  * Quien trabaja en este workspace y que puede hacer cada uno.
@@ -40,7 +49,6 @@ export function MembersScreen() {
   const invitaciones = useInvitationMutations(workspace?.teamId)
 
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<Role>('MIEMBRO')
 
   const manageable = canManage(workspace?.myRole)
 
@@ -55,8 +63,10 @@ export function MembersScreen() {
               className={styles.invite}
               onSubmit={async (event) => {
                 event.preventDefault()
-                // Invitar, no anadir: no entra en el equipo hasta que acepte.
-                await invitaciones.invite.mutateAsync({ email: email.trim(), role })
+                // Invitar, no anadir: no entra en el equipo hasta que acepte. El rol no se
+                // elige aqui: entra como alumno o como docente segun su tipo de cuenta, y
+                // a responsable se le puede pasar despues desde esta misma pantalla.
+                await invitaciones.invite.mutateAsync({ email: email.trim() })
                 setEmail('')
               }}
             >
@@ -73,35 +83,6 @@ export function MembersScreen() {
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="companero@uni.es"
                 />
-              </div>
-
-              <div>
-                <span className={styles.label}>Puede</span>
-                <Dropdown
-                  align="left"
-                  trigger={({ toggle }) => (
-                    <button type="button" className={styles.roleButton} onClick={toggle}>
-                      {ROLE_LABELS[role]}
-                    </button>
-                  )}
-                >
-                  {(close) => (
-                    <>
-                      {ROLES.map((item) => (
-                        <DropdownItem
-                          key={item}
-                          active={item === role}
-                          onClick={() => {
-                            close()
-                            setRole(item)
-                          }}
-                        >
-                          {ROLE_LABELS[item]}
-                        </DropdownItem>
-                      ))}
-                    </>
-                  )}
-                </Dropdown>
               </div>
 
               <Button type="submit" disabled={invitaciones.invite.isPending || !email.trim()}>
@@ -133,7 +114,7 @@ export function MembersScreen() {
                         <div className={styles.mail}>{member.user.email}</div>
                       </div>
 
-                      {manageable ? (
+                      {manageable && member.role !== 'DOCENTE' ? (
                         <Dropdown
                           trigger={({ toggle }) => (
                             <button className={styles.roleButton} onClick={toggle}>
@@ -143,7 +124,7 @@ export function MembersScreen() {
                         >
                           {(close) => (
                             <>
-                              {ROLES.map((item) => (
+                              {rolesDisponiblesPara(member.role).map((item) => (
                                 <DropdownItem
                                   key={item}
                                   active={item === member.role}

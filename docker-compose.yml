@@ -70,10 +70,11 @@ services:
       SERVER_PORT: 8080
       UPLOAD_DIR: /app/uploads
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10MB}
-      # Modulo de IA: modelo local servido por Ollama en la maquina anfitriona.
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3}
+      # Modulo de IA: modelo alojado en Groq, no local. Hace falta GROQ_API_KEY en .env.
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
       AI_ENABLED: ${AI_ENABLED:-true}
+      AI_TIMEOUT: ${AI_TIMEOUT:-2m}
       # Correo de las invitaciones. En desarrollo va a Mailpit, que no lo reenvia
       # a ninguna parte; para mandarlo de verdad, apunta MAIL_HOST a un SMTP real.
       MAIL_HOST: ${MAIL_HOST:-mailpit}
@@ -85,9 +86,6 @@ services:
       # valor por defecto antes de desplegar de verdad.
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@planifia.local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
-    # Permite al contenedor resolver la maquina anfitriona, donde corre Ollama.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       # Los ficheros adjuntos de las tareas viven fuera del contenedor.
       - uploads-data:/app/uploads

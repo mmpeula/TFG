@@ -49,7 +49,7 @@ public final class TaskSpecifications {
                 predicates.add(cb.equal(column.get("id"), columnId));
             }
             if (assigneeId != null) {
-                predicates.add(cb.equal(root.get("assignee").get("id"), assigneeId));
+                predicates.add(isAssignee(cb, query, root, assigneeId));
             }
             if (priority != null) {
                 predicates.add(cb.equal(root.get("priority"), priority));
@@ -67,6 +67,24 @@ public final class TaskSpecifications {
         subquery.select(cb.literal(1))
                 .where(cb.equal(member.get("team"), project.get("team")),
                         cb.equal(member.get("user").get("id"), userId));
+        return cb.exists(subquery);
+    }
+
+    /**
+     * EXISTS (select 1 from Task t join t.assignees a where t = root and a.id = :assigneeId).
+     * Igual que {@link #isTeamMember}, un EXISTS en vez de un join+distinct: con
+     * "assignees" siendo una relacion a muchos, un join normal en la consulta
+     * principal multiplicaria filas, y no se puede arreglar con distinct porque
+     * Oracle no admite el CLOB de {@code Task.description} como clave de
+     * comparacion en un SELECT DISTINCT (ORA-22848).
+     */
+    private static Predicate isAssignee(CriteriaBuilder cb, CommonAbstractCriteria query,
+                                        Root<Task> root, Long assigneeId) {
+        Subquery<Integer> subquery = query.subquery(Integer.class);
+        Root<Task> task = subquery.from(Task.class);
+        Join<Task, User> assignee = task.join("assignees");
+        subquery.select(cb.literal(1))
+                .where(cb.equal(task, root), cb.equal(assignee.get("id"), assigneeId));
         return cb.exists(subquery);
     }
 }

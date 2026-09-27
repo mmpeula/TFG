@@ -36,6 +36,17 @@ final class TeamRoles {
         }
     }
 
+    /**
+     * El rol de equipo con el que entra alguien al aceptar una invitacion: el que
+     * le corresponde a su cuenta, nunca uno elegido a mano por quien invita. Una
+     * cuenta DOCENTE entra como docente; cualquier otra, como alumno. Llegar a
+     * RESPONSABLE es un paso aparte, posterior: se cambia despues desde la
+     * pantalla de miembros, no se promete en la invitacion.
+     */
+    static Role entryRoleFor(User user) {
+        return user.getRole() == Role.DOCENTE ? Role.DOCENTE : Role.MIEMBRO;
+    }
+
     /** Permite que las cuentas antiguas RESPONSABLE sigan usando sus equipos. */
     private static boolean isMemberAccount(Role role) {
         return role == Role.MIEMBRO || role == Role.RESPONSABLE;

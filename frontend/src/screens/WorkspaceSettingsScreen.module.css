@@ -27,17 +27,6 @@
 
 .danger { padding-top: var(--space-2); border-top: 1px solid var(--color-divider); }
 
-.modalHint { font-size: 13px; color: var(--color-neutral-600); margin-bottom: var(--space-3); }
-.control {
-  width: 100%;
-  font-family: inherit; font-size: 14px; color: var(--color-text);
-  background: var(--color-bg);
-  border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-sm);
-  padding: 9px 11px;
-}
-.control:focus { outline: none; border-color: var(--color-neutral-900); }
-
 @media (max-width: 640px) {
   .data { grid-template-columns: 1fr; }
 }

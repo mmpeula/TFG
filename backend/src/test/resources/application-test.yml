@@ -18,7 +18,6 @@ app:
   # En los tests no se habla con ningun modelo: se comprueban el 503 y el parseo.
   ai:
     enabled: false
-    base-url: http://localhost:11434
     model: modelo-de-pruebas
   security:
     jwt:

@@ -19,8 +19,7 @@ public record TeamMemberResponse(
         Instant joinedAt,
 
         @Schema(description = "Lo que se sabe de esta persona al repartir trabajo en un plan. "
-                + "Se guarda y vale para todas las ejecuciones; no confundir con las indicaciones "
-                + "que se escriben justo antes de generar un plan, que solo valen para esa vez.")
+                + "Se guarda y vale para todas las ejecuciones.")
         String planNotes
 ) {
 

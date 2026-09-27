@@ -1,0 +1,12 @@
+.trigger {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; background: transparent; cursor: pointer;
+  border-radius: 999px; padding: 4px 10px;
+  font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--color-neutral-800);
+}
+.trigger:hover { background: var(--color-neutral-200); }
+
+/* Un avatar solapa un poco al anterior: varias personas se leen como un grupo, no como una lista. */
+.avatars { display: inline-flex; }
+.avatars > span + span { margin-left: -6px; }

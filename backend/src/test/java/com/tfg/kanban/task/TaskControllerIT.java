@@ -17,10 +17,10 @@ class TaskControllerIT extends AbstractApiIT {
     void memberManagesTasks() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo tareas");
+        Workspace workspace = createWorkspace(responsable, "Equipo tareas");
+        Long teamId = workspace.teamId();
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
-        Long projectId = createProject(responsable, teamId, "Practica tareas");
-        Long boardId = createBoard(responsable, projectId, "Tablero tareas");
+        Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);
 
         Long taskId = createTask(miembro, columns[0], "Escribir la introduccion");
@@ -29,11 +29,11 @@ class TaskControllerIT extends AbstractApiIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Escribir la introduccion y el resumen","priority":"ALTA",
-                                 "assigneeId":%d,"estimatedHours":3.5}
+                                 "assigneeIds":[%d],"estimatedHours":3.5}
                                 """.formatted(miembro.id())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.priority").value("ALTA"))
-                .andExpect(jsonPath("$.assignee.id").value(miembro.id()));
+                .andExpect(jsonPath("$.assignees[0].id").value(miembro.id()));
 
         mockMvc.perform(authorized(delete("/api/tasks/{id}", taskId), miembro))
                 .andExpect(status().isNoContent());
@@ -43,9 +43,9 @@ class TaskControllerIT extends AbstractApiIT {
     @DisplayName("Mover una tarea de columna la coloca en la posicion pedida y reindexa el origen")
     void moveTaskBetweenColumns() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo drag and drop");
-        Long projectId = createProject(responsable, teamId, "Practica drag and drop");
-        Long boardId = createBoard(responsable, projectId, "Tablero drag");
+        Workspace workspace = createWorkspace(responsable, "Equipo drag and drop");
+        Long teamId = workspace.teamId();
+        Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);
 
         Long first = createTask(responsable, columns[0], "Tarea 1");
@@ -76,9 +76,9 @@ class TaskControllerIT extends AbstractApiIT {
     @DisplayName("El limite WIP de la columna destino bloquea el movimiento")
     void wipLimitBlocksMove() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo WIP");
-        Long projectId = createProject(responsable, teamId, "Practica WIP");
-        Long boardId = createBoard(responsable, projectId, "Tablero WIP");
+        Workspace workspace = createWorkspace(responsable, "Equipo WIP");
+        Long teamId = workspace.teamId();
+        Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);
 
         // La columna "En curso" admite una sola tarea
@@ -111,10 +111,10 @@ class TaskControllerIT extends AbstractApiIT {
     void observerIsReadOnly() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser observador = registerUser(Role.DOCENTE);
-        Long teamId = createTeam(responsable, "Equipo observado");
+        Workspace workspace = createWorkspace(responsable, "Equipo observado");
+        Long teamId = workspace.teamId();
         addMember(responsable, teamId, observador, Role.DOCENTE);
-        Long projectId = createProject(responsable, teamId, "Practica observada");
-        Long boardId = createBoard(responsable, projectId, "Tablero observado");
+        Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);
         Long taskId = createTask(responsable, columns[0], "Tarea visible");
 
@@ -143,16 +143,16 @@ class TaskControllerIT extends AbstractApiIT {
     void cannotAssignOutsider() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser extrano = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo asignaciones");
-        Long projectId = createProject(responsable, teamId, "Practica asignaciones");
-        Long boardId = createBoard(responsable, projectId, "Tablero asignaciones");
+        Workspace workspace = createWorkspace(responsable, "Equipo asignaciones");
+        Long teamId = workspace.teamId();
+        Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);
         Long taskId = createTask(responsable, columns[0], "Tarea a asignar");
 
         mockMvc.perform(authorized(put("/api/tasks/{id}", taskId), responsable)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"Tarea a asignar","assigneeId":%d}
+                                {"title":"Tarea a asignar","assigneeIds":[%d]}
                                 """.formatted(extrano.id())))
                 .andExpect(status().isConflict());
     }
@@ -161,9 +161,9 @@ class TaskControllerIT extends AbstractApiIT {
     @DisplayName("El buscador combina los filtros de tablero, columna y prioridad")
     void searchCombinesFilters() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo filtros");
-        Long projectId = createProject(responsable, teamId, "Practica filtros");
-        Long boardId = createBoard(responsable, projectId, "Tablero filtros");
+        Workspace workspace = createWorkspace(responsable, "Equipo filtros");
+        Long teamId = workspace.teamId();
+        Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);
 
         Long urgente = createTask(responsable, columns[0], "Tarea urgente");
@@ -205,16 +205,17 @@ class TaskControllerIT extends AbstractApiIT {
     @DisplayName("El buscador de tareas filtra por proyecto y por persona asignada")
     void searchFiltersTasks() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo busqueda");
-        Long projectId = createProject(responsable, teamId, "Practica busqueda");
-        Long boardId = createBoard(responsable, projectId, "Tablero busqueda");
+        Workspace workspace = createWorkspace(responsable, "Equipo busqueda");
+        Long teamId = workspace.teamId();
+        Long projectId = workspace.id();
+        Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);
         Long taskId = createTask(responsable, columns[0], "Tarea buscada");
 
         mockMvc.perform(authorized(put("/api/tasks/{id}", taskId), responsable)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"Tarea buscada","assigneeId":%d}
+                                {"title":"Tarea buscada","assigneeIds":[%d]}
                                 """.formatted(responsable.id())))
                 .andExpect(status().isOk());
 

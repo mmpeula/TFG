@@ -16,7 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,22 +54,20 @@ class AccessServiceTest {
     }
 
     @Test
-    @DisplayName("El RESPONSABLE del equipo puede leer, escribir y administrar el proyecto")
+    @DisplayName("El RESPONSABLE del equipo puede leer y administrar el proyecto")
     void responsableHasFullControl() {
         withProjectRole(Role.RESPONSABLE);
 
         assertThat(accessService.canReadProject(7L)).isTrue();
-        assertThat(accessService.canWriteProject(7L)).isTrue();
         assertThat(accessService.canManageProject(7L)).isTrue();
     }
 
     @Test
-    @DisplayName("El MIEMBRO lee y escribe pero no administra")
+    @DisplayName("El MIEMBRO lee pero no administra")
     void memberCannotManage() {
         withProjectRole(Role.MIEMBRO);
 
         assertThat(accessService.canReadProject(7L)).isTrue();
-        assertThat(accessService.canWriteProject(7L)).isTrue();
         assertThat(accessService.canManageProject(7L)).isFalse();
     }
 
@@ -80,7 +77,6 @@ class AccessServiceTest {
         withProjectRole(Role.DOCENTE);
 
         assertThat(accessService.canReadProject(7L)).isTrue();
-        assertThat(accessService.canWriteProject(7L)).isFalse();
         assertThat(accessService.canManageProject(7L)).isFalse();
     }
 
@@ -90,7 +86,6 @@ class AccessServiceTest {
         withProjectRole(null);
 
         assertThat(accessService.canReadProject(7L)).isFalse();
-        assertThat(accessService.canWriteProject(7L)).isFalse();
         assertThat(accessService.canManageProject(7L)).isFalse();
     }
 

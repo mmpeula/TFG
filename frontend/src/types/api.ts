@@ -55,17 +55,6 @@ export interface AuthResponse {
 
 export interface TeamSummary { id: number; name: string }
 
-export interface TeamResponse {
-  id: number
-  name: string
-  description?: string
-  owner: UserSummary
-  memberCount: number
-  projectCount: number
-  myRole: Role | null
-  createdAt: string
-}
-
 /** Un workspace visto desde administracion: diagnostico, sin contenido del tablero. */
 export interface AdminWorkspaceResponse {
   id: number
@@ -119,11 +108,7 @@ export interface TeamMemberResponse {
   user: UserSummary
   role: Role
   joinedAt: string
-  /**
-   * Lo que se sabe de esta persona al repartir trabajo en un plan. Se guarda y vale
-   * para todas las ejecuciones; no confundir con las indicaciones que se escriben
-   * justo antes de generar un plan, que solo valen para esa vez.
-   */
+  /** Lo que se sabe de esta persona al repartir trabajo en un plan. Se guarda y vale para todas las ejecuciones. */
   planNotes?: string | null
 }
 
@@ -155,7 +140,7 @@ export interface TaskResponse {
   columnName: string
   boardId: number
   projectId: number
-  assignee?: UserSummary
+  assignees: UserSummary[]
   createdBy?: UserSummary
   commentCount: number
   attachmentCount: number
@@ -229,17 +214,19 @@ export interface ProposedTask {
   estimatedHours?: number
   /** Ultimo dia laborable de su sprint. Lo fija el servidor, no el modelo. */
   dueDate?: string
-  assigneeId?: number
-  assigneeName?: string
-  /** Titulos de las tareas de las que depende. */
+  /** Miembros a los que se reparte. Normalmente uno; mas de uno solo si la IA decide que la colaboracion aporta algo. */
+  assigneeIds: number[]
+  assigneeNames: string[]
+  /** Titulos de las tareas de las que depende. Ya validadas por el servidor. */
   dependsOn?: string[]
 }
 
-/** Un sprint del plan: las fechas las pone el servidor, el objetivo el modelo. */
+/** Un sprint del plan: las fechas las pone el servidor. */
 export interface PlannedSprint {
   number: number
   start: string
   end: string
+  /** Objetivo del sprint segun el modelo. */
   goal?: string | null
 }
 
@@ -253,9 +240,14 @@ export interface PlanTeamSlot {
 /** Ajustes de una generacion. Nada de esto se guarda. */
 export interface PlanOptions {
   startDate?: string | null
+  deadline?: string | null
   sprintDays?: number | null
-  indications?: string
   team?: PlanTeamSlot[]
+}
+
+/** Lo que se ha encontrado en el documento, sin generar nada todavia. */
+export interface DetectedDateResponse {
+  startDate: string | null
 }
 
 export interface MemberWorkload {
@@ -263,16 +255,8 @@ export interface MemberWorkload {
   memberName: string
   tasks: number
   hours: number
-}
-
-/**
- * Fechas con las que se ha hecho el plan, solo las que no coinciden con las del
- * workspace. Guardarlas hace que la pestana Plan pinte los mismos sprints.
- */
-export interface SuggestedSchedule {
-  startDate?: string | null
-  deadline?: string | null
-  sprintDays?: number | null
+  /** Horas de las que dispone en todo el plan, segun sus horas por semana. */
+  capacityHours: number
 }
 
 export interface AiPlanResponse {
@@ -290,7 +274,6 @@ export interface AiPlanResponse {
   workload: MemberWorkload[]
   /** Avisos del modelo y reglas que el plan no cumple tras los reintentos. */
   warnings: string[]
-  schedule?: SuggestedSchedule | null
   /** Llamadas al modelo que ha costado: 1 si el primer plan ya era valido. */
   attempts: number
   generatedAt: string
@@ -337,14 +320,6 @@ export interface ChatResponse {
   /** Que datos del workspace ha visto el modelo, para poder ensenarlo. */
   contextSummary: string
   generatedAt: string
-}
-
-export interface HealthResponse {
-  status: 'UP' | 'DOWN'
-  application: string
-  profile: string
-  timestamp: string
-  database: { status: 'UP' | 'DOWN'; product?: string; version?: string; error?: string }
 }
 
 export type SignalKind = 'parada' | 'saturacion' | 'fecha' | 'bloqueo'

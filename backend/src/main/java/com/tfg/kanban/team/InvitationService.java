@@ -65,7 +65,11 @@ public class InvitationService {
             throw new BusinessRuleException("Ya tiene una invitacion pendiente de responder");
         }
 
-        Role role = TeamRoles.ensureTeamRole(request.role() == null ? Role.MIEMBRO : request.role());
+        // El rol no lo elige quien invita: es el que le corresponde a la cuenta del
+        // invitado. Llegar a RESPONSABLE es un paso aparte, posterior a entrar. Se
+        // comprueba igual porque hay cuentas que no caben en ningun equipo (ADMIN):
+        // sin esto se mandaria una invitacion que nunca se podria aceptar.
+        Role role = TeamRoles.entryRoleFor(invited);
         TeamRoles.ensureRoleMatchesAccount(invited, role);
 
         User quienInvita = SecurityUtils.currentUserId().flatMap(userRepository::findById).orElse(null);

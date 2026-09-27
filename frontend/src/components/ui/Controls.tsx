@@ -18,6 +18,7 @@ export function Segmented<T extends string>({
       {options.map((option) => (
         <button
           key={option.value}
+          type="button"
           role="tab"
           aria-selected={option.value === value}
           className={[styles.segment, option.value === value && styles.segmentActive]
@@ -43,6 +44,7 @@ export function Chip({
 }) {
   return (
     <button
+      type="button"
       className={[styles.chip, active && styles.chipActive].filter(Boolean).join(' ')}
       onClick={onClick}
       aria-pressed={active}
@@ -102,7 +104,11 @@ export function DropdownItem({
   active?: boolean
 }) {
   return (
-    <button className={[styles.item, active && styles.itemActive].filter(Boolean).join(' ')} onClick={onClick}>
+    <button
+      type="button"
+      className={[styles.item, active && styles.itemActive].filter(Boolean).join(' ')}
+      onClick={onClick}
+    >
       {children}
     </button>
   )

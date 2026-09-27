@@ -59,9 +59,8 @@ public class TeamMember extends Auditable {
      * el responsable de un equipo editara el perfil que esa persona arrastra a
      * equipos suyos en los que el no pinta nada.</p>
      *
-     * <p>Es distinto de las indicaciones que se escriben justo antes de generar
-     * un plan: aquellas valen solo para esa vez y no se guardan en ningun sitio.
-     * Esto se queda y se usa en todas las ejecuciones siguientes.</p>
+     * <p>Se queda y se usa en todas las ejecuciones siguientes: no hace falta
+     * volver a escribirlo cada vez que se genera un plan.</p>
      */
     @Size(max = MAX_PLAN_NOTES)
     @Column(name = "PLAN_NOTES", length = MAX_PLAN_NOTES)

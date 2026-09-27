@@ -38,11 +38,11 @@ import java.util.stream.Collectors;
 public class AssistantChatService {
 
     /*
-     * Igual que el prompt de AiPlanService, escrito para un modelo pequeno en local.
+     * Igual que el prompt de AiPlanService, escrito para un modelo alojado en Groq.
      * Lo que mas mejora las respuestas no son las reglas de estilo sino las recetas
      * del final: son las preguntas que la interfaz sugiere al abrir el chat, asi que
-     * son las que de verdad se hacen, y sin decirle como contestarlas un 8B se va por
-     * las ramas o suelta una parrafada de manual de gestion de proyectos.
+     * son las que de verdad se hacen, y sin decirle como contestarlas el modelo se va
+     * por las ramas o suelta una parrafada de manual de gestion de proyectos.
      *
      * Nada de markdown a proposito: la respuesta se pinta como texto plano, asi que
      * unos asteriscos de negrita saldrian tal cual en pantalla.
@@ -115,7 +115,7 @@ public class AssistantChatService {
     private static final int DIAS_PARADA = 4;
 
     private final AiProperties properties;
-    private final OllamaClient ollamaClient;
+    private final GroqClient groqClient;
     private final WorkspaceService workspaceService;
     private final TaskRepository taskRepository;
     private final CommentRepository commentRepository;
@@ -130,16 +130,16 @@ public class AssistantChatService {
         List<Task> tasks = tasksOf(project);
         String context = buildContext(project, tasks);
 
-        List<OllamaClient.Message> messages = new ArrayList<>();
-        messages.add(new OllamaClient.Message("user", context));
-        messages.add(new OllamaClient.Message("assistant",
+        List<GroqClient.Message> messages = new ArrayList<>();
+        messages.add(new GroqClient.Message("user", context));
+        messages.add(new GroqClient.Message("assistant",
                 "Vale, ya tengo delante el tablero de este workspace. Que necesitas?"));
         for (ChatTurn turn : recent(request.historyOrEmpty())) {
-            messages.add(new OllamaClient.Message(normalizeRole(turn.role()), turn.content()));
+            messages.add(new GroqClient.Message(normalizeRole(turn.role()), turn.content()));
         }
-        messages.add(new OllamaClient.Message("user", request.message()));
+        messages.add(new GroqClient.Message("user", request.message()));
 
-        String answer = ollamaClient.chatText(SYSTEM_PROMPT, messages).trim();
+        String answer = groqClient.chatText(SYSTEM_PROMPT, messages).trim();
         if (answer.isBlank()) {
             throw new AiUnavailableException("El modelo no ha sabido que responder; prueba a reformular la pregunta");
         }
@@ -179,8 +179,8 @@ public class AssistantChatService {
         sb.append("\nPersonas del equipo:\n");
         for (TeamMember member : project.getTeam().getMembers()) {
             long suyas = tasks.stream()
-                    .filter(task -> task.getAssignee() != null
-                            && task.getAssignee().getId().equals(member.getUser().getId()))
+                    .filter(task -> task.getAssignees().stream()
+                            .anyMatch(assignee -> assignee.getId().equals(member.getUser().getId())))
                     .filter(task -> !esUltimaColumna(task))
                     .count();
             boolean esQuienPregunta = member.getUser().getId().equals(quienPregunta);
@@ -205,10 +205,11 @@ public class AssistantChatService {
             sb.append("- «").append(task.getTitle()).append("»")
                     .append(" | estado: ").append(task.getBoardColumn().getName())
                     .append(" | prioridad: ").append(task.getPriority().name().toLowerCase());
-            if (task.getAssignee() != null) {
-                sb.append(" | responsable: ").append(task.getAssignee().getFullName());
-            } else {
+            if (task.getAssignees().isEmpty()) {
                 sb.append(" | sin responsable");
+            } else {
+                sb.append(" | responsable: ").append(task.getAssignees().stream()
+                        .map(User::getFullName).collect(Collectors.joining(", ")));
             }
             if (task.getDueDate() != null) {
                 long dias = ChronoUnit.DAYS.between(hoy, task.getDueDate());

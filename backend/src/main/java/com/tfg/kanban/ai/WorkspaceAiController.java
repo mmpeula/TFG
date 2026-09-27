@@ -43,7 +43,7 @@ public class WorkspaceAiController {
             @ApiResponse(responseCode = "200", description = "Respuesta generada"),
             @ApiResponse(responseCode = "403", description = "No se pertenece a este workspace",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "El modelo local no esta disponible",
+            @ApiResponse(responseCode = "503", description = "Groq no esta disponible",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PreAuthorize("@access.canReadProject(#workspaceId)")
@@ -67,8 +67,7 @@ public class WorkspaceAiController {
 
     @Schema(description = "Descripcion libre del trabajo, mas los ajustes de esta generacion", example = """
             {"text":"Tenemos que hacer una practica de bases de datos con modelo E/R y consultas SQL",
-             "options":{"startDate":"2026-10-01","sprintDays":14,
-                        "indications":"Ana esta liada esta semana, dale menos carga que al resto"}}
+             "options":{"startDate":"2026-10-01","sprintDays":14}}
             """)
     public record TextRequest(
             @NotBlank(message = "escribe de que va el trabajo") String text,

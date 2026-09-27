@@ -27,19 +27,19 @@ class ErrorHandlingIT extends AbstractApiIT {
     @Test
     @DisplayName("Un endpoint protegido sin token responde 401 con el ApiError estandar")
     void protectedEndpointWithoutTokenReturnsUnauthorized() throws Exception {
-        mockMvc.perform(get("/api/teams"))
+        mockMvc.perform(get("/api/workspaces"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
-                .andExpect(jsonPath("$.path").value("/api/teams"))
+                .andExpect(jsonPath("$.path").value("/api/workspaces"))
                 .andExpect(jsonPath("$.message").isNotEmpty());
     }
 
     @Test
     @DisplayName("Un token invalido tampoco da acceso: 401")
     void invalidTokenReturnsUnauthorized() throws Exception {
-        mockMvc.perform(get("/api/teams").header("Authorization", "Bearer no-es-un-token"))
+        mockMvc.perform(get("/api/workspaces").header("Authorization", "Bearer no-es-un-token"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
@@ -60,7 +60,7 @@ class ErrorHandlingIT extends AbstractApiIT {
     void malformedJsonReturnsBadRequest() throws Exception {
         TestUser user = registerUser(Role.MIEMBRO);
 
-        mockMvc.perform(authorized(post("/api/teams"), user)
+        mockMvc.perform(authorized(post("/api/workspaces"), user)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{"))
                 .andExpect(status().isBadRequest())

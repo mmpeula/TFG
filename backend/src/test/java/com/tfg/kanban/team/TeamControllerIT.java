@@ -13,40 +13,55 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TeamControllerIT extends AbstractApiIT {
 
     @Test
-    @DisplayName("Quien crea el equipo queda como RESPONSABLE y lo ve en su listado")
-    void createTeamMakesCreatorResponsable() throws Exception {
+    @DisplayName("Quien crea el workspace queda como unico RESPONSABLE de su equipo")
+    void creatorIsTheResponsable() throws Exception {
         TestUser creator = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(creator, "Grupo de prueba");
+        Long teamId = createWorkspace(creator, "Grupo de prueba").teamId();
 
-        mockMvc.perform(authorized(get("/api/teams/{id}", teamId), creator))
+        mockMvc.perform(authorized(get("/api/teams/{id}/members", teamId), creator))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.myRole").value("RESPONSABLE"))
-                .andExpect(jsonPath("$.memberCount").value(1));
-
-        mockMvc.perform(authorized(get("/api/teams"), creator))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(teamId)).exists());
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].role").value("RESPONSABLE"));
     }
 
     @Test
-    @DisplayName("Un extrano no puede ver el equipo")
+    @DisplayName("Un extrano no puede ver quien esta en el equipo")
     void outsiderCannotSeeTeam() throws Exception {
         TestUser owner = registerUser(Role.MIEMBRO);
         TestUser outsider = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(owner, "Equipo privado");
+        Long teamId = createWorkspace(owner, "Equipo privado").teamId();
 
-        mockMvc.perform(authorized(get("/api/teams/{id}", teamId), outsider))
+        mockMvc.perform(authorized(get("/api/teams/{id}/members", teamId), outsider))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 
     @Test
-    @DisplayName("El RESPONSABLE anade miembros y les cambia el rol; el MIEMBRO no puede")
+    @DisplayName("Nadie entra en un equipo sin invitacion: no hay forma de anadir a alguien directamente")
+    void thereIsNoWayToAddSomeoneWithoutAnInvitation() throws Exception {
+        TestUser responsable = registerUser(Role.MIEMBRO);
+        TestUser otro = registerUser(Role.MIEMBRO);
+        Long teamId = createWorkspace(responsable, "Equipo cerrado").teamId();
+
+        mockMvc.perform(authorized(post("/api/teams/{id}/members", teamId), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","role":"MIEMBRO"}
+                                """.formatted(otro.email())))
+                .andExpect(status().isMethodNotAllowed());
+
+        mockMvc.perform(authorized(get("/api/teams/{id}/members", teamId), responsable))
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("El RESPONSABLE invita y cambia roles; el MIEMBRO no puede")
     void memberManagementIsRestrictedToResponsable() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
         TestUser otro = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo con miembros");
+        Workspace workspace = createWorkspace(responsable, "Equipo con miembros");
+        Long teamId = workspace.teamId();
 
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
 
@@ -55,10 +70,10 @@ class TeamControllerIT extends AbstractApiIT {
                 .andExpect(jsonPath("$.length()").value(2));
 
         // El MIEMBRO no puede invitar a nadie
-        mockMvc.perform(authorized(post("/api/teams/{id}/members", teamId), miembro)
+        mockMvc.perform(authorized(post("/api/teams/{id}/invitations", teamId), miembro)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"%s","role":"MIEMBRO"}
+                                {"email":"%s"}
                                 """.formatted(otro.email())))
                 .andExpect(status().isForbidden());
 
@@ -74,7 +89,8 @@ class TeamControllerIT extends AbstractApiIT {
     @DisplayName("No se puede dejar al equipo sin ningun RESPONSABLE")
     void cannotRemoveLastResponsable() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo de una persona");
+        Workspace workspace = createWorkspace(responsable, "Equipo de una persona");
+        Long teamId = workspace.teamId();
 
         mockMvc.perform(authorized(patch("/api/teams/{id}/members/{userId}", teamId, responsable.id()), responsable)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -88,7 +104,8 @@ class TeamControllerIT extends AbstractApiIT {
     void theCreatorCanLeaveHandingOverTheTeam() throws Exception {
         TestUser creador = registerUser(Role.MIEMBRO);
         TestUser companero = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(creador, "Equipo que cambia de manos");
+        Workspace workspace = createWorkspace(creador, "Equipo que cambia de manos");
+        Long teamId = workspace.teamId();
         addMember(creador, teamId, companero, Role.RESPONSABLE);
 
         mockMvc.perform(authorized(delete("/api/teams/{id}/members/{userId}", teamId, creador.id()), creador))
@@ -111,7 +128,8 @@ class TeamControllerIT extends AbstractApiIT {
     void planNotesSurviveAndTravelWithTheMember() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser companero = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo con fichas");
+        Workspace workspace = createWorkspace(responsable, "Equipo con fichas");
+        Long teamId = workspace.teamId();
         addMember(responsable, teamId, companero, Role.MIEMBRO);
 
         mockMvc.perform(authorized(
@@ -141,7 +159,8 @@ class TeamControllerIT extends AbstractApiIT {
     void onlyResponsableWritesPlanNotes() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser companero = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo con fichas");
+        Workspace workspace = createWorkspace(responsable, "Equipo con fichas");
+        Long teamId = workspace.teamId();
         addMember(responsable, teamId, companero, Role.MIEMBRO);
 
         // Ni siquiera la suya propia: la ficha la mantiene quien coordina el equipo,
@@ -164,7 +183,8 @@ class TeamControllerIT extends AbstractApiIT {
     @DisplayName("Una ficha desmedida se rechaza por validacion")
     void planNotesAreCapped() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo con fichas");
+        Workspace workspace = createWorkspace(responsable, "Equipo con fichas");
+        Long teamId = workspace.teamId();
 
         mockMvc.perform(authorized(
                         patch("/api/teams/{id}/members/{userId}/notes", teamId, responsable.id()), responsable)
@@ -173,16 +193,5 @@ class TeamControllerIT extends AbstractApiIT {
                                 java.util.Map.of("planNotes", "a".repeat(601)))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-    }
-
-    @Test
-    @DisplayName("No se borra un equipo que aun tiene proyectos")
-    void cannotDeleteTeamWithProjects() throws Exception {
-        TestUser responsable = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo con proyecto");
-        createProject(responsable, teamId, "Practica 1");
-
-        mockMvc.perform(authorized(delete("/api/teams/{id}", teamId), responsable))
-                .andExpect(status().isConflict());
     }
 }

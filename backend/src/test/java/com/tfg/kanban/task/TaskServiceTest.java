@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -28,6 +29,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** Tests unitarios de la logica de tablero: limite WIP, reordenacion y asignaciones. */
@@ -139,7 +145,7 @@ class TaskServiceTest {
         when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 99L)).thenReturn(false);
 
-        TaskRequest request = new TaskRequest("Tarea", null, null, TaskPriority.ALTA, null, null, 99L);
+        TaskRequest request = new TaskRequest("Tarea", null, null, TaskPriority.ALTA, null, null, List.of(99L));
 
         assertThatThrownBy(() -> taskService.update(1L, request))
                 .isInstanceOf(BusinessRuleException.class)
@@ -163,5 +169,114 @@ class TaskServiceTest {
 
         assertThat(moved.getPosition()).isEqualTo(1);
         assertThat(other.getPosition()).isZero();
+    }
+
+    @Test
+    @DisplayName("Se puede asignar una tarea a varias personas del equipo a la vez")
+    void assignsMultipleUsersFromTheTeam() {
+        User ana = User.builder().id(2L).fullName("Ana").build();
+        User luis = User.builder().id(3L).fullName("Luis").build();
+        when(boardService.getColumn(11L)).thenReturn(doing);
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 2L)).thenReturn(true);
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 3L)).thenReturn(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(User.builder().id(1L).fullName("Yo").build()));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(ana));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(luis));
+        when(taskRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, List.of(2L, 3L));
+        taskService.create(11L, request);
+
+        ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
+        verify(taskRepository).save(captor.capture());
+        assertThat(captor.getValue().getAssignees()).extracting(User::getId).containsExactlyInAnyOrder(2L, 3L);
+    }
+
+    @Test
+    @DisplayName("Los ids repetidos de la misma persona se deduplican")
+    void deduplicatesRepeatedAssigneeIds() {
+        User ana = User.builder().id(2L).fullName("Ana").build();
+        when(boardService.getColumn(11L)).thenReturn(doing);
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 2L)).thenReturn(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(User.builder().id(1L).fullName("Yo").build()));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(ana));
+        when(taskRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, List.of(2L, 2L));
+        taskService.create(11L, request);
+
+        ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
+        verify(taskRepository).save(captor.capture());
+        assertThat(captor.getValue().getAssignees()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Si cualquiera de varios responsables no pertenece al equipo, falla entero")
+    void cannotAssignAnyUserOutsideTeamEvenIfOthersAreValid() {
+        Task existing = task(1L, "Tarea", todo, 0);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 2L)).thenReturn(true);
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 99L)).thenReturn(false);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(User.builder().id(2L).fullName("Ana").build()));
+
+        TaskRequest request = new TaskRequest("Tarea", null, null, TaskPriority.ALTA, null, null, List.of(2L, 99L));
+
+        assertThatThrownBy(() -> taskService.update(1L, request))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("no pertenece al equipo");
+    }
+
+    @Test
+    @DisplayName("Pasar de un responsable a dos registra la asignacion")
+    void changingFromOneToSeveralAssigneesLogsActivity() {
+        User ana = User.builder().id(2L).fullName("Ana").build();
+        User luis = User.builder().id(3L).fullName("Luis").build();
+        Task existing = task(1L, "Tarea", todo, 0);
+        existing.getAssignees().add(ana);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 2L)).thenReturn(true);
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 3L)).thenReturn(true);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(ana));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(luis));
+
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, List.of(2L, 3L));
+        taskService.update(1L, request);
+
+        verify(activityService).record(eq(project), eq(ActivityAction.ASIGNACION), eq("Task"), eq(1L), anyString());
+    }
+
+    @Test
+    @DisplayName("Vaciar los responsables tambien registra la asignacion")
+    void removingAllAssigneesLogsActivity() {
+        User ana = User.builder().id(2L).fullName("Ana").build();
+        Task existing = task(1L, "Tarea", todo, 0);
+        existing.getAssignees().add(ana);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, List.of());
+        taskService.update(1L, request);
+
+        verify(activityService).record(eq(project), eq(ActivityAction.ASIGNACION), eq("Task"), eq(1L),
+                contains("sin asignar"));
+    }
+
+    @Test
+    @DisplayName("Si el conjunto de responsables no cambia, no se registra una nueva asignacion aunque llegue en otro orden")
+    void unchangedAssigneeSetDoesNotLogActivity() {
+        User ana = User.builder().id(2L).fullName("Ana").build();
+        User luis = User.builder().id(3L).fullName("Luis").build();
+        Task existing = task(1L, "Tarea", todo, 0);
+        existing.getAssignees().addAll(List.of(ana, luis));
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 2L)).thenReturn(true);
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 3L)).thenReturn(true);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(ana));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(luis));
+
+        // Mismo conjunto, pero en el orden inverso al que ya tenia.
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, List.of(3L, 2L));
+        taskService.update(1L, request);
+
+        verify(activityService, never()).record(any(), eq(ActivityAction.ASIGNACION), any(), any(), anyString());
     }
 }

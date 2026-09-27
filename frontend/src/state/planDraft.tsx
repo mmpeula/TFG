@@ -5,9 +5,9 @@ import { PlanDraftsContext, EMPTY_PLAN_DRAFT, type PlanDraft } from './context'
  * Lo que hay a medio rellenar en la pantalla de Generar plan, por workspace.
  *
  * Vive aqui arriba, junto a las generaciones en curso, porque el trabajo previo
- * a darle a generar (subir el enunciado, escribir las indicaciones, elegir entre
- * cuantos repartir) es demasiado como para perderlo por pasarse un momento al
- * tablero. Se guarda por workspace: cada practica tiene su propio borrador.
+ * a darle a generar (subir el enunciado, elegir entre cuantos repartir) es
+ * demasiado como para perderlo por pasarse un momento al tablero. Se guarda por
+ * workspace: cada practica tiene su propio borrador.
  */
 export function PlanDraftsProvider({ children }: { children: ReactNode }) {
   const [drafts, setDrafts] = useState<Record<number, PlanDraft>>({})

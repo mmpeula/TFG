@@ -81,7 +81,7 @@ export function PlanScreen() {
   const columns = useMemo(() => columnsOf(detail?.columns), [detail])
   const tasks = useMemo(() => columns.flatMap((column) => column.tasks ?? []), [columns])
   const visibleTasks = useMemo(
-    () => (scope === 'mine' ? tasks.filter((task) => task.assignee?.id === user?.id) : tasks),
+    () => (scope === 'mine' ? tasks.filter((task) => task.assignees.some((assignee) => assignee.id === user?.id)) : tasks),
     [tasks, scope, user?.id],
   )
   const writable = canWrite(detail?.myRole ?? null)

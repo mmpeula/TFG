@@ -28,10 +28,11 @@ class AiPlanControllerIT extends AbstractApiIT {
     private Contexto contexto() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser miembro = registerUser(Role.MIEMBRO);
-        Long teamId = createTeam(responsable, "Equipo IA");
+        Workspace workspace = createWorkspace(responsable, "Equipo IA");
+        Long teamId = workspace.teamId();
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
-        Long projectId = createProject(responsable, teamId, "Practica con IA");
-        Long boardId = createBoard(responsable, projectId, "Tablero IA");
+        Long projectId = workspace.id();
+        Long boardId = workspace.boardId();
         return new Contexto(responsable, miembro, projectId, boardId);
     }
 
@@ -43,7 +44,7 @@ class AiPlanControllerIT extends AbstractApiIT {
         String body = """
                 {"boardId":%d,"tasks":[
                   {"title":"Modelar el esquema","reason":"Lo pide el guion","tag":"analisis",
-                   "priority":"ALTA","estimatedHours":6,"assigneeId":%d,"assigneeName":"Quien sea"}
+                   "priority":"ALTA","estimatedHours":6,"assigneeIds":[%d],"assigneeNames":["Quien sea"]}
                 ]}
                 """.formatted(ctx.boardId(), ctx.miembro().id());
 
@@ -53,7 +54,7 @@ class AiPlanControllerIT extends AbstractApiIT {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].title").value("Modelar el esquema"))
                 .andExpect(jsonPath("$[0].aiGenerated").value(true))
-                .andExpect(jsonPath("$[0].assignee.id").value(ctx.miembro().id()))
+                .andExpect(jsonPath("$[0].assignees[0].id").value(ctx.miembro().id()))
                 .andExpect(jsonPath("$[0].columnName").value("Por hacer"));
     }
 
@@ -102,7 +103,7 @@ class AiPlanControllerIT extends AbstractApiIT {
     void acceptsOptionsPartAlongsideTheDocument() throws Exception {
         Contexto ctx = contexto();
         String options = """
-                {"startDate":"2027-01-04","sprintDays":14,"indications":"Nada de reuniones",
+                {"startDate":"2027-01-04","sprintDays":14,
                  "team":[{"userId":%d,"hoursPerWeek":12,"preferences":"Backend; Java"}]}
                 """.formatted(ctx.miembro().id());
 

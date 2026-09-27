@@ -7,6 +7,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
@@ -50,6 +51,20 @@ class DocumentTextExtractorTest {
         }
     }
 
+    /** Una tabla de Word de verdad, con filas y columnas reales en su XML. */
+    private byte[] docxWithTable(String[][] filas) throws Exception {
+        try (XWPFDocument document = new XWPFDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            XWPFTable table = document.createTable(filas.length, filas[0].length);
+            for (int fila = 0; fila < filas.length; fila++) {
+                for (int columna = 0; columna < filas[fila].length; columna++) {
+                    table.getRow(fila).getCell(columna).setText(filas[fila][columna]);
+                }
+            }
+            document.write(out);
+            return out.toByteArray();
+        }
+    }
+
     @Test
     @DisplayName("Extrae el texto de un PDF")
     void readsPdf() throws Exception {
@@ -67,6 +82,24 @@ class DocumentTextExtractorTest {
                 docx("Entrega: memoria de 10 paginas y presentacion"));
 
         assertThat(extractor.extract(file)).contains("memoria de 10 paginas");
+    }
+
+    @Test
+    @DisplayName("Las tablas de un Word se extraen como tabla HTML de verdad, con filas y columnas, no como texto aplanado")
+    void readsDocxTablesAsRealHtmlTables() throws Exception {
+        var file = new MockMultipartFile("file", "guion.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                docxWithTable(new String[][] {
+                        {"Sprint", "Fecha de entrega"},
+                        {"Sprint 1", "05/10/2026"},
+                        {"Sprint 2", "19/10/2026"},
+                }));
+
+        String html = extractor.extract(file);
+
+        assertThat(html).contains("<table").contains("<tr").contains("<td")
+                .contains("Sprint 1").contains("05/10/2026")
+                .contains("Sprint 2").contains("19/10/2026");
     }
 
     @Test
@@ -111,14 +144,26 @@ class DocumentTextExtractorTest {
     }
 
     @Test
-    @DisplayName("Un documento enorme se recorta para que quepa en el contexto del modelo")
+    @DisplayName("Un documento descomunal se recorta, como red de seguridad")
     void truncatesHugeDocument() {
-        String largo = "palabra ".repeat(4000);
+        String largo = "palabra ".repeat(11_000);
         var file = new MockMultipartFile("file", "tocho.txt", "text/plain", largo.getBytes(StandardCharsets.UTF_8));
 
         String text = extractor.extract(file);
 
         assertThat(text).hasSizeLessThan(largo.length()).endsWith("[...documento recortado por longitud...]");
+    }
+
+    @Test
+    @DisplayName("Un documento largo pero normal no se recorta: hace falta entero para cosas como la fecha")
+    void doesNotTruncateAnOrdinaryLongDocument() {
+        // Un guion de practica largo de verdad, no descomunal: unas 30 paginas.
+        String largo = "palabra ".repeat(9_000);
+        var file = new MockMultipartFile("file", "guion.txt", "text/plain", largo.getBytes(StandardCharsets.UTF_8));
+
+        String text = extractor.extract(file);
+
+        assertThat(text).doesNotContain("recortado").hasSize(largo.trim().length());
     }
 
     @Test

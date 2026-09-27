@@ -1,7 +1,6 @@
 package com.tfg.kanban.team;
 
 import com.tfg.kanban.common.BusinessRuleException;
-import com.tfg.kanban.common.PageResponse;
 import com.tfg.kanban.common.ResourceNotFoundException;
 import com.tfg.kanban.domain.model.Role;
 import com.tfg.kanban.domain.model.Team;
@@ -9,11 +8,8 @@ import com.tfg.kanban.domain.model.TeamMember;
 import com.tfg.kanban.domain.model.User;
 import com.tfg.kanban.domain.repository.TeamMemberRepository;
 import com.tfg.kanban.domain.repository.TeamRepository;
-import com.tfg.kanban.domain.repository.UserRepository;
-import com.tfg.kanban.security.SecurityUtils;
 import com.tfg.kanban.team.dto.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,10 +17,11 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * Equipos y sus miembros.
+ * Los miembros de un equipo: roles, indicaciones para el plan y salidas.
  *
- * Quien crea el equipo queda automaticamente como RESPONSABLE del mismo, de forma
- * que siempre hay al menos una persona que puede administrarlo.
+ * <p>El equipo lo crea su workspace, con quien lo crea como RESPONSABLE, y se entra
+ * en el por invitacion (ver {@link InvitationService}). La regla que se protege
+ * aqui es que nunca se quede sin ninguna persona responsable.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -33,88 +30,12 @@ public class TeamService {
 
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
-    private final UserRepository userRepository;
-
-    public PageResponse<TeamResponse> findMine(Pageable pageable) {
-        Long userId = SecurityUtils.requireCurrentUserId();
-        return PageResponse.of(teamRepository.findByMembers_User_Id(userId, pageable),
-                team -> TeamResponse.from(team, roleOf(team, userId)));
-    }
-
-    public TeamResponse findById(Long teamId) {
-        Team team = getTeam(teamId);
-        return TeamResponse.from(team, roleOf(team, SecurityUtils.requireCurrentUserId()));
-    }
-
-    @Transactional
-    public TeamResponse create(TeamRequest request) {
-        Long userId = SecurityUtils.requireCurrentUserId();
-        User owner = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
-
-        Team team = Team.builder()
-                .name(request.name().trim())
-                .description(request.description())
-                .owner(owner)
-                .build();
-
-        // El creador entra en el equipo como RESPONSABLE.
-        team.getMembers().add(TeamMember.builder()
-                .team(team)
-                .user(owner)
-                .role(Role.RESPONSABLE)
-                .build());
-
-        Team saved = teamRepository.save(team);
-        return TeamResponse.from(saved, Role.RESPONSABLE);
-    }
-
-    @Transactional
-    public TeamResponse update(Long teamId, TeamRequest request) {
-        Team team = getTeam(teamId);
-        team.setName(request.name().trim());
-        team.setDescription(request.description());
-        return TeamResponse.from(team, roleOf(team, SecurityUtils.requireCurrentUserId()));
-    }
-
-    @Transactional
-    public void delete(Long teamId) {
-        Team team = getTeam(teamId);
-        if (!team.getProjects().isEmpty()) {
-            throw new BusinessRuleException(
-                    "El equipo tiene proyectos asociados; borralos antes de eliminar el equipo");
-        }
-        teamRepository.delete(team);
-    }
 
     public List<TeamMemberResponse> findMembers(Long teamId) {
         getTeam(teamId);
         return teamMemberRepository.findByTeam_IdOrderByUser_FullNameAsc(teamId).stream()
                 .map(TeamMemberResponse::from)
                 .toList();
-    }
-
-    @Transactional
-    public TeamMemberResponse addMember(Long teamId, AddMemberRequest request) {
-        Team team = getTeam(teamId);
-        String email = request.email().trim().toLowerCase();
-        User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No hay ningun usuario registrado con el email " + email));
-
-        if (teamMemberRepository.existsByTeam_IdAndUser_Id(teamId, user.getId())) {
-            throw new BusinessRuleException("El usuario ya pertenece al equipo");
-        }
-
-        Role teamRole = TeamRoles.ensureTeamRole(request.role() == null ? Role.MIEMBRO : request.role());
-        TeamRoles.ensureRoleMatchesAccount(user, teamRole);
-        TeamMember member = TeamMember.builder()
-                .team(team)
-                .user(user)
-                .role(teamRole)
-                .build();
-
-        return TeamMemberResponse.from(teamMemberRepository.save(member));
     }
 
     @Transactional
@@ -134,9 +55,7 @@ public class TeamService {
      * Guarda lo que hay que saber de esta persona al repartir trabajo en un plan.
      *
      * <p>Se queda: vale para todos los planes que se generen despues en este
-     * workspace. Es lo contrario de las indicaciones que se escriben justo antes
-     * de generar un plan, que no se guardan en ningun sitio y mueren con esa
-     * ejecucion.</p>
+     * workspace.</p>
      *
      * <p>Un texto en blanco borra las indicaciones en vez de guardar una cadena
      * vacia, para que «sin indicaciones» sea un unico estado y no dos.</p>
@@ -208,14 +127,6 @@ public class TeamService {
             throw new BusinessRuleException(
                     "El equipo se quedaria sin responsable: nombra antes a otra persona responsable");
         }
-    }
-
-    private Role roleOf(Team team, Long userId) {
-        return team.getMembers().stream()
-                .filter(member -> member.getUser().getId().equals(userId))
-                .map(TeamMember::getRole)
-                .findFirst()
-                .orElse(null);
     }
 
 }

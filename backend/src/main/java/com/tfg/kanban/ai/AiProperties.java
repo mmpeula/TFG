@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 
 /**
- * Configuracion del modulo de IA. PlanifIA habla con un modelo que corre en
- * local (Ollama): no se envia nada a ningun servicio externo. El proveedor es
- * siempre Ollama; lo configurable es que modelo se usa y como se le llama.
+ * Configuracion del modulo de IA. PlanifIA habla con un modelo alojado en Groq;
+ * el documento y los datos del equipo que se mandan en el prompt salen de esta
+ * maquina hacia sus servidores para generar el plan.
  */
 @Getter
 @Setter
@@ -21,42 +21,46 @@ public class AiProperties {
     /** Si es false, el endpoint responde 503 explicando que la IA esta apagada. */
     private boolean enabled = true;
 
-    /** URL del servidor de Ollama. */
-    private String baseUrl = "http://localhost:11434";
+    /** URL de la API de Groq, compatible con el formato de OpenAI. */
+    private String baseUrl = "https://api.groq.com/openai/v1";
 
-    /** Modelo a usar. Debe estar descargado en el servidor (ollama pull ...). */
-    private String model = "llama3";
+    /** Clave de API de Groq. Sin ella no se puede hablar con el modelo. */
+    private String apiKey = "";
 
-    /** Un modelo de 8B en CPU tarda: el tiempo de espera es generoso a proposito. */
-    private Duration timeout = Duration.ofMinutes(3);
+    /** Modelo a usar, de los que sirve Groq (ver console.groq.com/docs/models). */
+    private String model = "openai/gpt-oss-120b";
+
+    /** Groq responde rapido (hardware LPU), pero un documento largo con varios sprints puede tardar. */
+    private Duration timeout = Duration.ofMinutes(2);
 
     /**
-     * Tope de seguridad de tareas que se aceptan de una respuesta. No es cuantas
-     * se le piden: un backlog de varios sprints y personas necesita decenas, y
-     * esto solo corta una respuesta desbocada.
+     * Tope de seguridad de cuantas tareas se aceptan del plan completo: un corte
+     * por si el documento tiene muchos sprints y la suma se dispara.
      */
     private int maxTasks = 60;
 
-    /** Temperatura baja: se busca un plan consistente, no creatividad. */
-    private double temperature = 0.3;
+    /** Temperatura baja: se busca un reparto consistente, no creatividad. */
+    private double temperature = 0.2;
 
     /**
-     * Ventana de contexto que se pide a Ollama (num_ctx). Su valor por defecto,
-     * 2048, no da ni para el enunciado: el prompt de sistema, el documento, el
-     * equipo y un backlog completo en JSON necesitan bastante mas. Por debajo de
-     * 8192 el JSON sale cortado a medias.
-     *
-     * <p>No se pone mas por defecto porque llama3 se entreno con 8192: por encima
-     * de su contexto nativo la salida empeora en vez de mejorar. Con un modelo de
-     * contexto largo (llama3.1, qwen2.5...) conviene subirlo con AI_NUM_CTX, sobre
-     * todo si se corrigen planes, que reenvian el anterior.</p>
-     */
-    private int numCtx = 8192;
-
-    /**
-     * Cuantas veces se le devuelve al modelo un plan que no pasa la validacion,
-     * con los errores concretos, para que lo corrija. Despues se muestra el
-     * ultimo tal cual con esos errores como avisos.
+     * Cuantas veces se repite la llamada antes de darlo por perdido: si la
+     * respuesta no es JSON valido, o si Groq ha limitado la peticion por su cuota
+     * de tokens por minuto (en ese caso se espera antes de cada reintento lo que la
+     * propia API dice, hasta 30 s). Con 2 caben incluso dos rachas de espera
+     * seguidas sin fallar, que es lo que tarda la cuota en recuperarse si se pide
+     * generar un plan varias veces seguidas en menos de un minuto.
      */
     private int maxRetries = 2;
+
+    /**
+     * Tope de tokens que el modelo puede generar en una sola llamada (max_tokens),
+     * cuando el presupuesto de la cuenta lo permite. Groq permite hasta 65536 en
+     * este modelo, pero esa cifra es la del modelo, no la de la cuenta: el tier
+     * gratuito ("on_demand") limita a solo 8000 tokens por minuto entre el prompt y
+     * la respuesta juntos. {@link GroqClient} calcula en cada llamada cuanto cabe
+     * de verdad segun el tamano del prompt y nunca pide mas que eso; este valor es
+     * solo el techo para cuando el prompt es pequeno. Con una cuenta de pago (Dev
+     * Tier) se puede subir sin que la cuota sea el problema.
+     */
+    private int maxOutputTokens = 6_000;
 }

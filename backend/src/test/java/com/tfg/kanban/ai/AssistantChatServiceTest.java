@@ -20,6 +20,7 @@ import org.mockito.quality.Strictness;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,7 +37,7 @@ import static org.mockito.Mockito.*;
 class AssistantChatServiceTest {
 
     @Mock private AiProperties properties;
-    @Mock private OllamaClient ollamaClient;
+    @Mock private GroqClient groqClient;
     @Mock private WorkspaceService workspaceService;
     @Mock private TaskRepository taskRepository;
     @Mock private CommentRepository commentRepository;
@@ -52,7 +53,7 @@ class AssistantChatServiceTest {
     @BeforeEach
     void setUp() {
         when(properties.isEnabled()).thenReturn(true);
-        when(properties.getModel()).thenReturn("llama3");
+        when(properties.getModel()).thenReturn("openai/gpt-oss-120b");
 
         ana = User.builder().id(1L).fullName("Ana Garcia").email("ana@uni.es").build();
         User luis = User.builder().id(2L).fullName("Luis Perez").email("luis@uni.es").build();
@@ -71,18 +72,19 @@ class AssistantChatServiceTest {
 
         when(workspaceService.getProject(10L)).thenReturn(project);
         when(commentRepository.countByTask_Id(any())).thenReturn(0L);
-        when(ollamaClient.chatText(anyString(), any())).thenReturn("Empezaria por el modelo E/R.");
+        when(groqClient.chatText(anyString(), any())).thenReturn("Empezaria por el modelo E/R.");
     }
 
     private Task task(Long id, String title, BoardColumn column, User assignee, LocalDate due) {
-        return Task.builder().id(id).title(title).boardColumn(column).assignee(assignee)
+        return Task.builder().id(id).title(title).boardColumn(column)
+                .assignees(assignee == null ? Set.of() : Set.of(assignee))
                 .priority(TaskPriority.ALTA).dueDate(due).estimatedHours(BigDecimal.valueOf(4)).build();
     }
 
     @SuppressWarnings("unchecked")
-    private List<OllamaClient.Message> capturarMensajes() {
-        ArgumentCaptor<List<OllamaClient.Message>> captor = ArgumentCaptor.forClass(List.class);
-        verify(ollamaClient).chatText(anyString(), captor.capture());
+    private List<GroqClient.Message> capturarMensajes() {
+        ArgumentCaptor<List<GroqClient.Message>> captor = ArgumentCaptor.forClass(List.class);
+        verify(groqClient).chatText(anyString(), captor.capture());
         return captor.getValue();
     }
 
@@ -100,7 +102,7 @@ class AssistantChatServiceTest {
         var response = service.answer(10L, new ChatRequest("Que hago primero?", null));
 
         assertThat(response.answer()).isEqualTo("Empezaria por el modelo E/R.");
-        assertThat(response.model()).isEqualTo("llama3");
+        assertThat(response.model()).isEqualTo("openai/gpt-oss-120b");
         assertThat(contexto())
                 .contains("Bases de Datos")
                 .contains("Modelar la base de datos")
@@ -204,7 +206,7 @@ class AssistantChatServiceTest {
 
         service.answer(10L, new ChatRequest("y ahora?", largo));
 
-        List<OllamaClient.Message> mensajes = capturarMensajes();
+        List<GroqClient.Message> mensajes = capturarMensajes();
         // contexto + respuesta de arranque + 6 turnos + la pregunta
         assertThat(mensajes).hasSize(9);
         assertThat(mensajes.get(2).content()).isEqualTo("3");
@@ -233,14 +235,14 @@ class AssistantChatServiceTest {
                 .isInstanceOf(AiUnavailableException.class)
                 .hasMessageContaining("desactivado");
 
-        verifyNoInteractions(ollamaClient);
+        verifyNoInteractions(groqClient);
     }
 
     @Test
     @DisplayName("Si el modelo devuelve una respuesta vacia se pide reformular")
     void rejectsEmptyAnswers() {
         when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of());
-        when(ollamaClient.chatText(anyString(), any())).thenReturn("   ");
+        when(groqClient.chatText(anyString(), any())).thenReturn("   ");
 
         assertThatThrownBy(() -> service.answer(10L, new ChatRequest("hola", null)))
                 .isInstanceOf(AiUnavailableException.class)
