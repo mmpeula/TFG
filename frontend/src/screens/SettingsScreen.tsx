@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { KeyRound, Pencil } from 'lucide-react'
 import { HomeShell } from '@/components/shell/HomeShell'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
@@ -9,18 +9,18 @@ import { Section } from './Section'
 import styles from './SettingsScreen.module.css'
 import { useUserMutations } from '@/hooks/useData'
 import { useAuth } from '@/state/context'
-import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '@/lib/roles'
+import { ROLE_LABELS } from '@/lib/roles'
 import { formatDateTime } from '@/lib/format'
 import type { UserResponse } from '@/types/api'
 
 /**
- * Mi cuenta: quien eres, qué rol global tienes y cómo cerrar sesión. El rol
- * que de verdad manda en cada workspace es el del equipo, no este — por eso
- * se explica junto a la sesión y no se deja como si fuera lo único que cuenta.
+ * Mi cuenta: quien eres, que rol global tienes, cuando se creo la cuenta y
+ * como editarla.
  */
 export function SettingsScreen() {
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const [editOpen, setEditOpen] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
 
   return (
     <HomeShell>
@@ -30,14 +30,20 @@ export function SettingsScreen() {
         <Section
           title="Perfil"
           action={
-            <Button variant="secondary" small onClick={() => setEditOpen(true)}>
-              <Pencil size={13} strokeWidth={2.75} />
-              Editar
-            </Button>
+            <div className={styles.headerActions}>
+              <Button variant="secondary" small onClick={() => setPasswordOpen(true)}>
+                <KeyRound size={13} strokeWidth={2.75} />
+                Cambiar contraseña
+              </Button>
+              <Button variant="secondary" small onClick={() => setEditOpen(true)}>
+                <Pencil size={13} strokeWidth={2.75} />
+                Editar
+              </Button>
+            </div>
           }
         >
           <div className={styles.profile}>
-            <Avatar user={user} size={56} />
+            <Avatar user={user} avatarUrl={user?.avatarUrl} size={56} />
             <div className={styles.identity}>
               <div className={styles.name}>{user?.fullName}</div>
               <div className={styles.hint}>{user?.email}</div>
@@ -54,36 +60,16 @@ export function SettingsScreen() {
               <dd>{formatDateTime(user?.createdAt)}</dd>
             </div>
           </dl>
-
-          <p className={styles.note}>
-            {user ? ROLE_DESCRIPTIONS[user.role] : ''} — pero el rol que manda en cada workspace es
-            el que te haya dado su responsable, no este.
-          </p>
-        </Section>
-
-        <Section title="Sesion">
-          <div className={styles.sessionRow}>
-            <p className={styles.hint}>Cierra la sesion en este dispositivo.</p>
-            <Button variant="secondary" small onClick={signOut}>
-              Cerrar sesion
-            </Button>
-          </div>
-        </Section>
-
-        <Section title="Sobre PlanifIA" subtitle="version de desarrollo">
-          <p className={styles.hint}>
-            Herramienta de gestion colaborativa de proyectos universitarios: tableros Kanban,
-            senales que se resuelven y un modulo de planificacion con IA todavia en construccion.
-          </p>
         </Section>
       </div>
 
       <EditProfileModal open={editOpen} user={user ?? null} onClose={() => setEditOpen(false)} />
+      <ChangePasswordModal open={passwordOpen} user={user ?? null} onClose={() => setPasswordOpen(false)} />
     </HomeShell>
   )
 }
 
-/** Nombre siempre; la contrasena solo se cambia si se escribe algo en su campo. */
+/** Nombre y foto de perfil; la contraseña tiene su propio dialogo. */
 function EditProfileModal({
   open,
   user,
@@ -101,34 +87,58 @@ function EditProfileModal({
 
 function EditProfileForm({ user, onClose }: { user: UserResponse; onClose: () => void }) {
   const [fullName, setFullName] = useState(user.fullName)
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [password, setPassword] = useState('')
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [removeAvatar, setRemoveAvatar] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const mutations = useUserMutations(user.id)
 
-  // Solo se piden las contrasenas si se esta cambiando la contrasena; quien entra
-  // aqui a corregirse una tilde del nombre no tiene por que escribir nada mas.
-  const cambiaPassword = password.length > 0
+  // La vista previa es un objeto local: hay que liberarlo si se cambia de
+  // fichero o se cierra el dialogo, o si no se acumulan URLs sin usar.
+  useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview) }, [avatarPreview])
 
   const nombreValido = fullName.trim().length > 0
-  const passwordValida = !cambiaPassword || password.length >= 8
-  const actualValida = !cambiaPassword || currentPassword.length > 0
-  const valido = nombreValido && passwordValida && actualValida
+  const guardando = mutations.update.isPending || mutations.uploadAvatar.isPending || mutations.removeAvatar.isPending
+
+  function pickFile(file: File | undefined) {
+    if (!file) return
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview)
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+    setRemoveAvatar(false)
+  }
+
+  function quitarFoto() {
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview)
+    setAvatarFile(null)
+    setAvatarPreview(null)
+    setRemoveAvatar(true)
+  }
 
   async function submit() {
-    if (!valido || mutations.update.isPending) return
+    if (!nombreValido || guardando) return
     try {
-      await mutations.update.mutateAsync({
-        fullName: fullName.trim(),
-        currentPassword: cambiaPassword ? currentPassword : undefined,
-        password: cambiaPassword ? password : undefined,
-      })
+      // Se limpia el estado de la foto nada mas confirmarla el servidor: si
+      // el nombre falla despues, un reintento no debe volver a subirla.
+      if (avatarFile) {
+        await mutations.uploadAvatar.mutateAsync(avatarFile)
+        setAvatarFile(null)
+      } else if (removeAvatar) {
+        await mutations.removeAvatar.mutateAsync()
+        setRemoveAvatar(false)
+      }
+      if (fullName.trim() !== user.fullName) {
+        await mutations.update.mutateAsync({ fullName: fullName.trim() })
+      }
       onClose()
     } catch {
-      // Equivocarse con la contrasena actual es un final normal, no un fallo: el
-      // aviso ya sale por el toast de la mutacion y el dialogo se queda abierto
-      // con lo escrito para poder corregirlo.
+      // El aviso ya sale por el toast de la mutacion; el dialogo se queda
+      // abierto con lo escrito para poder corregirlo.
     }
   }
+
+  const avatarActual = removeAvatar ? null : user.avatarUrl
+  const tieneFoto = Boolean(avatarPreview || avatarActual)
 
   return (
     <Modal
@@ -140,13 +150,36 @@ function EditProfileForm({ user, onClose }: { user: UserResponse; onClose: () =>
           <Button variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={submit} disabled={!valido || mutations.update.isPending}>
-            {mutations.update.isPending ? 'Guardando…' : 'Guardar'}
+          <Button onClick={submit} disabled={!nombreValido || guardando}>
+            {guardando ? 'Guardando…' : 'Guardar'}
           </Button>
         </>
       }
     >
       <div className={styles.form}>
+        <div className={styles.avatarEditor}>
+          {avatarPreview
+            ? <img className={styles.avatarPreview} src={avatarPreview} alt="Vista previa" />
+            : <Avatar user={user} avatarUrl={avatarActual} size={64} />}
+          <div className={styles.avatarActions}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              hidden
+              onChange={(event) => pickFile(event.target.files?.[0])}
+            />
+            <Button variant="secondary" small onClick={() => fileInputRef.current?.click()}>
+              Cambiar foto
+            </Button>
+            {tieneFoto && (
+              <Button variant="ghost" small onClick={quitarFoto}>
+                Quitar foto
+              </Button>
+            )}
+          </div>
+        </div>
+
         <label className={styles.label}>
           Nombre
           <input
@@ -157,36 +190,113 @@ function EditProfileForm({ user, onClose }: { user: UserResponse; onClose: () =>
             onKeyDown={(event) => event.key === 'Enter' && submit()}
           />
         </label>
+      </div>
+    </Modal>
+  )
+}
+
+/** Contraseña actual mas la nueva por duplicado, para no equivocarse al escribirla. */
+function ChangePasswordModal({
+  open,
+  user,
+  onClose,
+}: {
+  open: boolean
+  user: UserResponse | null
+  onClose: () => void
+}) {
+  if (!open || !user) return null
+  return <ChangePasswordForm user={user} onClose={onClose} />
+}
+
+function ChangePasswordForm({ user, onClose }: { user: UserResponse; onClose: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const mutations = useUserMutations(user.id)
+
+  const actualValida = currentPassword.length > 0
+  const passwordValida = password.length >= 8
+  const confirmacionValida = password === confirmPassword
+  const valido = actualValida && passwordValida && confirmacionValida
+
+  async function submit() {
+    if (!valido || mutations.changePassword.isPending) return
+    try {
+      await mutations.changePassword.mutateAsync({
+        fullName: user.fullName,
+        currentPassword,
+        password,
+      })
+      onClose()
+    } catch {
+      // Equivocarse con la contraseña actual es un final normal, no un fallo: el
+      // aviso ya sale por el toast de la mutacion y el dialogo se queda abierto
+      // con lo escrito para poder corregirlo.
+    }
+  }
+
+  return (
+    <Modal
+      open
+      title="Cambiar contraseña"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} disabled={!valido || mutations.changePassword.isPending}>
+            {mutations.changePassword.isPending ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </>
+      }
+    >
+      <div className={styles.form}>
+        <label className={styles.label}>
+          Contraseña actual
+          <input
+            type="password"
+            autoComplete="current-password"
+            className={styles.control}
+            value={currentPassword}
+            autoFocus
+            placeholder="La que usas ahora"
+            onChange={(event) => setCurrentPassword(event.target.value)}
+          />
+          <span className={styles.optional}>
+            Se pide para que una sesion abierta y sin vigilancia no baste para cambiarla.
+          </span>
+        </label>
 
         <label className={styles.label}>
-          Nueva contrasena <span className={styles.optional}>opcional</span>
+          Nueva contraseña
           <input
             type="password"
             autoComplete="new-password"
             className={styles.control}
             value={password}
-            placeholder="Dejar en blanco para no cambiarla"
             onChange={(event) => setPassword(event.target.value)}
           />
-          {!passwordValida && <span className={styles.error}>Al menos 8 caracteres.</span>}
+          {!passwordValida && password.length > 0 && (
+            <span className={styles.error}>Al menos 8 caracteres.</span>
+          )}
         </label>
 
-        {cambiaPassword && (
-          <label className={styles.label}>
-            Contrasena actual
-            <input
-              type="password"
-              autoComplete="current-password"
-              className={styles.control}
-              value={currentPassword}
-              placeholder="La que usas ahora"
-              onChange={(event) => setCurrentPassword(event.target.value)}
-            />
-            <span className={styles.optional}>
-              Se pide para que una sesion abierta y sin vigilancia no baste para cambiarla.
-            </span>
-          </label>
-        )}
+        <label className={styles.label}>
+          Repite la nueva contraseña
+          <input
+            type="password"
+            autoComplete="new-password"
+            className={styles.control}
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            onKeyDown={(event) => event.key === 'Enter' && submit()}
+          />
+          {!confirmacionValida && confirmPassword.length > 0 && (
+            <span className={styles.error}>Las dos contraseñas no coinciden.</span>
+          )}
+        </label>
       </div>
     </Modal>
   )

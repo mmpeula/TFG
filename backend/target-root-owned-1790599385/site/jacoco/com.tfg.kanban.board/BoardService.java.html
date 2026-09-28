@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BoardService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.board</a> &gt; <span class="el_source">BoardService.java</span></div><h1>BoardService.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.board;
+
+import com.tfg.kanban.activity.ActivityService;
+import com.tfg.kanban.board.dto.*;
+import com.tfg.kanban.common.BusinessRuleException;
+import com.tfg.kanban.common.ResourceNotFoundException;
+import com.tfg.kanban.domain.model.*;
+import com.tfg.kanban.domain.repository.BoardColumnRepository;
+import com.tfg.kanban.domain.repository.BoardRepository;
+import com.tfg.kanban.domain.repository.TaskRepository;
+import com.tfg.kanban.domain.repository.TeamMemberRepository;
+import com.tfg.kanban.security.SecurityUtils;
+import com.tfg.kanban.task.TaskMapper;
+import com.tfg.kanban.task.dto.TaskResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * El tablero de cada workspace y sus columnas. El tablero nace con su workspace
+ * (ver {@link DefaultBoard}); aqui se lee, se borra y se editan sus columnas.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class BoardService {
+
+    private final BoardRepository boardRepository;
+    private final BoardColumnRepository columnRepository;
+    private final TaskRepository taskRepository;
+    private final TeamMemberRepository teamMemberRepository;
+    private final ActivityService activityService;
+    private final TaskMapper taskMapper;
+
+    public List&lt;BoardResponse&gt; findByProject(Long projectId) {
+<span class="fc" id="L40">        return boardRepository.findByProject_Id(projectId).stream()</span>
+<span class="fc" id="L41">                .map(board -&gt; BoardResponse.summary(board, roleInBoard(board)))</span>
+<span class="fc" id="L42">                .toList();</span>
+    }
+
+    /** Tablero completo: columnas ordenadas con sus tareas. Es lo que pinta el Kanban. */
+    public BoardResponse findDetail(Long boardId) {
+<span class="fc" id="L47">        Board board = getBoard(boardId);</span>
+
+<span class="fc" id="L49">        List&lt;BoardColumn&gt; columns = columnRepository.findByBoard_IdOrderByPositionAsc(boardId);</span>
+<span class="fc" id="L50">        List&lt;Task&gt; tasks = taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(boardId);</span>
+<span class="fc" id="L51">        Map&lt;Long, List&lt;TaskResponse&gt;&gt; tasksByColumn = taskMapper.toResponses(tasks).stream()</span>
+<span class="fc" id="L52">                .collect(Collectors.groupingBy(TaskResponse::columnId));</span>
+
+<span class="fc" id="L54">        List&lt;ColumnResponse&gt; columnResponses = columns.stream()</span>
+<span class="fc" id="L55">                .map(column -&gt; ColumnResponse.withTasks(column,</span>
+<span class="fc" id="L56">                        tasksByColumn.getOrDefault(column.getId(), List.of())))</span>
+<span class="fc" id="L57">                .toList();</span>
+
+<span class="fc" id="L59">        return BoardResponse.detail(board, roleInBoard(board), columnResponses);</span>
+    }
+
+    @Transactional
+    public void delete(Long boardId) {
+<span class="fc" id="L64">        Board board = getBoard(boardId);</span>
+<span class="fc" id="L65">        activityService.record(board.getProject(), ActivityAction.BORRADO, &quot;Board&quot;, board.getId(),</span>
+<span class="fc" id="L66">                &quot;Borro el tablero '%s'&quot;.formatted(board.getName()));</span>
+<span class="fc" id="L67">        boardRepository.delete(board);</span>
+<span class="fc" id="L68">    }</span>
+
+    @Transactional
+    public ColumnResponse createColumn(Long boardId, ColumnRequest request) {
+<span class="fc" id="L72">        Board board = getBoard(boardId);</span>
+<span class="fc" id="L73">        int position = (int) columnRepository.countByBoard_Id(boardId);</span>
+
+<span class="fc" id="L75">        BoardColumn column = columnRepository.save(BoardColumn.builder()</span>
+<span class="fc" id="L76">                .board(board)</span>
+<span class="fc" id="L77">                .name(request.name().trim())</span>
+<span class="fc" id="L78">                .wipLimit(request.wipLimit())</span>
+<span class="fc" id="L79">                .position(position)</span>
+<span class="fc" id="L80">                .build());</span>
+
+<span class="fc" id="L82">        activityService.record(board.getProject(), ActivityAction.CREACION, &quot;BoardColumn&quot;, column.getId(),</span>
+<span class="fc" id="L83">                &quot;Creo la columna '%s'&quot;.formatted(column.getName()));</span>
+
+<span class="fc" id="L85">        return ColumnResponse.summary(column, 0);</span>
+    }
+
+    @Transactional
+    public ColumnResponse updateColumn(Long columnId, ColumnRequest request) {
+<span class="fc" id="L90">        BoardColumn column = getColumn(columnId);</span>
+<span class="fc" id="L91">        long tasks = taskRepository.countByBoardColumn_Id(columnId);</span>
+
+<span class="pc bpc" id="L93" title="2 of 4 branches missed.">        if (request.wipLimit() != null &amp;&amp; tasks &gt; request.wipLimit()) {</span>
+<span class="nc" id="L94">            throw new BusinessRuleException(</span>
+                    &quot;La columna tiene %d tareas, mas que el limite WIP solicitado (%d)&quot;
+<span class="nc" id="L96">                            .formatted(tasks, request.wipLimit()));</span>
+        }
+
+<span class="fc" id="L99">        column.setName(request.name().trim());</span>
+<span class="fc" id="L100">        column.setWipLimit(request.wipLimit());</span>
+
+<span class="fc" id="L102">        activityService.record(column.getBoard().getProject(), ActivityAction.ACTUALIZACION,</span>
+<span class="fc" id="L103">                &quot;BoardColumn&quot;, column.getId(), &quot;Actualizo la columna '%s'&quot;.formatted(column.getName()));</span>
+
+<span class="fc" id="L105">        return ColumnResponse.summary(column, (int) tasks);</span>
+    }
+
+    @Transactional
+    public void deleteColumn(Long columnId) {
+<span class="fc" id="L110">        BoardColumn column = getColumn(columnId);</span>
+<span class="fc" id="L111">        Long boardId = column.getBoard().getId();</span>
+
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (taskRepository.countByBoardColumn_Id(columnId) &gt; 0) {</span>
+<span class="fc" id="L114">            throw new BusinessRuleException(</span>
+                    &quot;La columna tiene tareas; muevelas o borralas antes de eliminar la columna&quot;);
+        }
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (columnRepository.countByBoard_Id(boardId) &lt;= 1) {</span>
+<span class="nc" id="L118">            throw new BusinessRuleException(&quot;El tablero debe tener al menos una columna&quot;);</span>
+        }
+
+<span class="fc" id="L121">        activityService.record(column.getBoard().getProject(), ActivityAction.BORRADO,</span>
+<span class="fc" id="L122">                &quot;BoardColumn&quot;, column.getId(), &quot;Borro la columna '%s'&quot;.formatted(column.getName()));</span>
+
+<span class="fc" id="L124">        columnRepository.delete(column);</span>
+<span class="fc" id="L125">        reindex(columnRepository.findByBoard_IdOrderByPositionAsc(boardId).stream()</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                .filter(item -&gt; !item.getId().equals(columnId))</span>
+<span class="fc" id="L127">                .toList());</span>
+<span class="fc" id="L128">    }</span>
+
+    public Board getBoard(Long boardId) {
+<span class="fc" id="L131">        return boardRepository.findById(boardId)</span>
+<span class="pc" id="L132">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Tablero&quot;, boardId));</span>
+    }
+
+    public BoardColumn getColumn(Long columnId) {
+<span class="fc" id="L136">        return columnRepository.findById(columnId)</span>
+<span class="pc" id="L137">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Columna&quot;, columnId));</span>
+    }
+
+    private void reindex(List&lt;BoardColumn&gt; columns) {
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (int i = 0; i &lt; columns.size(); i++) {</span>
+<span class="fc" id="L142">            columns.get(i).setPosition(i);</span>
+        }
+<span class="fc" id="L144">    }</span>
+
+    private Role roleInBoard(Board board) {
+<span class="fc" id="L147">        return SecurityUtils.currentUserId()</span>
+<span class="fc" id="L148">                .flatMap(userId -&gt; teamMemberRepository.findRoleByProject(board.getProject().getId(), userId))</span>
+<span class="fc" id="L149">                .orElse(null);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

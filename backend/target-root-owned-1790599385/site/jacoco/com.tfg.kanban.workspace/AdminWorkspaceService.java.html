@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminWorkspaceService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.workspace</a> &gt; <span class="el_source">AdminWorkspaceService.java</span></div><h1>AdminWorkspaceService.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.workspace;
+
+import com.tfg.kanban.activity.ActivityService;
+import com.tfg.kanban.common.BusinessRuleException;
+import com.tfg.kanban.common.CountByEntity;
+import com.tfg.kanban.common.ResourceNotFoundException;
+import com.tfg.kanban.domain.model.*;
+import com.tfg.kanban.domain.repository.*;
+import com.tfg.kanban.team.TeamService;
+import com.tfg.kanban.team.dto.UpdateMemberRoleRequest;
+import com.tfg.kanban.workspace.dto.AdminWorkspaceResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Los workspaces de toda la plataforma, para dar soporte.
+ *
+ * &lt;p&gt;Es lo unico que ve un administrador de un workspace ajeno, y a proposito no
+ * es todo: hay datos de diagnostico (quien esta, cuantas tareas, cuando se movio)
+ * pero no se expone ni una tarea, ni un comentario, ni un fichero. Administrar
+ * cuentas no da derecho a leer el trabajo de un grupo.&lt;/p&gt;
+ *
+ * &lt;p&gt;Por lo mismo, las acciones existen para &lt;b&gt;desbloquear o parar&lt;/b&gt;, no para
+ * participar: cambiar el rol de quien ya esta en el equipo, suspender el workspace
+ * y reactivarlo, y borrarlo. Un administrador no puede meter a nadie en un equipo
+ * —eso seria una puerta trasera a cualquier grupo—, ni escribir en el tablero.&lt;/p&gt;
+ *
+ * &lt;p&gt;Suspender esta antes que borrar a proposito: casi siempre lo que hace falta es
+ * parar un workspace un tiempo, y borrarlo se lleva por delante el trabajo de un
+ * grupo entero sin vuelta atras.&lt;/p&gt;
+ */
+<span class="fc" id="L39">@Slf4j</span>
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class AdminWorkspaceService {
+
+    private final ProjectRepository projectRepository;
+    private final TeamRepository teamRepository;
+    private final TeamMemberRepository teamMemberRepository;
+    private final BoardColumnRepository columnRepository;
+    private final TaskRepository taskRepository;
+    private final ActivityLogRepository activityLogRepository;
+    private final ActivityService activityService;
+    private final TeamService teamService;
+
+    /**
+     * Todos los workspaces. Se resuelve con consultas por lotes, como la pantalla
+     * de inicio: ninguna depende de cuantos workspaces haya en la plataforma.
+     */
+    public List&lt;AdminWorkspaceResponse&gt; findAll() {
+<span class="fc" id="L59">        List&lt;Project&gt; projects = projectRepository.findAll(Sort.by(Sort.Direction.DESC, &quot;createdAt&quot;));</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (projects.isEmpty()) {</span>
+<span class="nc" id="L61">            return List.of();</span>
+        }
+
+<span class="fc" id="L64">        List&lt;Long&gt; projectIds = projects.stream().map(Project::getId).toList();</span>
+<span class="fc" id="L65">        List&lt;Long&gt; teamIds = projects.stream().map(project -&gt; project.getTeam().getId()).distinct().toList();</span>
+
+<span class="fc" id="L67">        Map&lt;Long, List&lt;AdminWorkspaceResponse.Member&gt;&gt; membersByTeam = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (TeamMember member : teamMemberRepository.findWithUserByTeamIds(teamIds)) {</span>
+<span class="fc" id="L69">            membersByTeam</span>
+<span class="fc" id="L70">                    .computeIfAbsent(member.getTeam().getId(), key -&gt; new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L71">                    .add(new AdminWorkspaceResponse.Member(</span>
+<span class="fc" id="L72">                            member.getUser().getId(),</span>
+<span class="fc" id="L73">                            member.getUser().getFullName(),</span>
+<span class="fc" id="L74">                            member.getUser().getEmail(),</span>
+<span class="fc" id="L75">                            member.getRole(),</span>
+<span class="fc" id="L76">                            member.getUser().isEnabled()));</span>
+<span class="fc" id="L77">        }</span>
+
+<span class="fc" id="L79">        Map&lt;Long, Long&gt; tasksByProject = tasksByProject(projectIds);</span>
+<span class="fc" id="L80">        Map&lt;Long, Instant&gt; lastActivity = activityLogRepository.lastActivityByProjects(projectIds).stream()</span>
+<span class="fc" id="L81">                .collect(Collectors.toMap(row -&gt; (Long) row[0], row -&gt; (Instant) row[1]));</span>
+
+<span class="fc" id="L83">        return projects.stream().map(project -&gt; {</span>
+<span class="fc" id="L84">            Long teamId = project.getTeam().getId();</span>
+<span class="fc" id="L85">            List&lt;AdminWorkspaceResponse.Member&gt; members = membersByTeam.getOrDefault(teamId, List.of());</span>
+<span class="fc" id="L86">            return new AdminWorkspaceResponse(</span>
+<span class="fc" id="L87">                    project.getId(),</span>
+<span class="fc" id="L88">                    project.getName(),</span>
+                    teamId,
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                    project.getTeam().getOwner() == null ? null : project.getTeam().getOwner().getFullName(),</span>
+<span class="fc" id="L91">                    tasksByProject.getOrDefault(project.getId(), 0L).intValue(),</span>
+<span class="fc" id="L92">                    project.isEnabled(),</span>
+<span class="fc" id="L93">                    sinResponsableActivo(members),</span>
+<span class="fc" id="L94">                    project.getCreatedAt(),</span>
+<span class="fc" id="L95">                    lastActivity.get(project.getId()),</span>
+                    members);
+<span class="fc" id="L97">        }).toList();</span>
+    }
+
+    /**
+     * Cambia el rol que alguien tiene &lt;b&gt;dentro&lt;/b&gt; del workspace.
+     *
+     * &lt;p&gt;Sirve sobre todo para el caso que deja un equipo muerto —la unica persona
+     * responsable se fue o se le deshabilito la cuenta, y nadie puede administrarlo
+     * desde dentro—, pero vale para cualquier rol: tambien se puede degradar a
+     * alguien o dejarlo como docente.&lt;/p&gt;
+     *
+     * &lt;p&gt;Dos limites que no se saltan ni desde soporte. Solo se cambia el rol de
+     * quien &lt;b&gt;ya pertenece&lt;/b&gt; al equipo: si un administrador pudiera anadir a
+     * cualquiera, tendria una puerta de entrada a todos los grupos. Y el equipo
+     * nunca se queda sin responsable, porque sin nadie que pueda administrarlo el
+     * workspace queda inservible; esa regla es la misma que rige dentro del equipo
+     * y se reutiliza en lugar de repetirla.&lt;/p&gt;
+     */
+    @Transactional
+    public void cambiarRol(Long workspaceId, Long userId, Role role) {
+<span class="fc" id="L117">        Project project = getProject(workspaceId);</span>
+<span class="fc" id="L118">        Long teamId = project.getTeam().getId();</span>
+
+<span class="fc" id="L120">        TeamMember member = teamMemberRepository.findByTeam_IdAndUser_Id(teamId, userId)</span>
+<span class="fc" id="L121">                .orElseThrow(() -&gt; new BusinessRuleException(</span>
+                        &quot;Esa persona no esta en el equipo. Desde soporte solo se puede cambiar &quot;
+                                + &quot;el rol de quien ya pertenece al workspace.&quot;));
+
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (!member.getUser().isEnabled()) {</span>
+<span class="nc" id="L126">            throw new BusinessRuleException(</span>
+                    &quot;Esa cuenta esta deshabilitada: reactivala antes de cambiarle el rol&quot;);
+        }
+
+<span class="fc" id="L130">        Role anterior = member.getRole();</span>
+        // Aqui viven las dos reglas que hay que respetar: que el rol encaje con el
+        // tipo de cuenta y que no se quede el equipo sin ningun responsable.
+<span class="fc" id="L133">        teamService.updateMemberRole(teamId, userId, new UpdateMemberRoleRequest(role));</span>
+
+        // Queda en la actividad del propio workspace: el equipo ve quien lo toco.
+<span class="fc" id="L136">        activityService.record(project, ActivityAction.ACTUALIZACION, &quot;TeamMember&quot;, userId,</span>
+<span class="fc" id="L137">                &quot;Soporte cambio el rol de '%s': %s -&gt; %s&quot;.formatted(</span>
+<span class="fc" id="L138">                        member.getUser().getFullName(), anterior, role));</span>
+<span class="fc" id="L139">        log.info(&quot;Soporte: {} pasa de {} a {} en el workspace {}&quot;,</span>
+<span class="fc" id="L140">                member.getUser().getEmail(), anterior, role, workspaceId);</span>
+<span class="fc" id="L141">    }</span>
+
+    /**
+     * Suspende o reactiva el workspace.
+     *
+     * &lt;p&gt;Suspender no borra nada: el equipo deja de poder abrirlo y de poder tocar
+     * su equipo, pero el tablero, las tareas y los ficheros siguen ahi, y reactivarlo
+     * lo deja todo como estaba. Es lo que hay que hacer cuando un workspace tiene que
+     * parar por un rato y borrarlo seria desproporcionado.&lt;/p&gt;
+     */
+    @Transactional
+    public void setEnabled(Long workspaceId, boolean enabled) {
+<span class="fc" id="L153">        Project project = getProject(workspaceId);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (project.isEnabled() == enabled) {</span>
+<span class="nc" id="L155">            return;</span>
+        }
+<span class="fc" id="L157">        project.setEnabled(enabled);</span>
+
+        // Se anota antes de que deje de estar accesible, para que el equipo lo vea
+        // al volver: es la explicacion de por que se quedo parado.
+<span class="fc" id="L161">        activityService.record(project, ActivityAction.ACTUALIZACION, &quot;Project&quot;, workspaceId,</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                enabled ? &quot;Soporte reactivo el workspace&quot; : &quot;Soporte suspendio el workspace&quot;);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        log.info(&quot;Soporte: workspace {} {}&quot;, workspaceId, enabled ? &quot;reactivado&quot; : &quot;suspendido&quot;);</span>
+<span class="fc" id="L164">    }</span>
+
+    /**
+     * Borra un workspace ajeno.
+     *
+     * &lt;p&gt;A diferencia del borrado normal, aqui no hay dueno que valga: el equipo se
+     * borra tambien si se queda sin proyectos, porque si no quedaria un equipo
+     * vacio que su creador ya no puede alcanzar desde ninguna pantalla.&lt;/p&gt;
+     */
+    @Transactional
+    public void delete(Long workspaceId) {
+<span class="fc" id="L175">        Project project = getProject(workspaceId);</span>
+<span class="fc" id="L176">        Team team = project.getTeam();</span>
+<span class="fc" id="L177">        String nombre = project.getName();</span>
+
+<span class="fc" id="L179">        projectRepository.delete(project);</span>
+<span class="fc" id="L180">        projectRepository.flush();</span>
+
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (projectRepository.findByTeam_Id(team.getId()).isEmpty()) {</span>
+<span class="fc" id="L183">            teamRepository.delete(team);</span>
+        }
+<span class="fc" id="L185">        log.info(&quot;Soporte: borrado el workspace {} ('{}')&quot;, workspaceId, nombre);</span>
+<span class="fc" id="L186">    }</span>
+
+    /** Cuantas tareas tiene cada proyecto, pasando por sus columnas. */
+    private Map&lt;Long, Long&gt; tasksByProject(List&lt;Long&gt; projectIds) {
+<span class="fc" id="L190">        Map&lt;Long, Long&gt; porProyecto = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L191">        Map&lt;Long, Long&gt; projectByColumn = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (Object[] row : columnRepository.findColumnRowsByProjectIds(projectIds)) {</span>
+<span class="fc" id="L193">            projectByColumn.put((Long) row[2], (Long) row[0]);</span>
+<span class="fc" id="L194">        }</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (projectByColumn.isEmpty()) {</span>
+<span class="nc" id="L196">            return porProyecto;</span>
+        }
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for (CountByEntity count : taskRepository.countByColumnIds(List.copyOf(projectByColumn.keySet()))) {</span>
+<span class="fc" id="L199">            Long projectId = projectByColumn.get(count.entityId());</span>
+<span class="fc" id="L200">            porProyecto.merge(projectId, count.total(), Long::sum);</span>
+<span class="fc" id="L201">        }</span>
+<span class="fc" id="L202">        return porProyecto;</span>
+    }
+
+    /** Nadie con rol RESPONSABLE y la cuenta activa: el workspace esta bloqueado. */
+    private boolean sinResponsableActivo(List&lt;AdminWorkspaceResponse.Member&gt; members) {
+<span class="fc bfc" id="L207" title="All 4 branches covered.">        return members.stream().noneMatch(m -&gt; m.role() == Role.RESPONSABLE &amp;&amp; m.enabled());</span>
+    }
+
+    private Project getProject(Long workspaceId) {
+<span class="fc" id="L211">        return projectRepository.findById(workspaceId)</span>
+<span class="pc" id="L212">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Workspace&quot;, workspaceId));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

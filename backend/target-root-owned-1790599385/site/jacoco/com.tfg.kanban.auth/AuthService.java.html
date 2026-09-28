@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.auth</a> &gt; <span class="el_source">AuthService.java</span></div><h1>AuthService.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.auth;
+
+import com.tfg.kanban.auth.dto.AuthResponse;
+import com.tfg.kanban.auth.dto.LoginRequest;
+import com.tfg.kanban.auth.dto.RegisterRequest;
+import com.tfg.kanban.common.BusinessRuleException;
+import com.tfg.kanban.common.ResourceNotFoundException;
+import com.tfg.kanban.domain.model.Role;
+import com.tfg.kanban.domain.model.User;
+import com.tfg.kanban.domain.repository.UserRepository;
+import com.tfg.kanban.security.JwtService;
+import com.tfg.kanban.security.SecurityUtils;
+import com.tfg.kanban.user.dto.UserResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+<span class="fc" id="L24">@Slf4j</span>
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final AuthenticationManager authenticationManager;
+
+    @Transactional
+    public AuthResponse register(RegisterRequest request) {
+<span class="fc" id="L36">        String email = request.email().trim().toLowerCase();</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (userRepository.existsByEmailIgnoreCase(email)) {</span>
+<span class="fc" id="L38">            throw new BusinessRuleException(&quot;Ya existe un usuario con el email &quot; + email);</span>
+        }
+
+<span class="fc" id="L41">        User user = User.builder()</span>
+<span class="fc" id="L42">                .email(email)</span>
+<span class="fc" id="L43">                .passwordHash(passwordEncoder.encode(request.password()))</span>
+<span class="fc" id="L44">                .fullName(request.fullName().trim())</span>
+                // Alumno o Docente si se elige; nunca ADMIN. A diferencia del antiguo
+                // RESPONSABLE global (que daba permiso para tocar cualquier cuenta),
+                // DOCENTE no administra nada de la plataforma: solo cambia el panel con
+                // el que se entra y que en un equipo se sigue en modo lectura, asi que
+                // dejarlo elegir aqui no abre ninguna puerta que no estuviera ya.
+<span class="fc" id="L50">                .role(roleForRegistration(request.role()))</span>
+<span class="fc" id="L51">                .enabled(true)</span>
+<span class="fc" id="L52">                .build();</span>
+
+<span class="fc" id="L54">        User saved = userRepository.save(user);</span>
+<span class="fc" id="L55">        log.info(&quot;Usuario registrado: {} ({})&quot;, saved.getEmail(), saved.getRole());</span>
+<span class="fc" id="L56">        return buildResponse(saved);</span>
+    }
+
+    /** Alumno por defecto si no se elige nada; ADMIN queda fuera pase lo que pase. */
+    private Role roleForRegistration(Role requested) {
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (requested == null) {</span>
+<span class="fc" id="L62">            return Role.MIEMBRO;</span>
+        }
+<span class="fc bfc" id="L64" title="All 4 branches covered.">        if (requested != Role.MIEMBRO &amp;&amp; requested != Role.DOCENTE) {</span>
+<span class="fc" id="L65">            throw new BusinessRuleException(</span>
+                    &quot;Solo se puede elegir Alumno o Docente al registrarse&quot;);
+        }
+<span class="fc" id="L68">        return requested;</span>
+    }
+
+    @Transactional(readOnly = true)
+    public AuthResponse login(LoginRequest request) {
+<span class="fc" id="L73">        String email = request.email().trim().toLowerCase();</span>
+        try {
+<span class="fc" id="L75">            authenticationManager.authenticate(</span>
+<span class="fc" id="L76">                    new UsernamePasswordAuthenticationToken(email, request.password()));</span>
+<span class="fc" id="L77">        } catch (DisabledException ex) {</span>
+<span class="fc" id="L78">            throw new BusinessRuleException(&quot;La cuenta esta deshabilitada&quot;);</span>
+<span class="fc" id="L79">        } catch (AuthenticationException ex) {</span>
+<span class="fc" id="L80">            throw new InvalidCredentialsException();</span>
+<span class="fc" id="L81">        }</span>
+
+<span class="fc" id="L83">        User user = userRepository.findByEmailIgnoreCase(email)</span>
+<span class="fc" id="L84">                .orElseThrow(InvalidCredentialsException::new);</span>
+<span class="fc" id="L85">        return buildResponse(user);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse currentUser() {
+<span class="fc" id="L90">        Long userId = SecurityUtils.currentUserId()</span>
+<span class="fc" id="L91">                .orElseThrow(InvalidCredentialsException::new);</span>
+<span class="fc" id="L92">        return userRepository.findById(userId)</span>
+<span class="fc" id="L93">                .map(UserResponse::from)</span>
+<span class="pc" id="L94">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Usuario&quot;, userId));</span>
+    }
+
+    private AuthResponse buildResponse(User user) {
+<span class="fc" id="L98">        String token = jwtService.generateToken(user.getEmail(), user.getId(), user.getRole().name());</span>
+<span class="fc" id="L99">        return AuthResponse.of(token, jwtService.getExpirationMinutes(), UserResponse.from(user));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextNormalizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.ai</a> &gt; <span class="el_source">TextNormalizer.java</span></div><h1>TextNormalizer.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.ai;
+
+import java.text.Normalizer;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Deja un texto del modelo en una forma comparable.
+ *
+ * &lt;p&gt;Hace falta en dos sitios que comparan cosas escritas por un modelo pequeno:
+ * los nombres de las personas a las que dice asignar una tarea
+ * ({@link PlanTeam}) y los titulos de las tareas que propone
+ * ({@link AiPlanService}, para no repetir lo que ya esta en el tablero). En los
+ * dos casos el problema es el mismo —«Ana García» y «ana garcia» son la misma
+ * persona— y estaba resuelto dos veces por separado, asi que bastaba con tocar
+ * una para que dejaran de coincidir.&lt;/p&gt;
+ */
+final class TextNormalizer {
+
+    /**
+     * Palabras que no distinguen un titulo de otro. Se quitan para que «Escribir
+     * la memoria» y «Escribir memoria» cuenten como la misma tarea.
+     */
+<span class="fc" id="L24">    private static final List&lt;String&gt; STOP_WORDS = List.of(&quot;del&quot;, &quot;las&quot;, &quot;los&quot;, &quot;una&quot;, &quot;para&quot;, &quot;con&quot;, &quot;que&quot;);</span>
+
+    /** Por debajo de esto una palabra es un articulo o una preposicion, no contenido. */
+    private static final int MIN_WORD_LENGTH = 3;
+
+    private TextNormalizer() {
+    }
+
+    /** Sin tildes, en minusculas, sin signos y con los espacios de sobra quitados. */
+    static String plain(String value) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L35">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L37">        return Normalizer.normalize(value, Normalizer.Form.NFD)</span>
+<span class="fc" id="L38">                .replaceAll(&quot;\\p{M}&quot;, &quot;&quot;)</span>
+<span class="fc" id="L39">                .toLowerCase()</span>
+<span class="fc" id="L40">                .replaceAll(&quot;[^a-z0-9 ]&quot;, &quot; &quot;)</span>
+<span class="fc" id="L41">                .replaceAll(&quot;\\s+&quot;, &quot; &quot;)</span>
+<span class="fc" id="L42">                .trim();</span>
+    }
+
+    /** Como {@link #plain}, pero ademas sin las palabras que no dicen nada. */
+    static String keywords(String value) {
+<span class="fc" id="L47">        return Arrays.stream(plain(value).split(&quot; &quot;))</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                .filter(word -&gt; word.length() &gt;= MIN_WORD_LENGTH)</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                .filter(word -&gt; !STOP_WORDS.contains(word))</span>
+<span class="fc" id="L50">                .reduce((a, b) -&gt; a + &quot; &quot; + b)</span>
+<span class="fc" id="L51">                .orElse(&quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

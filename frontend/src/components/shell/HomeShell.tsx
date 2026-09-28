@@ -31,7 +31,7 @@ export function HomeShell({ children }: { children: ReactNode }) {
 
         <div className={styles.actions}>
           <button className={styles.profile} onClick={() => navigate(ROUTES.configuracion)}>
-            <Avatar user={user} size={30} />
+            <Avatar user={user} avatarUrl={user?.avatarUrl} size={30} />
             <span className={styles.profileName}>{user?.fullName}</span>
           </button>
           <Tooltip label="Cerrar sesion">

@@ -55,7 +55,7 @@ export function LoginScreen() {
             </div>
 
             <div>
-              <label className={styles.label} htmlFor="password">Contrasena</label>
+              <label className={styles.label} htmlFor="password">Contraseña</label>
               <input
                 id="password" type="password" autoComplete="current-password" required className={styles.control}
                 value={password} onChange={(event) => setPassword(event.target.value)}

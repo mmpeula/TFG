@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssistantChatService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.ai</a> &gt; <span class="el_source">AssistantChatService.java</span></div><h1>AssistantChatService.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.ai;
+
+import com.tfg.kanban.ai.dto.ChatRequest;
+import com.tfg.kanban.ai.dto.ChatResponse;
+import com.tfg.kanban.ai.dto.ChatTurn;
+import com.tfg.kanban.common.CountByEntity;
+import com.tfg.kanban.domain.model.*;
+import com.tfg.kanban.domain.repository.CommentRepository;
+import com.tfg.kanban.domain.repository.TaskRepository;
+import com.tfg.kanban.security.SecurityUtils;
+import com.tfg.kanban.workspace.WorkspaceService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+/**
+ * El asistente conversacional del workspace.
+ *
+ * &lt;p&gt;A diferencia de {@link AiPlanService}, que propone tareas para el tablero,
+ * aqui el modelo solo &lt;b&gt;responde&lt;/b&gt;: no escribe nada. Lo que hace util la
+ * respuesta es el contexto, que se arma con el estado real del tablero (tareas,
+ * columnas, fechas, personas) en lugar de dejar que el modelo se lo imagine.&lt;/p&gt;
+ */
+<span class="fc" id="L35">@Slf4j</span>
+@Service
+@RequiredArgsConstructor
+public class AssistantChatService {
+
+    /*
+     * Igual que el prompt de AiPlanService, escrito para un modelo alojado en Groq.
+     * Lo que mas mejora las respuestas no son las reglas de estilo sino las recetas
+     * del final: son las preguntas que la interfaz sugiere al abrir el chat, asi que
+     * son las que de verdad se hacen, y sin decirle como contestarlas el modelo se va
+     * por las ramas o suelta una parrafada de manual de gestion de proyectos.
+     *
+     * Nada de markdown a proposito: la respuesta se pinta como texto plano, asi que
+     * unos asteriscos de negrita saldrian tal cual en pantalla.
+     */
+    private static final String SYSTEM_PROMPT = &quot;&quot;&quot;
+            Eres el asistente de PlanifIA: un gestor de proyectos con ojo clinico para leer un
+            tablero Kanban y decir, sin rodeos, que esta pasando de verdad. Estudiantes
+            universitarios te preguntan sobre el tablero de un workspace concreto, que tienes
+            delante con todos sus datos.
+
+            No eres un buscador que repite lo que ya esta en pantalla: cruzas fechas, prioridades,
+            responsables y tiempo sin moverse para sacar una conclusion que a simple vista no se ve.
+            &quot;Vais tarde&quot;, &quot;esto esta parado&quot; o &quot;fulanito lleva el doble que los demas&quot; son el tipo de
+            cosas que se te tienen que ocurrir.
+
+            Respondes SIEMPRE en espanol, en tono cercano y directo, como un companero de clase que
+            se ha leido el tablero entero antes de contestar. Nunca en ingles.
+
+            COMO ESCRIBIR
+            - Corto: 120 palabras como mucho, y muchas veces con dos frases sobra.
+            - Texto plano: ni asteriscos, ni almohadillas, ni negritas. Para enumerar, guiones.
+            - Cita los titulos de las tareas exactamente como aparecen, entre comillas angulares.
+            - Numeros, no vaguedades: &quot;3 de 8 terminadas&quot; dice mas que &quot;vais bien&quot;. Si el dato para
+              un numero exacto no esta, no lo inventes: describe lo que sí ves.
+            - Al grano: no repitas la pregunta ni empieces con &quot;Claro&quot; o &quot;Por supuesto&quot;.
+            - Nada de lenguaje de empresa ni de jerga de gestion de proyectos.
+
+            DE DONDE SACAS LO QUE DICES
+            - Solo de los datos del workspace que se te dan. No te inventes tareas, personas,
+              fechas, comentarios ni avances que no aparezcan ahi.
+            - Si falta el dato para responder con precision, dilo en una frase y di que haria falta
+              para saberlo, en vez de rellenar el hueco con una suposicion.
+            - &quot;yo&quot;, &quot;me toca&quot; o &quot;mis tareas&quot; se refieren a quien pregunta, que se te indica arriba
+              marcado como quien esta al otro lado de la conversacion.
+            - Si te preguntan una duda tecnica que no va del tablero, contesta breve y no mezcles
+              datos inventados del proyecto.
+
+            LAS PREGUNTAS DE SIEMPRE
+            - &quot;Que hago primero&quot;: de sus tareas pendientes, ordena por lo que ya esta atrasado,
+              luego por fecha limite cercana y prioridad alta, y por ultimo por lo que lleva mas
+              tiempo parado. Nombra dos o tres, no la lista entera, y di en una frase por que van
+              antes que el resto.
+            - &quot;Como vamos&quot;: cuantas terminadas de cuantas en total, cuantas quedan por cerrar, y si
+              hay algo atrasado, a punto de vencer, o parado sin moverse. Si con los dias que quedan
+              hasta la entrega y lo que falta por cerrar el ritmo pinta ajustado, dilo tal cual.
+            - &quot;Quien tiene mas trabajo&quot;: compara las tareas pendientes de cada persona con sus
+              numeros exactos. Si alguien dobla al resto, nombralo; si esta repartido, dilo tambien
+              en vez de forzar un culpable donde no lo hay.
+            - &quot;Hay algo bloqueado o parado&quot;: busca tareas marcadas como sin mover desde hace dias o
+              sin nadie asignado en una columna de trabajo. Si hay alguna, la que lleve mas tiempo
+              parada primero, y di desde cuando. Si no hay ninguna, dilo en una frase y no te
+              inventes un problema para tener algo que contar.
+            - &quot;Divide esta tarea&quot;: tres o cuatro pasos concretos y en orden, cada uno algo que se
+              pueda dar por terminado, no fases abstractas tipo &quot;analisis&quot; o &quot;implementacion&quot;.
+            &quot;&quot;&quot;;
+
+    /** Tope de turnos anteriores que se reenvian: mas no cabe junto al contexto. */
+    private static final int MAX_HISTORY = 6;
+
+    /** Tope de tareas que se describen. Un tablero de practicas rara vez pasa de aqui. */
+    private static final int MAX_TASKS = 60;
+
+    /**
+     * Dias sin tocar una tarea a partir de los cuales se cuenta como parada.
+     *
+     * Mismo umbral que {@code lib/signals.ts} en el frontend (DIAS_PARADA): son la
+     * misma senal contada dos veces, una para pintar la insignia del tablero y otra
+     * para que el asistente pueda hablar de ella cuando le preguntan.
+     */
+    private static final int DIAS_PARADA = 4;
+
+    private final AiProperties properties;
+    private final GroqClient groqClient;
+    private final WorkspaceService workspaceService;
+    private final TaskRepository taskRepository;
+    private final CommentRepository commentRepository;
+
+    @Transactional(readOnly = true)
+    public ChatResponse answer(Long workspaceId, ChatRequest request) {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (!properties.isEnabled()) {</span>
+<span class="fc" id="L126">            throw new AiUnavailableException(&quot;El modulo de IA esta desactivado en la configuracion del servidor&quot;);</span>
+        }
+
+<span class="fc" id="L129">        Project project = workspaceService.getProject(workspaceId);</span>
+<span class="fc" id="L130">        List&lt;Task&gt; tasks = tasksOf(project);</span>
+<span class="fc" id="L131">        String context = buildContext(project, tasks);</span>
+
+<span class="fc" id="L133">        List&lt;GroqClient.Message&gt; messages = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L134">        messages.add(new GroqClient.Message(&quot;user&quot;, context));</span>
+<span class="fc" id="L135">        messages.add(new GroqClient.Message(&quot;assistant&quot;,</span>
+                &quot;Vale, ya tengo delante el tablero de este workspace. Que necesitas?&quot;));
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        for (ChatTurn turn : recent(request.historyOrEmpty())) {</span>
+<span class="fc" id="L138">            messages.add(new GroqClient.Message(normalizeRole(turn.role()), turn.content()));</span>
+<span class="fc" id="L139">        }</span>
+<span class="fc" id="L140">        messages.add(new GroqClient.Message(&quot;user&quot;, request.message()));</span>
+
+<span class="fc" id="L142">        String answer = groqClient.chatText(SYSTEM_PROMPT, messages).trim();</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (answer.isBlank()) {</span>
+<span class="fc" id="L144">            throw new AiUnavailableException(&quot;El modelo no ha sabido que responder; prueba a reformular la pregunta&quot;);</span>
+        }
+
+<span class="fc" id="L147">        log.info(&quot;Asistente: respuesta para el workspace {} con {} tareas de contexto&quot;, workspaceId, tasks.size());</span>
+<span class="fc" id="L148">        return ChatResponse.of(answer, properties.getModel(), summary(project, tasks));</span>
+    }
+
+    private List&lt;Task&gt; tasksOf(Project project) {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (project.getBoards().isEmpty()) return List.of();</span>
+<span class="fc" id="L153">        return taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(project.getBoards().get(0).getId());</span>
+    }
+
+    /**
+     * El estado del tablero en texto plano. Va como primer mensaje del usuario y no
+     * como parte del prompt de sistema para que el modelo lo trate como datos.
+     */
+    private String buildContext(Project project, List&lt;Task&gt; tasks) {
+<span class="fc" id="L161">        LocalDate hoy = LocalDate.now();</span>
+<span class="fc" id="L162">        StringBuilder sb = new StringBuilder();</span>
+
+<span class="fc" id="L164">        sb.append(&quot;Datos del workspace «&quot;).append(project.getName()).append(&quot;».\n&quot;);</span>
+<span class="pc bpc" id="L165" title="2 of 4 branches missed.">        if (project.getDescription() != null &amp;&amp; !project.getDescription().isBlank()) {</span>
+<span class="fc" id="L166">            sb.append(&quot;Descripcion: &quot;).append(project.getDescription()).append(&quot;\n&quot;);</span>
+        }
+<span class="fc" id="L168">        sb.append(&quot;Fecha de hoy: &quot;).append(hoy).append(&quot;\n&quot;);</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (project.getDeadline() != null) {</span>
+<span class="fc" id="L170">            long dias = ChronoUnit.DAYS.between(hoy, project.getDeadline());</span>
+<span class="fc" id="L171">            sb.append(&quot;Entrega: &quot;).append(project.getDeadline())</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                    .append(dias &gt;= 0 ? &quot; (quedan %d dias)&quot;.formatted(dias) : &quot; (ya vencida)&quot;).append(&quot;\n&quot;);</span>
+        }
+
+        // Sin esto, &quot;que hago primero?&quot; no tiene respuesta posible: el modelo no sabe
+        // cual de las personas del equipo esta al otro lado.
+<span class="fc" id="L177">        Long quienPregunta = SecurityUtils.currentUserId().orElse(null);</span>
+
+<span class="fc" id="L179">        sb.append(&quot;\nPersonas del equipo:\n&quot;);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        for (TeamMember member : project.getTeam().getMembers()) {</span>
+<span class="fc" id="L181">            long suyas = tasks.stream()</span>
+<span class="fc" id="L182">                    .filter(task -&gt; task.getAssignees().stream()</span>
+<span class="fc" id="L183">                            .anyMatch(assignee -&gt; assignee.getId().equals(member.getUser().getId())))</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                    .filter(task -&gt; !esUltimaColumna(task))</span>
+<span class="fc" id="L185">                    .count();</span>
+<span class="fc" id="L186">            boolean esQuienPregunta = member.getUser().getId().equals(quienPregunta);</span>
+<span class="fc" id="L187">            sb.append(&quot;- &quot;).append(member.getUser().getFullName())</span>
+<span class="fc" id="L188">                    .append(&quot; (&quot;).append(member.getRole().name().toLowerCase()).append(&quot;): &quot;)</span>
+<span class="fc" id="L189">                    .append(suyas).append(&quot; tareas pendientes&quot;)</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                    .append(esQuienPregunta ? &quot;  &lt;-- ES QUIEN TE ESTA PREGUNTANDO\n&quot; : &quot;\n&quot;);</span>
+<span class="fc" id="L191">        }</span>
+
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (tasks.isEmpty()) {</span>
+<span class="fc" id="L194">            sb.append(&quot;\nEl tablero esta vacio: todavia no hay ninguna tarea.\n&quot;);</span>
+<span class="fc" id="L195">            return sb.toString();</span>
+        }
+
+<span class="fc" id="L198">        sb.append(&quot;\nTareas del tablero (&quot;).append(tasks.size()).append(&quot; en total):\n&quot;);</span>
+<span class="fc" id="L199">        List&lt;Task&gt; descritas = tasks.stream().limit(MAX_TASKS).toList();</span>
+<span class="fc" id="L200">        Map&lt;Long, Long&gt; comentariosPorTarea = commentRepository</span>
+<span class="fc" id="L201">                .countByTaskIds(descritas.stream().map(Task::getId).toList()).stream()</span>
+<span class="fc" id="L202">                .collect(Collectors.toMap(CountByEntity::entityId, CountByEntity::total));</span>
+
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        for (Task task : descritas) {</span>
+<span class="fc" id="L205">            sb.append(&quot;- «&quot;).append(task.getTitle()).append(&quot;»&quot;)</span>
+<span class="fc" id="L206">                    .append(&quot; | estado: &quot;).append(task.getBoardColumn().getName())</span>
+<span class="fc" id="L207">                    .append(&quot; | prioridad: &quot;).append(task.getPriority().name().toLowerCase());</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            if (task.getAssignees().isEmpty()) {</span>
+<span class="fc" id="L209">                sb.append(&quot; | sin responsable&quot;);</span>
+            } else {
+<span class="fc" id="L211">                sb.append(&quot; | responsable: &quot;).append(task.getAssignees().stream()</span>
+<span class="fc" id="L212">                        .map(User::getFullName).collect(Collectors.joining(&quot;, &quot;)));</span>
+            }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (task.getDueDate() != null) {</span>
+<span class="fc" id="L215">                long dias = ChronoUnit.DAYS.between(hoy, task.getDueDate());</span>
+<span class="fc" id="L216">                sb.append(&quot; | fecha limite: &quot;).append(task.getDueDate())</span>
+<span class="pc bpc" id="L217" title="1 of 4 branches missed.">                        .append(dias &lt; 0 ? &quot; (ATRASADA)&quot; : dias &lt;= 3 ? &quot; (urge)&quot; : &quot;&quot;);</span>
+            }
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            if (task.getEstimatedHours() != null) {</span>
+<span class="fc" id="L220">                sb.append(&quot; | horas estimadas: &quot;).append(task.getEstimatedHours());</span>
+            }
+<span class="fc" id="L222">            diasParada(task, hoy).ifPresent(dias -&gt;</span>
+<span class="fc" id="L223">                    sb.append(&quot; | sin mover desde hace &quot;).append(dias).append(&quot; dias (PARADA)&quot;));</span>
+<span class="fc" id="L224">            long comentarios = comentariosPorTarea.getOrDefault(task.getId(), 0L);</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            if (comentarios &gt; 0) {</span>
+<span class="nc" id="L226">                sb.append(&quot; | &quot;).append(comentarios).append(&quot; comentarios&quot;);</span>
+            }
+<span class="fc" id="L228">            sb.append(&quot;\n&quot;);</span>
+<span class="fc" id="L229">        }</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        if (tasks.size() &gt; MAX_TASKS) {</span>
+<span class="nc" id="L231">            sb.append(&quot;(y &quot;).append(tasks.size() - MAX_TASKS).append(&quot; tareas mas que no caben aqui)\n&quot;);</span>
+        }
+<span class="fc" id="L233">        return sb.toString();</span>
+    }
+
+    /** La ultima columna del tablero es la de terminadas, se llame como se llame. */
+    private boolean esUltimaColumna(Task task) {
+<span class="fc" id="L238">        List&lt;BoardColumn&gt; columns = task.getBoardColumn().getBoard().getColumns();</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        return !columns.isEmpty()</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">                &amp;&amp; columns.get(columns.size() - 1).getId().equals(task.getBoardColumn().getId());</span>
+    }
+
+    /**
+     * Ni &quot;por hacer&quot; (nadie la ha tocado todavia, no es que este atascada) ni
+     * &quot;hecho&quot; (ya no importa cuanto tardo). Solo cuenta como parada una tarea que
+     * esta en marcha y lleva dias sin moverse: son las columnas de en medio.
+     */
+    private boolean esColumnaDeTrabajo(Task task) {
+<span class="fc" id="L249">        List&lt;BoardColumn&gt; columns = task.getBoardColumn().getBoard().getColumns();</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (columns.size() &lt; 3) return false;</span>
+<span class="fc" id="L251">        Long columnId = task.getBoardColumn().getId();</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        return !columns.get(0).getId().equals(columnId)</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">                &amp;&amp; !columns.get(columns.size() - 1).getId().equals(columnId);</span>
+    }
+
+    /**
+     * Dias sin mover una tarea en curso, si hace suficientes como para contar.
+     *
+     * &lt;p&gt;Sin esta senal el asistente solo podia hablar de fechas limite, y una
+     * tarea sin fecha que lleva dos semanas parada en &quot;en curso&quot; pasaba
+     * completamente desapercibida aunque sea justo el tipo de cosa que alguien
+     * preguntaria «hay algo bloqueado?» para saber.&lt;/p&gt;
+     */
+    private Optional&lt;Long&gt; diasParada(Task task, LocalDate hoy) {
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (!esColumnaDeTrabajo(task)) return Optional.empty();</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        Instant ultimoMovimiento = task.getUpdatedAt() != null ? task.getUpdatedAt() : task.getCreatedAt();</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        if (ultimoMovimiento == null) return Optional.empty();</span>
+
+<span class="fc" id="L269">        long dias = ChronoUnit.DAYS.between(</span>
+<span class="fc" id="L270">                ultimoMovimiento.atZone(ZoneId.systemDefault()).toLocalDate(), hoy);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        return dias &gt;= DIAS_PARADA ? Optional.of(dias) : Optional.empty();</span>
+    }
+
+    private String summary(Project project, List&lt;Task&gt; tasks) {
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        long pendientes = tasks.stream().filter(task -&gt; !esUltimaColumna(task)).count();</span>
+<span class="fc" id="L276">        return &quot;%d tareas (%d pendientes) · %d personas&quot;.formatted(</span>
+<span class="fc" id="L277">                tasks.size(), pendientes, project.getTeam().getMembers().size());</span>
+    }
+
+    private List&lt;ChatTurn&gt; recent(List&lt;ChatTurn&gt; history) {
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        return history.size() &lt;= MAX_HISTORY ? history : history.subList(history.size() - MAX_HISTORY, history.size());</span>
+    }
+
+    /** Cualquier cosa que no sea del asistente se trata como del usuario. */
+    private String normalizeRole(String role) {
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        return &quot;assistant&quot;.equalsIgnoreCase(role) ? &quot;assistant&quot; : &quot;user&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

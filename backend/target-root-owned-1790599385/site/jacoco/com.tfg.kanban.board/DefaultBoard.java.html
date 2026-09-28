@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultBoard.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.board</a> &gt; <span class="el_source">DefaultBoard.java</span></div><h1>DefaultBoard.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.board;
+
+import com.tfg.kanban.domain.model.Board;
+import com.tfg.kanban.domain.model.BoardColumn;
+import com.tfg.kanban.domain.model.Project;
+
+import java.util.List;
+
+/**
+ * Con que columnas nace un tablero.
+ *
+ * &lt;p&gt;Vive aparte porque hay dos caminos que crean tableros —el workspace nuevo,
+ * que trae el suyo hecho, y anadir otro tablero a un proyecto que ya existe— y
+ * los dos tienen que dar exactamente el mismo resultado. Separados, bastaba con
+ * tocar uno para que un tablero naciera con columnas distintas segun por donde
+ * se hubiera creado, y el progreso del workspace (que lee la ultima columna
+ * como «hecho») dejaba de significar lo mismo en los dos casos.&lt;/p&gt;
+ */
+public final class DefaultBoard {
+
+    /** Las tres columnas clasicas de un Kanban, en orden. */
+<span class="fc" id="L22">    private static final List&lt;String&gt; COLUMN_NAMES = List.of(&quot;Por hacer&quot;, &quot;En progreso&quot;, &quot;Hecho&quot;);</span>
+
+    private DefaultBoard() {
+    }
+
+    /** Un tablero del proyecto con sus columnas por defecto, todavia sin guardar. */
+    public static Board of(String name, String description, Project project) {
+<span class="fc" id="L29">        Board board = Board.builder()</span>
+<span class="fc" id="L30">                .name(name)</span>
+<span class="fc" id="L31">                .description(description)</span>
+<span class="fc" id="L32">                .project(project)</span>
+<span class="fc" id="L33">                .build();</span>
+
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        for (int position = 0; position &lt; COLUMN_NAMES.size(); position++) {</span>
+<span class="fc" id="L36">            board.getColumns().add(BoardColumn.builder()</span>
+<span class="fc" id="L37">                    .board(board)</span>
+<span class="fc" id="L38">                    .name(COLUMN_NAMES.get(position))</span>
+<span class="fc" id="L39">                    .position(position)</span>
+<span class="fc" id="L40">                    .build());</span>
+        }
+<span class="fc" id="L42">        return board;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

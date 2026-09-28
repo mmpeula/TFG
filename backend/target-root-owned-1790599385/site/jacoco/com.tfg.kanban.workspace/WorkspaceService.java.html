@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkspaceService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.workspace</a> &gt; <span class="el_source">WorkspaceService.java</span></div><h1>WorkspaceService.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.workspace;
+
+import com.tfg.kanban.activity.ActivityService;
+import com.tfg.kanban.board.DefaultBoard;
+import com.tfg.kanban.common.CountByEntity;
+import com.tfg.kanban.common.BusinessRuleException;
+import com.tfg.kanban.common.ResourceNotFoundException;
+import com.tfg.kanban.domain.model.*;
+import com.tfg.kanban.domain.repository.*;
+import com.tfg.kanban.domain.spec.ProjectSpecifications;
+import com.tfg.kanban.security.SecurityUtils;
+import com.tfg.kanban.workspace.dto.CreateWorkspaceRequest;
+import com.tfg.kanban.workspace.dto.UpdateWorkspaceRequest;
+import com.tfg.kanban.workspace.dto.WorkspaceResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Workspaces: la unidad con la que trabaja el estudiante.
+ *
+ * &lt;p&gt;Un workspace es un &lt;b&gt;proyecto&lt;/b&gt; con su equipo y su tablero. Los tres se
+ * crean juntos en una sola operacion porque exponer esa jerarquia en la interfaz
+ * obligaba a entender el modelo de datos antes de poder escribir la primera tarea.
+ * Por debajo no cambia nada: el resto de la API sigue trabajando con equipos,
+ * proyectos y tableros.&lt;/p&gt;
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class WorkspaceService {
+
+    private final ProjectRepository projectRepository;
+    private final TeamRepository teamRepository;
+    private final TeamMemberRepository teamMemberRepository;
+    private final BoardColumnRepository columnRepository;
+    private final TaskRepository taskRepository;
+    private final ActivityLogRepository activityLogRepository;
+    private final UserRepository userRepository;
+    private final ActivityService activityService;
+
+    /**
+     * Todos los workspaces del usuario, con los numeros que se ven en la tarjeta.
+     *
+     * Es la pantalla de inicio, la que mas se carga, asi que se resuelve con cinco
+     * consultas fijas: los proyectos, sus columnas, las tareas de esas columnas,
+     * los miembros de cada equipo y el ultimo movimiento. Ninguna depende de
+     * cuantos workspaces tenga la persona.
+     */
+    public List&lt;WorkspaceResponse&gt; findMine() {
+<span class="fc" id="L56">        Long userId = SecurityUtils.requireCurrentUserId();</span>
+<span class="fc" id="L57">        List&lt;Project&gt; projects = projectRepository.findAll(</span>
+<span class="fc" id="L58">                ProjectSpecifications.visibleTo(userId, null, null),</span>
+<span class="fc" id="L59">                Sort.by(Sort.Direction.DESC, &quot;createdAt&quot;));</span>
+
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (projects.isEmpty()) {</span>
+<span class="fc" id="L62">            return List.of();</span>
+        }
+
+<span class="fc" id="L65">        List&lt;Long&gt; projectIds = projects.stream().map(Project::getId).toList();</span>
+<span class="fc" id="L66">        List&lt;Long&gt; teamIds = projects.stream().map(project -&gt; project.getTeam().getId()).distinct().toList();</span>
+
+        // (proyecto, tablero, columna, posicion) para todos los proyectos de golpe.
+<span class="fc" id="L69">        Map&lt;Long, List&lt;ColumnRow&gt;&gt; columnsByProject = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (Object[] row : columnRepository.findColumnRowsByProjectIds(projectIds)) {</span>
+<span class="fc" id="L71">            columnsByProject</span>
+<span class="fc" id="L72">                    .computeIfAbsent((Long) row[0], key -&gt; new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L73">                    .add(new ColumnRow((Long) row[1], (Long) row[2]));</span>
+<span class="fc" id="L74">        }</span>
+
+<span class="fc" id="L76">        List&lt;Long&gt; columnIds = columnsByProject.values().stream()</span>
+<span class="fc" id="L77">                .flatMap(List::stream).map(ColumnRow::columnId).toList();</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        Map&lt;Long, Long&gt; tasksByColumn = columnIds.isEmpty() ? Map.of()</span>
+<span class="fc" id="L79">                : taskRepository.countByColumnIds(columnIds).stream()</span>
+<span class="fc" id="L80">                        .collect(Collectors.toMap(CountByEntity::entityId, CountByEntity::total));</span>
+
+<span class="fc" id="L82">        Map&lt;Long, Long&gt; membersByTeam = teamMemberRepository.countByTeamIds(teamIds).stream()</span>
+<span class="fc" id="L83">                .collect(Collectors.toMap(CountByEntity::entityId, CountByEntity::total));</span>
+<span class="fc" id="L84">        Map&lt;Long, Role&gt; rolesByTeam = teamMemberRepository.rolesInTeams(teamIds, userId).stream()</span>
+<span class="fc" id="L85">                .collect(Collectors.toMap(row -&gt; (Long) row[0], row -&gt; (Role) row[1]));</span>
+<span class="fc" id="L86">        Map&lt;Long, Instant&gt; lastActivity = activityLogRepository.lastActivityByProjects(projectIds).stream()</span>
+<span class="fc" id="L87">                .collect(Collectors.toMap(row -&gt; (Long) row[0], row -&gt; (Instant) row[1]));</span>
+
+<span class="fc" id="L89">        return projects.stream()</span>
+<span class="fc" id="L90">                .map(project -&gt; {</span>
+<span class="fc" id="L91">                    List&lt;ColumnRow&gt; columns = columnsByProject.getOrDefault(project.getId(), List.of());</span>
+<span class="fc" id="L92">                    Long teamId = project.getTeam().getId();</span>
+<span class="fc" id="L93">                    return card(project,</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                            columns.isEmpty() ? null : columns.get(0).boardId(),</span>
+<span class="fc" id="L95">                            columns.stream().map(ColumnRow::columnId).toList(),</span>
+                            tasksByColumn,
+<span class="fc" id="L97">                            membersByTeam.getOrDefault(teamId, 0L).intValue(),</span>
+<span class="fc" id="L98">                            rolesByTeam.get(teamId),</span>
+<span class="fc" id="L99">                            lastActivity.get(project.getId()));</span>
+                })
+<span class="fc" id="L101">                .toList();</span>
+    }
+
+    /** Una columna del tablero, con el tablero al que pertenece. */
+<span class="fc" id="L105">    private record ColumnRow(Long boardId, Long columnId) {</span>
+    }
+
+    public WorkspaceResponse findById(Long workspaceId) {
+<span class="fc" id="L109">        Project project = getProject(workspaceId);</span>
+<span class="fc" id="L110">        List&lt;BoardColumn&gt; columns = columnRepository.findByProjectIds(List.of(workspaceId));</span>
+<span class="fc" id="L111">        List&lt;Long&gt; columnIds = columns.stream().map(BoardColumn::getId).toList();</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        Map&lt;Long, Long&gt; tasks = columnIds.isEmpty() ? Map.of()</span>
+<span class="fc" id="L113">                : taskRepository.countByColumnIds(columnIds).stream()</span>
+<span class="fc" id="L114">                        .collect(Collectors.toMap(CountByEntity::entityId, CountByEntity::total));</span>
+<span class="fc" id="L115">        Instant last = activityLogRepository.findTop1ByProject_IdOrderByOccurredAtDesc(workspaceId).stream()</span>
+<span class="fc" id="L116">                .findFirst().map(ActivityLog::getOccurredAt).orElse(null);</span>
+
+<span class="fc" id="L118">        return card(project,</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                project.getBoards().isEmpty() ? null : project.getBoards().get(0).getId(),</span>
+                columnIds, tasks,
+<span class="fc" id="L121">                project.getTeam().getMembers().size(),</span>
+<span class="fc" id="L122">                roleIn(project), last);</span>
+    }
+
+    /**
+     * Crea el workspace entero: equipo, proyecto, tablero y sus tres columnas.
+     * Todo en una transaccion, para que no pueda quedar un equipo sin proyecto si
+     * algo falla por el camino.
+     */
+    @Transactional
+    public WorkspaceResponse create(CreateWorkspaceRequest request) {
+<span class="fc" id="L132">        Long userId = SecurityUtils.requireCurrentUserId();</span>
+<span class="fc" id="L133">        User owner = userRepository.findById(userId)</span>
+<span class="pc" id="L134">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Usuario&quot;, userId));</span>
+<span class="pc bpc" id="L135" title="3 of 4 branches missed.">        if (owner.getRole() != Role.MIEMBRO &amp;&amp; owner.getRole() != Role.RESPONSABLE) {</span>
+<span class="nc" id="L136">            throw new BusinessRuleException(&quot;Solo una cuenta MIEMBRO puede crear un workspace&quot;);</span>
+        }
+<span class="fc" id="L138">        String name = request.name().trim();</span>
+
+<span class="fc" id="L140">        Team team = Team.builder()</span>
+<span class="fc" id="L141">                .name(name)</span>
+<span class="fc" id="L142">                .description(request.description())</span>
+<span class="fc" id="L143">                .owner(owner)</span>
+<span class="fc" id="L144">                .build();</span>
+<span class="fc" id="L145">        team.getMembers().add(TeamMember.builder()</span>
+<span class="fc" id="L146">                .team(team)</span>
+<span class="fc" id="L147">                .user(owner)</span>
+<span class="fc" id="L148">                .role(Role.RESPONSABLE)</span>
+<span class="fc" id="L149">                .build());</span>
+
+<span class="fc" id="L151">        Project project = Project.builder()</span>
+<span class="fc" id="L152">                .name(name)</span>
+<span class="fc" id="L153">                .description(request.description())</span>
+<span class="fc" id="L154">                .color(request.color())</span>
+<span class="fc" id="L155">                .icon(request.icon())</span>
+<span class="fc" id="L156">                .sprintDays(request.sprintDays())</span>
+<span class="fc" id="L157">                .status(ProjectStatus.EN_CURSO)</span>
+<span class="fc" id="L158">                .team(team)</span>
+<span class="fc" id="L159">                .build();</span>
+
+<span class="fc" id="L161">        project.getBoards().add(DefaultBoard.of(&quot;Tablero&quot;, null, project));</span>
+<span class="fc" id="L162">        team.getProjects().add(project);</span>
+
+<span class="fc" id="L164">        teamRepository.save(team);</span>
+<span class="fc" id="L165">        Project saved = projectRepository.save(project);</span>
+
+<span class="fc" id="L167">        activityService.record(saved, ActivityAction.CREACION, &quot;Project&quot;, saved.getId(),</span>
+<span class="fc" id="L168">                &quot;Creo el workspace '%s'&quot;.formatted(saved.getName()));</span>
+
+<span class="fc" id="L170">        return findById(saved.getId());</span>
+    }
+
+    @Transactional
+    public WorkspaceResponse update(Long workspaceId, UpdateWorkspaceRequest request) {
+<span class="fc" id="L175">        Project project = getProject(workspaceId);</span>
+<span class="fc" id="L176">        project.setName(request.name().trim());</span>
+<span class="fc" id="L177">        project.setDescription(request.description());</span>
+<span class="fc" id="L178">        project.setColor(request.color());</span>
+<span class="fc" id="L179">        project.setIcon(request.icon());</span>
+<span class="fc" id="L180">        project.setStartDate(request.startDate());</span>
+<span class="fc" id="L181">        project.setDeadline(request.deadline());</span>
+<span class="fc" id="L182">        project.setSprintDays(request.sprintDays());</span>
+
+        // El equipo se llama igual que el workspace: al renombrarlo, se renombra.
+<span class="fc" id="L185">        Team team = project.getTeam();</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (team.getProjects().size() &lt;= 1) {</span>
+<span class="fc" id="L187">            team.setName(project.getName());</span>
+        }
+
+<span class="fc" id="L190">        activityService.record(project, ActivityAction.ACTUALIZACION, &quot;Project&quot;, project.getId(),</span>
+<span class="fc" id="L191">                &quot;Actualizo el workspace '%s'&quot;.formatted(project.getName()));</span>
+
+<span class="fc" id="L193">        return findById(workspaceId);</span>
+    }
+
+    /**
+     * Borra el workspace. Si su equipo se queda sin proyectos y lo creo esta misma
+     * persona, se borra tambien: de otro modo quedarian equipos vacios invisibles.
+     */
+    @Transactional
+    public void delete(Long workspaceId) {
+<span class="fc" id="L202">        Project project = getProject(workspaceId);</span>
+<span class="fc" id="L203">        Team team = project.getTeam();</span>
+
+<span class="fc" id="L205">        projectRepository.delete(project);</span>
+<span class="fc" id="L206">        projectRepository.flush();</span>
+
+<span class="fc" id="L208">        boolean vacio = projectRepository.findByTeam_Id(team.getId()).isEmpty();</span>
+<span class="pc bpc" id="L209" title="2 of 4 branches missed.">        boolean esMio = team.getOwner() != null &amp;&amp; team.getOwner().getId().equals(SecurityUtils.requireCurrentUserId());</span>
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        if (vacio &amp;&amp; esMio) {</span>
+<span class="fc" id="L211">            teamRepository.delete(team);</span>
+        }
+<span class="fc" id="L213">    }</span>
+
+    /**
+     * Arma la tarjeta. &quot;Hecho&quot; es la ultima columna del tablero, se llame como se
+     * llame: asi el progreso sigue siendo correcto si el usuario las renombra.
+     */
+    private WorkspaceResponse card(Project project, Long boardId, List&lt;Long&gt; columnIds,
+                                   Map&lt;Long, Long&gt; tasksByColumn, int memberCount,
+                                   Role role, Instant lastActivity) {
+<span class="fc" id="L222">        int total = 0;</span>
+<span class="fc" id="L223">        int done = 0;</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        Long doneColumnId = columnIds.isEmpty() ? null : columnIds.get(columnIds.size() - 1);</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        for (Long columnId : columnIds) {</span>
+<span class="fc" id="L226">            int count = tasksByColumn.getOrDefault(columnId, 0L).intValue();</span>
+<span class="fc" id="L227">            total += count;</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            if (columnId.equals(doneColumnId)) {</span>
+<span class="fc" id="L229">                done += count;</span>
+            }
+<span class="fc" id="L231">        }</span>
+
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        Instant last = lastActivity != null ? lastActivity</span>
+<span class="pc bnc" id="L234" title="All 2 branches missed.">                : project.getUpdatedAt() != null ? project.getUpdatedAt() : project.getCreatedAt();</span>
+
+<span class="fc" id="L236">        return new WorkspaceResponse(</span>
+<span class="fc" id="L237">                project.getId(), project.getName(), project.getDescription(),</span>
+<span class="fc" id="L238">                project.getColor(), project.getIcon(),</span>
+<span class="fc" id="L239">                project.getTeam().getId(), boardId, role,</span>
+                total, done, total - done,
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                total == 0 ? 0 : Math.round(done * 100f / total),</span>
+<span class="fc" id="L242">                memberCount, project.getStartDate(), project.getDeadline(), project.getSprintDays(), last,</span>
+<span class="fc" id="L243">                project.isEnabled());</span>
+    }
+
+    public Project getProject(Long workspaceId) {
+<span class="fc" id="L247">        return projectRepository.findById(workspaceId)</span>
+<span class="pc" id="L248">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Workspace&quot;, workspaceId));</span>
+    }
+
+    private Role roleIn(Project project) {
+<span class="fc" id="L252">        return teamMemberRepository.findByTeam_IdAndUser_Id(project.getTeam().getId(), SecurityUtils.requireCurrentUserId())</span>
+<span class="fc" id="L253">                .map(TeamMember::getRole).orElse(null);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

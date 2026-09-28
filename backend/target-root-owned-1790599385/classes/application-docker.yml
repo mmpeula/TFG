@@ -1,0 +1,22 @@
+# Perfil docker: el backend corre en un contenedor y llega a la BD por el
+# nombre del servicio de docker-compose. Todos los valores vienen del .env.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:oracle:thin:@//oracle-db:1521/FREEPDB1}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+
+app:
+  storage:
+    upload-dir: ${UPLOAD_DIR:/app/uploads}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+
+logging:
+  level:
+    com.tfg.kanban: INFO

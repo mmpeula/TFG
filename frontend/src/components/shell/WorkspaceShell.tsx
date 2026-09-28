@@ -105,7 +105,7 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
             </Tooltip>
           )}
           <button className={styles.profile} onClick={() => navigate(ROUTES.configuracion)} aria-label="Mi cuenta">
-            <Avatar user={user} size={28} />
+            <Avatar user={user} avatarUrl={user?.avatarUrl} size={28} />
           </button>
           <Tooltip label="Cerrar sesion">
             <button className={styles.icon} onClick={signOut} aria-label="Cerrar sesion">

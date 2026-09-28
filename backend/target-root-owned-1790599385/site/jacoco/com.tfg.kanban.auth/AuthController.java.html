@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.auth</a> &gt; <span class="el_source">AuthController.java</span></div><h1>AuthController.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.auth;
+
+import com.tfg.kanban.auth.dto.AuthResponse;
+import com.tfg.kanban.auth.dto.LoginRequest;
+import com.tfg.kanban.auth.dto.RegisterRequest;
+import com.tfg.kanban.common.ApiError;
+import com.tfg.kanban.user.dto.UserResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/api/auth&quot;)
+@RequiredArgsConstructor
+@Tag(name = &quot;Autenticacion&quot;, description = &quot;Registro, login y usuario actual&quot;)
+public class AuthController {
+
+    private final AuthService authService;
+
+    @Operation(summary = &quot;Registrar un usuario nuevo&quot;,
+            description = &quot;Crea la cuenta y devuelve directamente un token JWT para no obligar a hacer login despues.&quot;)
+    @ApiResponses({
+            @ApiResponse(responseCode = &quot;201&quot;, description = &quot;Usuario creado&quot;),
+            @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Datos invalidos&quot;,
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = &quot;409&quot;, description = &quot;El email ya esta registrado&quot;,
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @PostMapping(&quot;/register&quot;)
+    public ResponseEntity&lt;AuthResponse&gt; register(@Valid @RequestBody RegisterRequest request) {
+<span class="fc" id="L40">        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));</span>
+    }
+
+    @Operation(summary = &quot;Iniciar sesion&quot;, description = &quot;Devuelve un token JWT valido para el resto de la API.&quot;)
+    @ApiResponses({
+            @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Autenticacion correcta&quot;),
+            @ApiResponse(responseCode = &quot;401&quot;, description = &quot;Credenciales invalidas&quot;,
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @PostMapping(&quot;/login&quot;)
+    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
+<span class="fc" id="L51">        return authService.login(request);</span>
+    }
+
+    @Operation(summary = &quot;Usuario autenticado&quot;, description = &quot;Datos del usuario dueno del token enviado.&quot;,
+            security = @SecurityRequirement(name = &quot;bearerAuth&quot;))
+    @ApiResponses({
+            @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Usuario actual&quot;),
+            @ApiResponse(responseCode = &quot;401&quot;, description = &quot;Token ausente o invalido&quot;,
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @GetMapping(&quot;/me&quot;)
+    public UserResponse me() {
+<span class="fc" id="L63">        return authService.currentUser();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

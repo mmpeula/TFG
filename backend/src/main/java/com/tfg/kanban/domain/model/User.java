@@ -60,6 +60,13 @@ public class User extends Auditable {
     @Builder.Default
     private boolean enabled = true;
 
+    /** Nombre con el que se guarda la foto de perfil en el almacenamiento de ficheros; null si no tiene. */
+    @Column(name = "AVATAR_STORED_NAME", length = 255)
+    private String avatarStoredName;
+
+    @Column(name = "AVATAR_CONTENT_TYPE", length = 100)
+    private String avatarContentType;
+
     /** Equipos a los que pertenece el usuario (lado inverso de la relacion). */
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default

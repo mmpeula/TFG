@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InvitationController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.team</a> &gt; <span class="el_source">InvitationController.java</span></div><h1>InvitationController.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.team;
+
+import com.tfg.kanban.common.ApiError;
+import com.tfg.kanban.team.dto.InvitationResponse;
+import com.tfg.kanban.team.dto.InviteRequest;
+import com.tfg.kanban.team.dto.MyInvitationResponse;
+import com.tfg.kanban.team.dto.TeamMemberResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * Invitaciones a un equipo.
+ *
+ * &lt;p&gt;Invitar y cancelar son cosa del RESPONSABLE del equipo; responder, solo de
+ * quien ha sido invitado, y eso se comprueba en el servicio contra el token
+ * porque no depende de ningun rol.&lt;/p&gt;
+ */
+@RestController
+@RequiredArgsConstructor
+@Tag(name = &quot;Invitaciones&quot;, description = &quot;Invitar a alguien a un equipo y responder a la invitacion&quot;)
+public class InvitationController {
+
+    private final InvitationService invitationService;
+
+    @Operation(summary = &quot;Invitar a alguien al equipo&quot;,
+            description = &quot;&quot;&quot;
+                    Solo el RESPONSABLE. Manda un correo con el enlace para aceptar. La persona
+                    NO entra en el equipo hasta que acepta: hasta entonces figura como pendiente.
+                    &quot;&quot;&quot;)
+    @ApiResponses({
+            @ApiResponse(responseCode = &quot;201&quot;, description = &quot;Invitacion enviada&quot;),
+            @ApiResponse(responseCode = &quot;404&quot;, description = &quot;No hay ninguna cuenta con ese email&quot;,
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Ya esta en el equipo o ya tiene una invitacion pendiente&quot;,
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @PreAuthorize(&quot;@access.canManageTeam(#teamId)&quot;)
+    @PostMapping(&quot;/api/teams/{teamId}/invitations&quot;)
+    public ResponseEntity&lt;InvitationResponse&gt; invite(@PathVariable Long teamId,
+                                                     @Valid @RequestBody InviteRequest request) {
+<span class="fc" id="L53">        return ResponseEntity.status(HttpStatus.CREATED).body(invitationService.invite(teamId, request));</span>
+    }
+
+    @Operation(summary = &quot;Invitaciones pendientes del equipo&quot;,
+            description = &quot;Las que aun no han respondido. Las ve cualquier miembro del equipo.&quot;)
+    @PreAuthorize(&quot;@access.isTeamMember(#teamId)&quot;)
+    @GetMapping(&quot;/api/teams/{teamId}/invitations&quot;)
+    public List&lt;InvitationResponse&gt; pending(@PathVariable Long teamId) {
+<span class="fc" id="L61">        return invitationService.pendingOf(teamId);</span>
+    }
+
+    @Operation(summary = &quot;Cancelar una invitacion&quot;, description = &quot;Solo el RESPONSABLE, y solo si sigue pendiente.&quot;)
+    @ApiResponses(@ApiResponse(responseCode = &quot;204&quot;, description = &quot;Invitacion cancelada&quot;))
+    @PreAuthorize(&quot;@access.canManageTeam(#teamId)&quot;)
+    @DeleteMapping(&quot;/api/teams/{teamId}/invitations/{invitationId}&quot;)
+    public ResponseEntity&lt;Void&gt; cancel(@PathVariable Long teamId, @PathVariable Long invitationId) {
+<span class="fc" id="L69">        invitationService.cancel(teamId, invitationId);</span>
+<span class="fc" id="L70">        return ResponseEntity.noContent().build();</span>
+    }
+
+    @Operation(summary = &quot;Mis invitaciones pendientes&quot;,
+            description = &quot;Las que esperan respuesta del usuario autenticado, para avisarle al entrar.&quot;)
+    @GetMapping(&quot;/api/invitations/mine&quot;)
+    public List&lt;MyInvitationResponse&gt; mine() {
+<span class="fc" id="L77">        return invitationService.mine();</span>
+    }
+
+    @Operation(summary = &quot;Aceptar una invitacion&quot;,
+            description = &quot;Solo quien fue invitado. Al aceptar, entra en el equipo con el rol de la invitacion.&quot;)
+    @ApiResponses({
+            @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Ya es miembro del equipo&quot;),
+            @ApiResponse(responseCode = &quot;404&quot;, description = &quot;La invitacion no existe, no es suya o ya no vale&quot;,
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @PostMapping(&quot;/api/invitations/{token}/accept&quot;)
+    public TeamMemberResponse accept(@PathVariable String token) {
+<span class="fc" id="L89">        return invitationService.accept(token);</span>
+    }
+
+    @Operation(summary = &quot;Rechazar una invitacion&quot;, description = &quot;Solo quien fue invitado.&quot;)
+    @ApiResponses(@ApiResponse(responseCode = &quot;204&quot;, description = &quot;Invitacion rechazada&quot;))
+    @PostMapping(&quot;/api/invitations/{token}/reject&quot;)
+    public ResponseEntity&lt;Void&gt; reject(@PathVariable String token) {
+<span class="nc" id="L96">        invitationService.reject(token);</span>
+<span class="nc" id="L97">        return ResponseEntity.noContent().build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

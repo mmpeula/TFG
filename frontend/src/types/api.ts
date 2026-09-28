@@ -44,6 +44,7 @@ export interface UserResponse {
   role: Role
   enabled: boolean
   createdAt: string
+  avatarUrl: string | null
 }
 
 export interface AuthResponse {

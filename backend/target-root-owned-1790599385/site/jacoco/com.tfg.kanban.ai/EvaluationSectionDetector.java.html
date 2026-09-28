@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvaluationSectionDetector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.ai</a> &gt; <span class="el_source">EvaluationSectionDetector.java</span></div><h1>EvaluationSectionDetector.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.ai;
+
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+/**
+ * Localiza, con una heuristica generica (no atada a Scrum, a JADE ni a ninguna
+ * metodologia o asignatura concreta), donde empieza la parte de un documento
+ * que reparte nota, marca algo como obligatorio o dice que hay que entregar:
+ * un titulo como &quot;Evaluacion&quot;, &quot;Rubrica&quot;, &quot;Criterios&quot;, &quot;Puntuacion&quot;,
+ * &quot;Requisitos&quot; o &quot;Entrega&quot;.
+ *
+ * &lt;p&gt;Existe por esto: el documento se recorta antes de mandarlo al modelo
+ * (ver {@code AiPlanService.DOCUMENT_CHARS_FOR_MODEL}, necesario para no
+ * pasarse de la cuota de tokens del proveedor). Si esa seccion cae justo
+ * despues del recorte —algo habitual, porque la evaluacion suele ir al final
+ * del documento—, el modelo nunca llega a verla y reparte tareas sin saber
+ * que hay apartados puntuables que cubrir. Lo que devuelve esta clase se
+ * manda aparte, siempre, este o no dentro de la parte que sobrevive al
+ * recorte.&lt;/p&gt;
+ */
+final class EvaluationSectionDetector {
+
+<span class="fc" id="L24">    private static final Pattern[] KEYWORDS = {</span>
+<span class="fc" id="L25">            Pattern.compile(&quot;evalua&quot;), Pattern.compile(&quot;rubrica&quot;), Pattern.compile(&quot;criterio&quot;),</span>
+<span class="fc" id="L26">            Pattern.compile(&quot;puntuacion&quot;), Pattern.compile(&quot;requisito&quot;), Pattern.compile(&quot;entrega&quot;),</span>
+    };
+
+    /**
+     * De sobra para una rubrica con su lista de entregables detras (el caso
+     * real mas habitual: van juntas, al final del documento), sin acercarse a
+     * lo que le cuesta en tokens repetir el documento entero.
+     */
+    private static final int MAX_SECTION_CHARS = 2_500;
+
+    /** Por encima de esto ya no es un titulo, es un parrafo que solo menciona la palabra de pasada. */
+    private static final int MAX_HEADING_LENGTH = 100;
+
+    /** &quot;4 Evaluacion...&quot;, &quot;4.1 Rubrica...&quot;, &quot;IV. Criterios...&quot;: numero, punto opcional, texto. */
+<span class="fc" id="L40">    private static final Pattern NUMBERED_HEADING = Pattern.compile(&quot;^\\d+(\\.\\d+)*\\.?\\s+\\S.*&quot;);</span>
+
+    private EvaluationSectionDetector() {
+    }
+
+    /**
+     * El fragmento del documento, tal cual esta escrito (sin resumirlo con el
+     * modelo: eso costaria otra llamada solo para esto), desde el primer titulo
+     * que parece repartir nota o marcar un requisito. Vacio si no se reconoce
+     * ninguno.
+     */
+    static Optional&lt;String&gt; detect(String text) {
+<span class="fc bfc" id="L52" title="All 4 branches covered.">        if (text == null || text.isBlank()) {</span>
+<span class="fc" id="L53">            return Optional.empty();</span>
+        }
+<span class="fc" id="L55">        String[] lines = text.split(&quot;\n&quot;, -1);</span>
+
+<span class="fc" id="L57">        int inicio = indexOfFirst(lines, EvaluationSectionDetector::esEncabezadoFuerte);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (inicio &lt; 0) {</span>
+<span class="fc" id="L59">            inicio = indexOfFirst(lines, EvaluationSectionDetector::esEncabezadoDebil);</span>
+        }
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (inicio &lt; 0) {</span>
+<span class="fc" id="L62">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L65">        StringBuilder seccion = new StringBuilder();</span>
+<span class="pc bpc" id="L66" title="1 of 4 branches missed.">        for (int i = inicio; i &lt; lines.length &amp;&amp; seccion.length() &lt; MAX_SECTION_CHARS; i++) {</span>
+<span class="fc" id="L67">            seccion.append(lines[i]).append('\n');</span>
+        }
+        // El bucle solo corta entre lineas: si una linea sola ya se pasa del tope
+        // (nada que ver en un documento normal, pero mejor no confiar en eso), se
+        // recorta aqui de verdad.
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        String extracto = seccion.length() &gt; MAX_SECTION_CHARS</span>
+<span class="fc" id="L73">                ? seccion.substring(0, MAX_SECTION_CHARS).strip() : seccion.toString().strip();</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        return extracto.isBlank() ? Optional.empty() : Optional.of(extracto);</span>
+    }
+
+    private static int indexOfFirst(String[] lines, java.util.function.Predicate&lt;String&gt; condicion) {
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int i = 0; i &lt; lines.length; i++) {</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (condicion.test(lines[i])) {</span>
+<span class="fc" id="L80">                return i;</span>
+            }
+        }
+<span class="fc" id="L83">        return -1;</span>
+    }
+
+    /**
+     * Un titulo numerado o en mayusculas que menciona alguna palabra clave: el
+     * indicio mas fiable de que es de verdad un titulo, no una frase de en medio
+     * de un parrafo que solo cita la palabra de pasada.
+     */
+    private static boolean esEncabezadoFuerte(String line) {
+<span class="fc" id="L92">        String trimmed = line.strip();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (!candidatoAEncabezado(trimmed)) {</span>
+<span class="fc" id="L94">            return false;</span>
+        }
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        boolean formaDeTitulo = NUMBERED_HEADING.matcher(trimmed).matches()</span>
+<span class="fc bfc" id="L97" title="All 4 branches covered.">                || (trimmed.equals(trimmed.toUpperCase(java.util.Locale.ROOT)) &amp;&amp; trimmed.chars().anyMatch(Character::isLetter));</span>
+<span class="fc bfc" id="L98" title="All 4 branches covered.">        return formaDeTitulo &amp;&amp; contieneAlgunaClave(trimmed);</span>
+    }
+
+    /**
+     * Sin forma de titulo, pero al menos corta y con mayuscula o numero al
+     * principio: mejor esto que nada si el documento no numera sus apartados.
+     */
+    private static boolean esEncabezadoDebil(String line) {
+<span class="fc" id="L106">        String trimmed = line.strip();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (!candidatoAEncabezado(trimmed)) {</span>
+<span class="fc" id="L108">            return false;</span>
+        }
+<span class="fc" id="L110">        char primera = trimmed.charAt(0);</span>
+<span class="fc bfc" id="L111" title="All 6 branches covered.">        return (Character.isUpperCase(primera) || Character.isDigit(primera)) &amp;&amp; contieneAlgunaClave(trimmed);</span>
+    }
+
+    private static boolean candidatoAEncabezado(String trimmed) {
+<span class="fc bfc" id="L115" title="All 4 branches covered.">        return !trimmed.isEmpty() &amp;&amp; trimmed.length() &lt;= MAX_HEADING_LENGTH;</span>
+    }
+
+    private static boolean contieneAlgunaClave(String trimmed) {
+<span class="fc" id="L119">        String normalizado = TextNormalizer.plain(trimmed);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (Pattern keyword : KEYWORDS) {</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (keyword.matcher(normalizado).find()) {</span>
+<span class="fc" id="L122">                return true;</span>
+            }
+        }
+<span class="fc" id="L125">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

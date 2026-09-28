@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.tfg.kanban.comment.CommentControllerIT
+-------------------------------------------------------------------------------
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.843 s -- in com.tfg.kanban.comment.CommentControllerIT

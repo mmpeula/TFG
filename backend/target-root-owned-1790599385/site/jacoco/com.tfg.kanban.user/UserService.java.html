@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.user</a> &gt; <span class="el_source">UserService.java</span></div><h1>UserService.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.user;
+
+import com.tfg.kanban.common.BusinessRuleException;
+import com.tfg.kanban.common.PageResponse;
+import com.tfg.kanban.common.ResourceNotFoundException;
+import com.tfg.kanban.domain.model.Role;
+import com.tfg.kanban.domain.model.User;
+import com.tfg.kanban.domain.repository.UserRepository;
+import com.tfg.kanban.security.SecurityUtils;
+import com.tfg.kanban.user.dto.UpdateGlobalRoleRequest;
+import com.tfg.kanban.user.dto.UpdateUserRequest;
+import com.tfg.kanban.user.dto.UserResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public PageResponse&lt;UserResponse&gt; search(String search, Pageable pageable) {
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        String term = StringUtils.hasText(search) ? search.trim() : &quot;&quot;;</span>
+<span class="fc" id="L30">        return PageResponse.of(</span>
+<span class="fc" id="L31">                userRepository.findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(</span>
+                        term, term, pageable),
+                UserResponse::from);
+    }
+
+    @Transactional
+    public UserResponse update(Long id, UpdateUserRequest request) {
+<span class="fc" id="L38">        User user = getUser(id);</span>
+<span class="fc" id="L39">        user.setFullName(request.fullName().trim());</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (StringUtils.hasText(request.password())) {</span>
+<span class="fc" id="L41">            ensureMayChangePassword(user, request.currentPassword());</span>
+<span class="fc" id="L42">            user.setPasswordHash(passwordEncoder.encode(request.password()));</span>
+        }
+<span class="fc" id="L44">        return UserResponse.from(user);</span>
+    }
+
+    /**
+     * Para cambiarse uno mismo la contrasena hay que saber la de ahora.
+     *
+     * &lt;p&gt;Sin esto bastaba con una sesion abierta y sin vigilancia —un portatil de
+     * la biblioteca -- para dejar a su dueno fuera de su propia cuenta: la nueva
+     * contrasena la elige quien esta sentado delante y el dueno ya no la sabe.&lt;/p&gt;
+     *
+     * &lt;p&gt;Al administrador que restablece la de otra persona no se le pide, porque
+     * no la tiene: eso es precisamente para lo que existe el restablecimiento. La
+     * suya propia si la tiene que saber, como todo el mundo.&lt;/p&gt;
+     */
+    private void ensureMayChangePassword(User user, String currentPassword) {
+<span class="fc" id="L59">        boolean esSuPropiaCuenta = SecurityUtils.currentUserId()</span>
+<span class="fc" id="L60">                .filter(userId -&gt; userId.equals(user.getId()))</span>
+<span class="fc" id="L61">                .isPresent();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (!esSuPropiaCuenta) {</span>
+<span class="fc" id="L63">            return;</span>
+        }
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (!StringUtils.hasText(currentPassword)</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {</span>
+<span class="fc" id="L67">            throw new BusinessRuleException(&quot;La contrasena actual no es correcta&quot;);</span>
+        }
+<span class="fc" id="L69">    }</span>
+
+    @Transactional
+    public UserResponse updateGlobalRole(Long id, UpdateGlobalRoleRequest request) {
+<span class="fc" id="L73">        User user = getUser(id);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (!isAccountRole(request.role())) {</span>
+<span class="nc" id="L75">            throw new BusinessRuleException(&quot;Una cuenta solo puede ser ADMIN, DOCENTE o MIEMBRO&quot;);</span>
+        }
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">        if (user.getRole() == Role.ADMIN &amp;&amp; request.role() != Role.ADMIN) {</span>
+<span class="fc" id="L78">            ensureNotLastAdmin();</span>
+        }
+<span class="fc" id="L80">        user.setRole(request.role());</span>
+<span class="fc" id="L81">        return UserResponse.from(user);</span>
+    }
+
+    /**
+     * Baja logica: se deshabilita la cuenta en lugar de borrarla, para no perder
+     * la autoria de tareas, comentarios y registros de actividad.
+     */
+    @Transactional
+    public void disable(Long id) {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (SecurityUtils.currentUserId().filter(id::equals).isPresent()) {</span>
+<span class="fc" id="L91">            throw new BusinessRuleException(&quot;No puedes deshabilitar tu propia cuenta&quot;);</span>
+        }
+<span class="fc" id="L93">        User user = getUser(id);</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (user.getRole() == Role.ADMIN) {</span>
+<span class="nc" id="L95">            ensureNotLastAdmin();</span>
+        }
+<span class="fc" id="L97">        user.setEnabled(false);</span>
+<span class="fc" id="L98">    }</span>
+
+    /** Da de alta de nuevo una cuenta deshabilitada. */
+    @Transactional
+    public void enable(Long id) {
+<span class="fc" id="L103">        getUser(id).setEnabled(true);</span>
+<span class="fc" id="L104">    }</span>
+
+    private void ensureNotLastAdmin() {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (userRepository.countByRole(Role.ADMIN) &lt;= 1) {</span>
+<span class="fc" id="L108">            throw new BusinessRuleException(&quot;La plataforma debe tener al menos un administrador&quot;);</span>
+        }
+<span class="fc" id="L110">    }</span>
+
+    private boolean isAccountRole(Role role) {
+<span class="pc bpc" id="L113" title="1 of 6 branches missed.">        return role == Role.ADMIN || role == Role.DOCENTE || role == Role.MIEMBRO;</span>
+    }
+
+    public User getUser(Long id) {
+<span class="fc" id="L117">        return userRepository.findById(id)</span>
+<span class="fc" id="L118">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Usuario&quot;, id));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

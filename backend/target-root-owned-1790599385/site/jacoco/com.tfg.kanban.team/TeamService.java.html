@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TeamService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.team</a> &gt; <span class="el_source">TeamService.java</span></div><h1>TeamService.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.team;
+
+import com.tfg.kanban.common.BusinessRuleException;
+import com.tfg.kanban.common.ResourceNotFoundException;
+import com.tfg.kanban.domain.model.Role;
+import com.tfg.kanban.domain.model.Team;
+import com.tfg.kanban.domain.model.TeamMember;
+import com.tfg.kanban.domain.model.User;
+import com.tfg.kanban.domain.repository.TeamMemberRepository;
+import com.tfg.kanban.domain.repository.TeamRepository;
+import com.tfg.kanban.team.dto.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Comparator;
+import java.util.List;
+
+/**
+ * Los miembros de un equipo: roles, indicaciones para el plan y salidas.
+ *
+ * &lt;p&gt;El equipo lo crea su workspace, con quien lo crea como RESPONSABLE, y se entra
+ * en el por invitacion (ver {@link InvitationService}). La regla que se protege
+ * aqui es que nunca se quede sin ninguna persona responsable.&lt;/p&gt;
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class TeamService {
+
+    private final TeamRepository teamRepository;
+    private final TeamMemberRepository teamMemberRepository;
+
+    public List&lt;TeamMemberResponse&gt; findMembers(Long teamId) {
+<span class="fc" id="L35">        getTeam(teamId);</span>
+<span class="fc" id="L36">        return teamMemberRepository.findByTeam_IdOrderByUser_FullNameAsc(teamId).stream()</span>
+<span class="fc" id="L37">                .map(TeamMemberResponse::from)</span>
+<span class="fc" id="L38">                .toList();</span>
+    }
+
+    @Transactional
+    public TeamMemberResponse updateMemberRole(Long teamId, Long userId, UpdateMemberRoleRequest request) {
+<span class="fc" id="L43">        TeamMember member = getMember(teamId, userId);</span>
+<span class="fc" id="L44">        Role role = TeamRoles.ensureTeamRole(request.role());</span>
+<span class="fc" id="L45">        TeamRoles.ensureRoleMatchesAccount(member.getUser(), role);</span>
+
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">        if (member.getRole() == Role.RESPONSABLE &amp;&amp; role != Role.RESPONSABLE) {</span>
+<span class="fc" id="L48">            ensureNotLastResponsable(teamId);</span>
+        }
+<span class="fc" id="L50">        member.setRole(role);</span>
+<span class="fc" id="L51">        return TeamMemberResponse.from(member);</span>
+    }
+
+    /**
+     * Guarda lo que hay que saber de esta persona al repartir trabajo en un plan.
+     *
+     * &lt;p&gt;Se queda: vale para todos los planes que se generen despues en este
+     * workspace.&lt;/p&gt;
+     *
+     * &lt;p&gt;Un texto en blanco borra las indicaciones en vez de guardar una cadena
+     * vacia, para que «sin indicaciones» sea un unico estado y no dos.&lt;/p&gt;
+     */
+    @Transactional
+    public TeamMemberResponse updateMemberNotes(Long teamId, Long userId, UpdateMemberNotesRequest request) {
+<span class="fc" id="L65">        TeamMember member = getMember(teamId, userId);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        String notes = request.planNotes() == null ? null : request.planNotes().trim();</span>
+<span class="fc bfc" id="L67" title="All 4 branches covered.">        member.setPlanNotes(notes == null || notes.isEmpty() ? null : notes);</span>
+<span class="fc" id="L68">        return TeamMemberResponse.from(member);</span>
+    }
+
+    /**
+     * Saca a alguien del equipo, tanto si lo expulsa el responsable como si se sale
+     * por su cuenta.
+     *
+     * &lt;p&gt;La regla que manda es que el equipo nunca se quede sin responsable: sin
+     * nadie que pueda administrarlo, su proyecto queda inaccesible para siempre. A
+     * quien crea el equipo no se le trata distinto por serlo —tambien puede irse—,
+     * pero al hacerlo hay que pasarle la propiedad a otra persona responsable,
+     * porque de ella depende quien puede borrar el equipo al quedarse vacio.&lt;/p&gt;
+     */
+    @Transactional
+    public void removeMember(Long teamId, Long userId) {
+<span class="fc" id="L83">        TeamMember member = getMember(teamId, userId);</span>
+<span class="fc" id="L84">        Team team = member.getTeam();</span>
+
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (member.getRole() == Role.RESPONSABLE) {</span>
+<span class="fc" id="L87">            ensureNotLastResponsable(teamId);</span>
+        }
+<span class="pc bpc" id="L89" title="1 of 4 branches missed.">        if (team.getOwner() != null &amp;&amp; team.getOwner().getId().equals(userId)) {</span>
+<span class="fc" id="L90">            team.setOwner(otroResponsable(team, userId));</span>
+        }
+        // Por la coleccion y no por el repositorio: Team.members va con cascade ALL y
+        // orphanRemoval, asi que si la lista en memoria sigue conteniendo al miembro
+        // (basta con haberla leido, como hace otroResponsable), al volcar los cambios
+        // Hibernate lo vuelve a guardar y el borrado se deshace sin dar ningun error.
+<span class="fc" id="L96">        team.getMembers().remove(member);</span>
+<span class="fc" id="L97">    }</span>
+
+    /**
+     * Otra persona responsable del equipo, la que lleve mas tiempo en el. Solo se
+     * llama al irse quien lo creo; si no hubiera ninguna, el equipo se quedaria sin
+     * dueno y sin nadie que pueda administrarlo.
+     */
+    private User otroResponsable(Team team, Long saliente) {
+<span class="fc" id="L105">        return team.getMembers().stream()</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                .filter(member -&gt; member.getRole() == Role.RESPONSABLE)</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                .filter(member -&gt; !member.getUser().getId().equals(saliente))</span>
+<span class="fc" id="L108">                .min(Comparator.comparing(TeamMember::getId))</span>
+<span class="fc" id="L109">                .map(TeamMember::getUser)</span>
+<span class="pc" id="L110">                .orElseThrow(() -&gt; new BusinessRuleException(</span>
+                        &quot;Eres la unica persona responsable: nombra a otra antes de salirte del equipo&quot;));
+    }
+
+    public Team getTeam(Long teamId) {
+<span class="fc" id="L115">        return teamRepository.findById(teamId)</span>
+<span class="pc" id="L116">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Equipo&quot;, teamId));</span>
+    }
+
+    private TeamMember getMember(Long teamId, Long userId) {
+<span class="fc" id="L120">        return teamMemberRepository.findByTeam_IdAndUser_Id(teamId, userId)</span>
+<span class="pc" id="L121">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L122">                        &quot;El usuario %d no pertenece al equipo %d&quot;.formatted(userId, teamId)));</span>
+    }
+
+    private void ensureNotLastResponsable(Long teamId) {
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (teamMemberRepository.countByTeam_IdAndRole(teamId, Role.RESPONSABLE) &lt;= 1) {</span>
+<span class="fc" id="L127">            throw new BusinessRuleException(</span>
+                    &quot;El equipo se quedaria sin responsable: nombra antes a otra persona responsable&quot;);
+        }
+<span class="fc" id="L130">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

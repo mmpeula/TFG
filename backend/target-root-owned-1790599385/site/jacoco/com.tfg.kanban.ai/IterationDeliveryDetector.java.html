@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IterationDeliveryDetector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.ai</a> &gt; <span class="el_source">IterationDeliveryDetector.java</span></div><h1>IterationDeliveryDetector.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.ai;
+
+import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.Month;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Busca fechas de entrega por iteracion/sprint en el documento, para avisar de
+ * ellas aunque no se usen para planificar.
+ *
+ * &lt;p&gt;Un guion de practica en PDF suele traer estas fechas en una tabla con una
+ * columna ancha (la descripcion de la entrega, que ocupa varias lineas) y otra
+ * estrecha (la fecha). Delimitar esa tabla por su area exigiria coordenadas
+ * fijas, y el area cambia de un documento a otro; en su lugar, PDFBox con
+ * {@code setSortByPosition} ordena por posicion vertical, lo que mezcla las
+ * lineas cortas de la fecha con las de la descripcion larga de al lado. El texto
+ * real que sale de un documento asi, para &quot;1º Iteracion: 5-6 de noviembre&quot;, es
+ * literalmente:&lt;/p&gt;
+ *
+ * &lt;pre&gt;Informe de las reuniones de revision y
+ * 1º Iteracion: 5-6 de
+ * retrospectiva.
+ * noviembre.&lt;/pre&gt;
+ *
+ * &lt;p&gt;Una regex normal no encuentra &quot;noviembre&quot; pegado a &quot;5-6 de&quot; porque no lo
+ * esta: &quot;retrospectiva.&quot; se ha colado en medio. Por eso aqui no se busca un
+ * patron continuo, sino el rango de dias y el nombre del mes por separado,
+ * dentro de una ventana amplia tras &quot;Iteracion N&quot;, sea cual sea lo que haya
+ * entre medias.&lt;/p&gt;
+ */
+final class IterationDeliveryDetector {
+
+    /** Cuanto texto se mira tras &quot;Iteracion N&quot; para encontrar dias y mes, aunque esten separados. */
+    private static final int WINDOW_CHARS = 150;
+
+<span class="fc" id="L43">    private static final Pattern ITERATION = Pattern.compile(&quot;(?i)(\\d+)\\s*[ºª°]?\\s*iteraci[oó]n\\s*:?&quot;);</span>
+<span class="fc" id="L44">    private static final Pattern DAY_RANGE = Pattern.compile(&quot;\\b(\\d{1,2})\\s*[-–]\\s*(\\d{1,2})\\s+de\\b&quot;);</span>
+<span class="fc" id="L45">    private static final Pattern SINGLE_DAY = Pattern.compile(&quot;\\b(\\d{1,2})\\s+de\\b&quot;);</span>
+<span class="fc" id="L46">    private static final Pattern ACADEMIC_YEAR = Pattern.compile(&quot;(?i)curso\\s+(\\d{4})\\s*/\\s*(\\d{4})&quot;);</span>
+<span class="fc" id="L47">    private static final Pattern NOT_DEFINITIVE = Pattern.compile(</span>
+            &quot;(?i)se concretar[aá]|se confirmar[aá]|pendiente de confirmar|fecha exacta&quot;);
+
+<span class="fc" id="L50">    private static final Map&lt;String, Integer&gt; MESES = Map.ofEntries(</span>
+<span class="fc" id="L51">            Map.entry(&quot;enero&quot;, 1), Map.entry(&quot;febrero&quot;, 2), Map.entry(&quot;marzo&quot;, 3), Map.entry(&quot;abril&quot;, 4),</span>
+<span class="fc" id="L52">            Map.entry(&quot;mayo&quot;, 5), Map.entry(&quot;junio&quot;, 6), Map.entry(&quot;julio&quot;, 7), Map.entry(&quot;agosto&quot;, 8),</span>
+<span class="fc" id="L53">            Map.entry(&quot;septiembre&quot;, 9), Map.entry(&quot;setiembre&quot;, 9), Map.entry(&quot;octubre&quot;, 10),</span>
+<span class="fc" id="L54">            Map.entry(&quot;noviembre&quot;, 11), Map.entry(&quot;diciembre&quot;, 12));</span>
+
+    /** Una entrega de iteracion: un dia o un rango, con o sin fecha exacta confirmada. */
+<span class="fc" id="L57">    record Delivery(int iteration, int day1, int day2, int month, int year, boolean definitive) {</span>
+
+        String describe() {
+<span class="fc" id="L60">            String mes = Month.of(month).getDisplayName(java.time.format.TextStyle.FULL, new Locale(&quot;es&quot;, &quot;ES&quot;));</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            String cuando = day1 == day2</span>
+<span class="fc" id="L62">                    ? &quot;el %d de %s de %d&quot;.formatted(day1, mes, year)</span>
+<span class="fc" id="L63">                    : &quot;la semana del %d al %d de %s de %d&quot;.formatted(day1, day2, mes, year);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            String nota = definitive ? &quot;&quot; : &quot; (el documento dice que la fecha exacta se confirmará aparte)&quot;;</span>
+<span class="fc" id="L65">            return &quot;El documento indica que la entrega de la iteración %d es %s%s.&quot;</span>
+<span class="fc" id="L66">                    .formatted(iteration, cuando, nota);</span>
+        }
+    }
+
+    private IterationDeliveryDetector() {
+    }
+
+    static List&lt;Delivery&gt; detect(String text) {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        boolean definitive = !NOT_DEFINITIVE.matcher(text).find();</span>
+<span class="fc" id="L75">        List&lt;Delivery&gt; entregas = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L77">        Matcher iteracion = ITERATION.matcher(text);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        while (iteracion.find()) {</span>
+            int numero;
+            try {
+<span class="fc" id="L81">                numero = Integer.parseInt(iteracion.group(1));</span>
+<span class="nc" id="L82">            } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L83">                continue;</span>
+<span class="fc" id="L84">            }</span>
+<span class="fc" id="L85">            String ventana = text.substring(iteracion.end(), Math.min(text.length(), iteracion.end() + WINDOW_CHARS));</span>
+<span class="fc" id="L86">            dayRangeIn(ventana).ifPresent(dias -&gt; monthIn(ventana).ifPresent(mes -&gt;</span>
+<span class="fc" id="L87">                    yearFor(mes, text).ifPresent(anio -&gt; {</span>
+                        // Los dos dias tienen que ser fechas de verdad: si el rango o el
+                        // mes casan por casualidad con numeros sueltos, mejor no avisar
+                        // de una entrega que no existe.
+<span class="pc bpc" id="L91" title="2 of 4 branches missed.">                        if (esFechaValida(anio, mes, dias[0]) &amp;&amp; esFechaValida(anio, mes, dias[1])) {</span>
+<span class="fc" id="L92">                            entregas.add(new Delivery(numero, dias[0], dias[1], mes, anio, definitive));</span>
+                        }
+<span class="fc" id="L94">                    })));</span>
+<span class="fc" id="L95">        }</span>
+<span class="fc" id="L96">        return entregas;</span>
+    }
+
+    /** El primer rango &quot;D-D de&quot; de la ventana, o un solo dia &quot;D de&quot; si no hay rango. */
+    private static Optional&lt;int[]&gt; dayRangeIn(String ventana) {
+<span class="fc" id="L101">        Matcher rango = DAY_RANGE.matcher(ventana);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (rango.find()) {</span>
+            try {
+<span class="fc" id="L104">                return Optional.of(new int[] {Integer.parseInt(rango.group(1)), Integer.parseInt(rango.group(2))});</span>
+<span class="nc" id="L105">            } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L106">                return Optional.empty();</span>
+            }
+        }
+<span class="fc" id="L109">        Matcher dia = SINGLE_DAY.matcher(ventana);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (dia.find()) {</span>
+            try {
+<span class="fc" id="L112">                int d = Integer.parseInt(dia.group(1));</span>
+<span class="fc" id="L113">                return Optional.of(new int[] {d, d});</span>
+<span class="nc" id="L114">            } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L115">                return Optional.empty();</span>
+            }
+        }
+<span class="nc" id="L118">        return Optional.empty();</span>
+    }
+
+    /** El primer nombre de mes que aparece en la ventana, este donde este. */
+    private static Optional&lt;Integer&gt; monthIn(String ventana) {
+<span class="fc" id="L123">        String plano = ventana.toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L124">        int mejor = -1;</span>
+<span class="fc" id="L125">        Integer mes = null;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (Map.Entry&lt;String, Integer&gt; entry : MESES.entrySet()) {</span>
+<span class="fc" id="L127">            int pos = plano.indexOf(entry.getKey());</span>
+<span class="pc bpc" id="L128" title="1 of 6 branches missed.">            if (pos != -1 &amp;&amp; (mejor == -1 || pos &lt; mejor)) {</span>
+<span class="fc" id="L129">                mejor = pos;</span>
+<span class="fc" id="L130">                mes = entry.getValue();</span>
+            }
+<span class="fc" id="L132">        }</span>
+<span class="fc" id="L133">        return Optional.ofNullable(mes);</span>
+    }
+
+    /**
+     * El curso academico (&quot;Curso 2025/2026&quot;) dice que anio le toca a cada mes:
+     * de agosto a diciembre el primero, de enero a julio el segundo. Sin ese
+     * dato, se intenta con la fecha de inicio ya detectada; si tampoco hay,
+     * el anio en curso.
+     */
+    private static boolean esFechaValida(int year, int month, int day) {
+        try {
+<span class="fc" id="L144">            LocalDate.of(year, month, day);</span>
+<span class="fc" id="L145">            return true;</span>
+<span class="nc" id="L146">        } catch (DateTimeException ex) {</span>
+<span class="nc" id="L147">            return false;</span>
+        }
+    }
+
+    private static Optional&lt;Integer&gt; yearFor(int month, String text) {
+<span class="fc" id="L152">        Matcher curso = ACADEMIC_YEAR.matcher(text);</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (curso.find()) {</span>
+            try {
+<span class="fc" id="L155">                int primero = Integer.parseInt(curso.group(1));</span>
+<span class="fc" id="L156">                int segundo = Integer.parseInt(curso.group(2));</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                return Optional.of(month &gt;= 8 ? primero : segundo);</span>
+<span class="nc" id="L158">            } catch (NumberFormatException ex) {</span>
+                // sigue con los siguientes respaldos
+            }
+        }
+<span class="fc" id="L162">        Optional&lt;LocalDate&gt; inicio = DocumentDateDetector.detect(text);</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (inicio.isPresent()) return Optional.of(inicio.get().getYear());</span>
+<span class="nc" id="L164">        return Optional.of(LocalDate.now().getYear());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.tfg.kanban.auth.AuthControllerIT
+-------------------------------------------------------------------------------
+Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.742 s -- in com.tfg.kanban.auth.AuthControllerIT

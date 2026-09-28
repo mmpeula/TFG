@@ -248,7 +248,7 @@ export const attachments = {
 
 export const users = {
   /**
-   * Nombre siempre; contrasena solo si se quiere cambiar, y entonces hace falta
+   * Nombre siempre; contraseña solo si se quiere cambiar, y entonces hace falta
    * la actual. El backend no se la pide al administrador que restablece la de
    * otra persona, porque no la tiene.
    */
@@ -263,4 +263,17 @@ export const users = {
     apiClient.patch<UserResponse>(`/users/${userId}/role`, { role }).then((r) => r.data),
   disable: (userId: number) => apiClient.delete<void>(`/users/${userId}`),
   enable: (userId: number) => apiClient.patch<void>(`/users/${userId}/enable`),
+  uploadAvatar: (userId: number, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiClient
+      .post<UserResponse>(`/users/${userId}/avatar`, form, { headers: { 'Content-Type': undefined } })
+      .then((r) => r.data)
+  },
+  removeAvatar: (userId: number) => apiClient.delete<void>(`/users/${userId}/avatar`),
+  /** La foto pasa por axios para que lleve el token; se entrega como URL temporal. */
+  avatarBlob: async (avatarUrl: string) => {
+    const response = await apiClient.get<Blob>(avatarUrl.replace(/^\/api/, ''), { responseType: 'blob' })
+    return URL.createObjectURL(response.data)
+  },
 }

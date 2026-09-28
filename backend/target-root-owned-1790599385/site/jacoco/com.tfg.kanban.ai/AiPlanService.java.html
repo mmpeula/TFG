@@ -1,0 +1,921 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AiPlanService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.ai</a> &gt; <span class="el_source">AiPlanService.java</span></div><h1>AiPlanService.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.ai;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tfg.kanban.activity.ActivityService;
+import com.tfg.kanban.ai.dto.AiPlanResponse;
+import com.tfg.kanban.ai.dto.ApplyPlanRequest;
+import com.tfg.kanban.ai.dto.MemberWorkload;
+import com.tfg.kanban.ai.dto.PlanOptions;
+import com.tfg.kanban.ai.dto.PlannedSprint;
+import com.tfg.kanban.ai.dto.ProposedTask;
+import com.tfg.kanban.board.BoardService;
+import com.tfg.kanban.common.BusinessRuleException;
+import com.tfg.kanban.domain.model.*;
+import com.tfg.kanban.domain.repository.TaskRepository;
+import com.tfg.kanban.domain.repository.UserRepository;
+import com.tfg.kanban.project.ProjectService;
+import com.tfg.kanban.security.SecurityUtils;
+import com.tfg.kanban.storage.FileStorageService;
+import com.tfg.kanban.task.TaskMapper;
+import com.tfg.kanban.task.dto.TaskResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Planificacion automatica a partir del documento de la practica.
+ *
+ * &lt;p&gt;El modelo &lt;b&gt;propone&lt;/b&gt;: nada se escribe en el tablero hasta que el usuario
+ * acepta las tareas que quiere ({@link #apply}). Es la regla de producto del modulo
+ * de IA y la razon de separar generar y aplicar en dos endpoints.&lt;/p&gt;
+ *
+ * &lt;p&gt;El documento se manda entero en una sola llamada: GPT-OSS 120B en Groq tiene
+ * contexto de sobra (131072 tokens) para el documento completo —el propio
+ * {@link DocumentTextExtractor} ya lo capa a 80000 caracteres como red de
+ * seguridad, muy por debajo de eso—, asi que no hace falta trocearlo por sprint
+ * como con un modelo pequeno en local. El modelo decide el reparto completo,
+ * sprint a sprint, de una vez; lo que si es medible —el reparto de horas, las
+ * dependencias entre tareas— se comprueba en Java sobre el resultado, no se le
+ * pide al modelo que se autoevalue. Las fechas de los sprints y de las tareas las
+ * pone siempre el servidor, para que casen con los sprints de la pestana Plan.&lt;/p&gt;
+ */
+<span class="fc" id="L51">@Slf4j</span>
+@Service
+@RequiredArgsConstructor
+public class AiPlanService {
+
+    /*
+     * El reparto por prioridades es lo que hace que respete horas y preferencias:
+     * sin decir que manda si chocan, el modelo sacrifica lo que le parece. Las
+     * cuentas (capacidad util, margen) ya van hechas en el mensaje de usuario, y
+     * el formato solo pide lo que parse() lee: las fechas las pone el servidor, y
+     * cada campo de mas es respuesta que no cabe en la cuota de tokens.
+     */
+    static final String SYSTEM_PROMPT = &quot;&quot;&quot;
+            Eres un Scrum Master y Project Manager senior con más de 15 años convirtiendo enunciados de prácticas universitarias y proyectos de software en backlogs listos para ejecutar. Tu objetivo: un plan realista que cubra todo lo que el documento exige y reparta el trabajo de forma justa según la disponibilidad y las preferencias de cada persona.
+
+            PROCESO (internamente, antes de responder):
+            1. Extrae del documento: duración, sprints o iteraciones, cada entregable (con su nombre exacto), los roles que define, requisitos obligatorios, fechas y restricciones. Si una fecha está pendiente de confirmar (ej. &quot;se concretará en Prado&quot;), no la inventes: marca ese sprint como no definitivo.
+            2. Lista TODOS los criterios de evaluación, apartados puntuables, requisitos obligatorios y advertencias (penalizaciones, presentaciones, informes, demostraciones). Cada uno necesita al menos una tarea específica y reconocible; no basta una tarea genérica de &quot;implementación&quot; o &quot;pruebas&quot;.
+            3. Estudia al equipo con los datos del mensaje: capacidad útil de cada persona en cada sprint, su rol y sus preferencias.
+            4. Divide el trabajo en tareas concretas de 2 a 8 horas, con la terminología del documento.
+            5. Define el objetivo de cada sprint y solo las dependencias que tengan sentido real.
+            6. Reparte con las reglas de abajo y revisa antes de responder.
+
+            REGLAS DE REPARTO (por prioridad: si dos chocan, manda la de arriba):
+            1. Restricciones: si alguien no está disponible en un periodo o dice que no puede hacer algo, no le asignes nada ahí. Traduce semanas y meses a sprints con las fechas del mensaje. Quien tiene 0 h no recibe tareas.
+            2. Roles: si el documento define roles (moderador, gestor de calidad, catalogador...), sus tareas son de quien el documento diga. Si no los define, la gestión (planning, revisión, retrospectiva, entrega) la lleva quien está marcado como (lider), y con 4 o más personas le quitas carga técnica.
+            3. Capacidad: lo que suma una persona en un sprint no supera su capacidad útil (ya lleva descontado el margen para imprevistos). Si el trabajo no cabe, no sobrecargues a nadie: pásalo a otro sprint o deja fuera lo menos importante, y dilo en &quot;avisos&quot;.
+            4. Preferencias: da a cada persona lo que prefiere o domina mientras las reglas anteriores lo permitan. Si tienes que darle algo que pidió evitar, dilo en &quot;avisos&quot;.
+            5. Equilibrio: carga proporcional a la capacidad, no a partes iguales; quien tiene el doble de horas lleva aproximadamente el doble. Toda persona disponible tiene trabajo en cada sprint: si una fase es de un solo perfil, da tareas de apoyo (documentación, integración, revisión).
+            6. Una sola persona por tarea, salvo que la colaboración aporte de verdad (conocimientos complementarios o mucho volumen). Cada responsable dedica las horas completas de la tarea.
+            7. Ninguna tarea depende de otra de un sprint posterior.
+
+            CALIDAD:
+            - &quot;motivo&quot; cita la parte concreta del documento que justifica la tarea.
+            - Tipo: &quot;Story&quot; si aporta funcionalidad o un entregable visible, &quot;Task&quot; si es gestión o soporte.
+            - Épica: agrupa por fase o área (entre 3 y 7).
+            - Prioridad: &quot;alta&quot; si bloquea a otras, &quot;media&quot; si es importante sin bloquear, &quot;baja&quot; si es mejora.
+
+            AUTORREVISIÓN (antes de responder):
+            - ¿Cada criterio de &quot;criterios_detectados&quot; tiene alguna tarea en &quot;tareas_relacionadas&quot;? Si no, añádela.
+            - ¿Alguien supera su capacidad útil en algún sprint? ¿Alguien disponible se queda sin trabajo?
+            - ¿Se respetan restricciones, roles y preferencias?
+            - ¿Las dependencias son lógicas y no van hacia sprints posteriores?
+            - ¿Te has inventado algo por falta de información? Dilo en &quot;avisos&quot;.
+            &quot;avisos&quot; es solo para lo que el equipo tiene que revisar (conflictos, trabajo que no cabe, datos inventados): no confirmes las reglas que sí se cumplen.
+
+            FORMATO DE SALIDA: responde SOLO con un JSON válido, sin texto antes ni después:
+            {
+              &quot;resumen&quot;: {&quot;num_sprints&quot;: 0,
+                &quot;criterios_detectados&quot;: [{&quot;criterio&quot;: &quot;&quot;, &quot;peso_o_importancia&quot;: &quot;&quot;, &quot;tareas_relacionadas&quot;: [&quot;&quot;]}]},
+              &quot;sprints&quot;: [{&quot;numero&quot;: 1, &quot;objetivo&quot;: &quot;&quot;, &quot;fecha_definitiva&quot;: true}],
+              &quot;tareas&quot;: [{
+                &quot;titulo&quot;: &quot;&quot;, &quot;descripcion&quot;: &quot;&quot;, &quot;tipo&quot;: &quot;Story|Task&quot;, &quot;epica&quot;: &quot;&quot;,
+                &quot;sprint&quot;: 1, &quot;asignado&quot;: [&quot;&quot;], &quot;horas&quot;: 0, &quot;prioridad&quot;: &quot;alta|media|baja&quot;,
+                &quot;motivo&quot;: &quot;&quot;, &quot;depende_de&quot;: []
+              }],
+              &quot;avisos&quot;: []
+            }&quot;&quot;&quot;;
+
+    /** Sin fecha de entrega, cuantos sprints se aceptan como mucho. */
+    private static final int MAX_SPRINTS = 12;
+
+    /**
+     * Tope de caracteres del documento que se manda en el prompt, muy por debajo
+     * del limite de seguridad de {@link DocumentTextExtractor} (pensado para la
+     * ventana de contexto del modelo, de 131072 tokens). Esta cuenta de Groq tiene
+     * una cuota de solo 8000 tokens por minuto entre prompt y respuesta: con el
+     * prompt de sistema y los datos del equipo ya se van mas de 1500, asi que el
+     * documento no puede acercarse a ese limite de contexto sin dejar la respuesta
+     * sin sitio donde generarse.
+     */
+    private static final int DOCUMENT_CHARS_FOR_MODEL = 6_000;
+
+    /**
+     * Diferencia en el uso de la capacidad, en tanto por uno, con quien mas usa la
+     * suya en un sprint, que ya merece un aviso: 0.35 es un 55 % frente a un 90 %.
+     */
+<span class="fc" id="L128">    private static final BigDecimal UTILIZATION_GAP_THRESHOLD = new BigDecimal(&quot;0.35&quot;);</span>
+
+    private final AiProperties properties;
+    private final GroqClient groqClient;
+    private final ObjectMapper objectMapper;
+    private final ProjectService projectService;
+    private final BoardService boardService;
+    private final TaskRepository taskRepository;
+    private final UserRepository userRepository;
+    private final ActivityService activityService;
+    private final TaskMapper taskMapper;
+    private final DocumentTextExtractor documentTextExtractor;
+    private final AiTaskScheduler aiTaskScheduler;
+
+    /** Genera el plan a partir del guion ya guardado en el proyecto. */
+    @Transactional(readOnly = true)
+    public AiPlanResponse generate(Long projectId, PlanOptions options) {
+<span class="fc" id="L145">        Project project = projectService.getProject(projectId);</span>
+
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        if (project.getBriefing() == null || project.getBriefing().isBlank()) {</span>
+<span class="fc" id="L148">            throw new BusinessRuleException(</span>
+                    &quot;El proyecto no tiene guion de la practica: subelo como documento o escribelo en el proyecto&quot;);
+        }
+<span class="fc" id="L151">        return plan(project, project.getBriefing(), &quot;guion del proyecto&quot;, options);</span>
+    }
+
+    /**
+     * Genera el plan a partir de un documento subido. El texto extraido se guarda
+     * ademas como guion del proyecto: es la fuente de verdad de la practica.
+     */
+    @Transactional
+    public AiPlanResponse generateFromDocument(Long projectId, MultipartFile file, PlanOptions options) {
+<span class="fc" id="L160">        Project project = projectService.getProject(projectId);</span>
+<span class="fc" id="L161">        String text = documentTextExtractor.extract(file);</span>
+
+<span class="fc" id="L163">        project.setBriefing(text);</span>
+
+<span class="fc" id="L165">        return plan(project, text, &quot;documento: &quot; + FileStorageService.cleanFilename(file.getOriginalFilename()),</span>
+                options);
+    }
+
+    /**
+     * Busca la fecha de inicio en un documento sin generar nada: es deteccion por
+     * texto, no una llamada a Groq, asi que se puede pedir antes de generar para
+     * no tener que adivinar (y luego regenerar si la adivinanza fallaba).
+     */
+    @Transactional(readOnly = true)
+    public Optional&lt;LocalDate&gt; detectStartDate(MultipartFile file) {
+<span class="nc" id="L176">        return DocumentDateDetector.detect(documentTextExtractor.extract(file));</span>
+    }
+
+    /**
+     * Genera el plan a partir de un texto escrito a mano («tenemos que hacer una
+     * practica de...»). No toca el guion guardado: eso queda reservado al
+     * documento oficial de la actividad.
+     */
+    @Transactional(readOnly = true)
+    public AiPlanResponse generateFromText(Long projectId, String text, PlanOptions options) {
+<span class="fc" id="L186">        Project project = projectService.getProject(projectId);</span>
+<span class="pc bpc" id="L187" title="2 of 4 branches missed.">        if (text == null || text.isBlank()) {</span>
+<span class="fc" id="L188">            throw new BusinessRuleException(&quot;Escribe de que va el trabajo para que pueda proponerte tareas&quot;);</span>
+        }
+<span class="nc" id="L190">        return plan(project, text.trim(), &quot;descripcion escrita&quot;, options);</span>
+    }
+
+    private AiPlanResponse plan(Project project, String text, String source, PlanOptions requested) {
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (!properties.isEnabled()) {</span>
+<span class="fc" id="L195">            throw new AiUnavailableException(&quot;El modulo de IA esta desactivado en la configuracion del servidor&quot;);</span>
+        }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        PlanOptions options = requested == null ? PlanOptions.defaults() : requested;</span>
+
+<span class="fc" id="L199">        PlanTeam team = PlanTeam.resolve(project.getTeam().getMembers(), options.team());</span>
+        // Solo se busca en el documento cuando de verdad hace falta: si ya hay una
+        // fecha del formulario o del workspace, esa manda y no compensa leer el texto.
+<span class="fc bfc" id="L202" title="All 4 branches covered.">        Optional&lt;LocalDate&gt; fromDocument = options.startDate() == null &amp;&amp; project.getStartDate() == null</span>
+<span class="fc" id="L203">                ? DocumentDateDetector.detect(text) : Optional.empty();</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        LocalDate start = options.startDate() != null ? options.startDate()</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                : project.getStartDate() != null ? project.getStartDate()</span>
+<span class="fc" id="L206">                : fromDocument.orElse(LocalDate.now());</span>
+<span class="fc" id="L207">        int sprintDays = AiTaskScheduler.daysOrDefault(</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                options.sprintDays() != null ? options.sprintDays() : project.getSprintDays());</span>
+
+        // Con fecha de entrega los sprints salen de ahi y el modelo solo los rellena;
+        // sin ella, cuantos hacen falta lo propone el modelo. La del formulario manda
+        // sobre la guardada, igual que con la fecha de inicio.
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        LocalDate deadline = options.deadline() != null ? options.deadline() : project.getDeadline();</span>
+<span class="pc bpc" id="L214" title="1 of 4 branches missed.">        boolean sprintsFijos = deadline != null &amp;&amp; deadline.isAfter(start);</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        List&lt;AiTaskScheduler.Window&gt; fixedWindows = sprintsFijos</span>
+<span class="fc" id="L216">                ? aiTaskScheduler.sprintsOf(new AiTaskScheduler.Window(start, deadline), sprintDays)</span>
+<span class="fc" id="L217">                : null;</span>
+
+<span class="fc" id="L219">        List&lt;Task&gt; existing = existingTasks(project);</span>
+        // Se busca en el documento entero, antes de recortarlo: la evaluacion suele
+        // ir al final, justo la parte que un recorte por longitud se dejaria fuera.
+<span class="fc" id="L222">        Optional&lt;String&gt; criteriaExcerpt = EvaluationSectionDetector.detect(text);</span>
+<span class="fc" id="L223">        String userPrompt = buildPrompt(truncateForModel(text), criteriaExcerpt, team, start, sprintDays,</span>
+                fixedWindows, existing);
+<span class="fc" id="L225">        ParsedPlanResult result = runPlan(userPrompt);</span>
+
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        List&lt;AiTaskScheduler.Window&gt; ventanas = fixedWindows != null ? fixedWindows</span>
+<span class="fc" id="L228">                : aiTaskScheduler.consecutiveSprints(start, sprintCountFrom(result.parsed()), sprintDays);</span>
+
+<span class="fc" id="L230">        List&lt;String&gt; deliveryWarnings = new ArrayList&lt;&gt;(IterationDeliveryDetector.detect(text).stream()</span>
+<span class="fc" id="L231">                .map(IterationDeliveryDetector.Delivery::describe).toList());</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (text.length() &gt; DOCUMENT_CHARS_FOR_MODEL) {</span>
+<span class="fc" id="L233">            deliveryWarnings.add((&quot;El documento tiene %,d caracteres: al modelo solo se le han mandado los &quot;</span>
+                    + &quot;primeros %,d para no superar la cuota de tokens por minuto de Groq. Puede faltar contenido &quot;
+<span class="fc" id="L235">                    + &quot;de las ultimas paginas en el plan.&quot;).formatted(text.length(), DOCUMENT_CHARS_FOR_MODEL));</span>
+        }
+
+<span class="fc" id="L238">        return toResponse(project, source, team, start, ventanas, result, deliveryWarnings);</span>
+    }
+
+    /** Solo para lo que entra en el prompt: el resto de usos del documento (fechas) necesitan el texto entero. */
+    private static String truncateForModel(String text) {
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        return text.length() &lt;= DOCUMENT_CHARS_FOR_MODEL ? text</span>
+<span class="fc" id="L244">                : text.substring(0, DOCUMENT_CHARS_FOR_MODEL) + &quot;\n\n[...documento recortado por longitud...]&quot;;</span>
+    }
+
+    /** Lo que ha salido de la llamada al modelo: el plan interpretado y cuantos intentos ha costado. */
+<span class="fc" id="L248">    private record ParsedPlanResult(ParsedPlan parsed, int attempts) {</span>
+    }
+
+    /**
+     * Llama al modelo con el documento completo. Si el JSON no parsea, reintenta
+     * hasta el limite configurado; si Groq limita por cuota de tokens (429), espera
+     * lo que la propia API dice y lo intenta otra vez, en vez de fallar a la
+     * primera por algo que se resuelve solo con tiempo.
+     */
+    private ParsedPlanResult runPlan(String userPrompt) {
+<span class="fc" id="L258">        int intentos = 0;</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        for (int intento = 0; intento &lt;= properties.getMaxRetries(); intento++) {</span>
+<span class="fc" id="L260">            intentos++;</span>
+            String raw;
+            try {
+<span class="fc" id="L263">                raw = groqClient.chatJson(SYSTEM_PROMPT, userPrompt);</span>
+<span class="fc" id="L264">            } catch (GroqClient.RateLimitedException ex) {</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">                if (intento == properties.getMaxRetries()) throw ex;</span>
+<span class="fc" id="L266">                log.warn(&quot;IA: Groq ha limitado la peticion en el intento {}, esperando {} s antes de reintentar&quot;,</span>
+<span class="fc" id="L267">                        intentos, ex.getRetryAfterSeconds());</span>
+<span class="fc" id="L268">                esperar(ex.getRetryAfterSeconds());</span>
+<span class="fc" id="L269">                continue;</span>
+<span class="fc" id="L270">            }</span>
+            try {
+<span class="fc" id="L272">                return new ParsedPlanResult(parse(raw), intentos);</span>
+<span class="fc" id="L273">            } catch (InvalidPlanException ex) {</span>
+<span class="fc" id="L274">                log.warn(&quot;IA: respuesta no interpretable en el intento {}: {}&quot;, intentos, abbreviate(raw));</span>
+            }
+        }
+<span class="fc" id="L277">        throw new AiUnavailableException(</span>
+                &quot;El modelo no ha devuelto un plan que se pueda leer tras %d intentos. Vuelve a intentarlo.&quot;
+<span class="fc" id="L279">                        .formatted(intentos));</span>
+    }
+
+    private static void esperar(double segundos) {
+        try {
+<span class="fc" id="L284">            Thread.sleep((long) Math.ceil(segundos * 1000));</span>
+<span class="nc" id="L285">        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L286">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L287">            throw new AiUnavailableException(&quot;Interrumpido mientras se esperaba para reintentar&quot;, ex);</span>
+<span class="fc" id="L288">        }</span>
+<span class="fc" id="L289">    }</span>
+
+    /** Sin fecha de entrega: los que diga el modelo, dentro de lo razonable. */
+    private int sprintCountFrom(ParsedPlan parsed) {
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        int propuestos = parsed.numSprints() != null ? parsed.numSprints()</span>
+<span class="nc" id="L294">                : parsed.tasks().stream().map(ProposedTask::sprint).filter(Objects::nonNull)</span>
+<span class="nc" id="L295">                        .max(Integer::compare).orElse(1);</span>
+<span class="fc" id="L296">        return Math.max(1, Math.min(MAX_SPRINTS, propuestos));</span>
+    }
+
+    /** Junta lo que ha devuelto el modelo, resuelve fechas y personas, y calcula los avisos. */
+    private AiPlanResponse toResponse(Project project, String source, PlanTeam team, LocalDate start,
+                                      List&lt;AiTaskScheduler.Window&gt; ventanas, ParsedPlanResult result,
+                                      List&lt;String&gt; deliveryWarnings) {
+<span class="fc" id="L303">        ParsedPlan parsed = result.parsed();</span>
+<span class="fc" id="L304">        List&lt;Task&gt; existing = existingTasks(project);</span>
+
+        // Un sprint que no exista se trata como &quot;sin sprint&quot;, no se descarta la tarea.
+<span class="fc" id="L307">        List&lt;ProposedTask&gt; conSprintValido = parsed.tasks().stream()</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">                .map(task -&gt; sprintValido(task.sprint(), ventanas.size()) ? task : withSprint(task, null))</span>
+<span class="fc" id="L309">                .toList();</span>
+
+<span class="fc" id="L311">        List&lt;ProposedTask&gt; sinDuplicados = withoutDuplicates(conSprintValido, existing);</span>
+<span class="fc" id="L312">        int duplicates = conSprintValido.size() - sinDuplicados.size();</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        List&lt;ProposedTask&gt; limitadas = sinDuplicados.size() &gt; properties.getMaxTasks()</span>
+<span class="pc" id="L314">                ? sinDuplicados.subList(0, properties.getMaxTasks()) : sinDuplicados;</span>
+
+<span class="fc" id="L316">        List&lt;ProposedTask&gt; tasks = limitadas.stream().map(task -&gt; {</span>
+<span class="fc" id="L317">            List&lt;PlanTeam.Member&gt; personas = team.matchAll(task.assigneeNamesOrEmpty());</span>
+<span class="fc" id="L318">            List&lt;Long&gt; ids = personas.stream().map(PlanTeam.Member::userId).toList();</span>
+<span class="fc" id="L319">            List&lt;String&gt; nombres = task.assigneeNamesOrEmpty().stream()</span>
+<span class="fc" id="L320">                    .map(nombre -&gt; team.match(nombre).map(PlanTeam.Member::name).orElse(nombre))</span>
+<span class="fc" id="L321">                    .toList();</span>
+<span class="fc" id="L322">            boolean sprintValido = sprintValido(task.sprint(), ventanas.size());</span>
+<span class="fc" id="L323">            return new ProposedTask(task.title(), task.description(), task.reason(), task.type(), task.epic(),</span>
+<span class="fc" id="L324">                    task.sprint(), task.priority(), task.estimatedHours(),</span>
+                    // La fecha la pone el servidor: el ultimo dia laborable del sprint.
+<span class="fc bfc" id="L326" title="All 2 branches covered.">                    sprintValido ? aiTaskScheduler.lastWorkingDay(ventanas.get(task.sprint() - 1)) : null,</span>
+<span class="fc" id="L327">                    ids, nombres, task.dependsOnOrEmpty());</span>
+<span class="fc" id="L328">        }).toList();</span>
+
+<span class="fc" id="L330">        DependencyCheck depCheck = validateDependencies(tasks);</span>
+<span class="fc" id="L331">        tasks = depCheck.tasks();</span>
+
+<span class="fc" id="L333">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L334">        warnings.addAll(capacityWarnings(tasks, team, ventanas, parsed.modelWarnings()));</span>
+<span class="fc" id="L335">        warnings.addAll(pendingWarnings(tasks));</span>
+<span class="fc" id="L336">        warnings.addAll(depCheck.warnings());</span>
+<span class="fc" id="L337">        warnings.addAll(sprintGoalWarnings(parsed.goals(), ventanas.size()));</span>
+<span class="fc" id="L338">        warnings.addAll(criteriaWarnings(parsed.criteria()));</span>
+<span class="fc" id="L339">        warnings.addAll(parsed.modelWarnings());</span>
+<span class="fc" id="L340">        warnings.addAll(deliveryWarnings);</span>
+
+<span class="fc" id="L342">        List&lt;PlannedSprint&gt; sprints = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        for (int i = 0; i &lt; ventanas.size(); i++) {</span>
+<span class="fc" id="L344">            ParsedPlan.SprintGoal goal = parsed.goals().get(i + 1);</span>
+<span class="fc" id="L345">            sprints.add(new PlannedSprint(i + 1, ventanas.get(i).start(), ventanas.get(i).end(),</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">                    goal == null ? null : goal.objetivo()));</span>
+        }
+
+<span class="fc" id="L349">        LocalDate fin = ventanas.get(ventanas.size() - 1).end();</span>
+<span class="fc" id="L350">        long dias = new AiTaskScheduler.Window(start, fin).days();</span>
+<span class="fc" id="L351">        int semanas = (int) Math.ceil(dias / 7.0);</span>
+
+<span class="fc" id="L353">        log.info(&quot;IA: {} tareas en {} sprints para el proyecto {} ({} intentos, {} avisos)&quot;,</span>
+<span class="fc" id="L354">                tasks.size(), sprints.size(), project.getId(), result.attempts(), warnings.size());</span>
+
+<span class="fc" id="L356">        return AiPlanResponse.of(project.getId(), properties.getModel(), source, semanas, sprints, tasks,</span>
+<span class="fc" id="L357">                workload(tasks, team, ventanas), warnings, duplicates, result.attempts());</span>
+    }
+
+    private static boolean sprintValido(Integer sprint, int totalSprints) {
+<span class="pc bpc" id="L361" title="1 of 6 branches missed.">        return sprint != null &amp;&amp; sprint &gt;= 1 &amp;&amp; sprint &lt;= totalSprints;</span>
+    }
+
+    private static ProposedTask withSprint(ProposedTask task, Integer sprint) {
+<span class="fc" id="L365">        return new ProposedTask(task.title(), task.description(), task.reason(), task.type(), task.epic(),</span>
+<span class="fc" id="L366">                sprint, task.priority(), task.estimatedHours(), task.dueDate(), task.assigneeIds(),</span>
+<span class="fc" id="L367">                task.assigneeNames(), task.dependsOnOrEmpty());</span>
+    }
+
+    /** Lo que queda de comprobar las dependencias: las tareas con solo las validas, y un aviso por cada una descartada. */
+<span class="fc" id="L371">    private record DependencyCheck(List&lt;ProposedTask&gt; tasks, List&lt;String&gt; warnings) {</span>
+    }
+
+    /**
+     * Una dependencia solo vale si apunta a una tarea que existe de verdad, que no
+     * es ella misma, y que esta en su mismo sprint o en uno anterior. El modelo ya
+     * lo tiene entre sus reglas, pero es justo el tipo de cosa medible que no se
+     * deja a su palabra: si se equivoca, se descarta esa dependencia concreta y se
+     * avisa, sin tirar el resto del plan.
+     */
+    private DependencyCheck validateDependencies(List&lt;ProposedTask&gt; tasks) {
+<span class="fc" id="L382">        Map&lt;String, ProposedTask&gt; porTitulo = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        for (ProposedTask task : tasks) {</span>
+<span class="fc" id="L384">            porTitulo.putIfAbsent(TextNormalizer.plain(task.title()), task);</span>
+<span class="fc" id="L385">        }</span>
+
+<span class="fc" id="L387">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L388">        List&lt;ProposedTask&gt; resultado = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">        for (ProposedTask task : tasks) {</span>
+<span class="fc" id="L390">            List&lt;String&gt; validas = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">            for (String titulo : task.dependsOnOrEmpty()) {</span>
+<span class="fc" id="L392">                ProposedTask previa = porTitulo.get(TextNormalizer.plain(titulo));</span>
+<span class="pc bpc" id="L393" title="1 of 4 branches missed.">                boolean valida = previa != null &amp;&amp; previa != task</span>
+<span class="pc bpc" id="L394" title="1 of 6 branches missed.">                        &amp;&amp; task.sprint() != null &amp;&amp; previa.sprint() != null &amp;&amp; previa.sprint() &lt;= task.sprint();</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">                if (valida) {</span>
+<span class="fc" id="L396">                    validas.add(previa.title());</span>
+                } else {
+<span class="fc" id="L398">                    warnings.add(&quot;Se ha descartado una dependencia de «%s» hacia «%s»: no es valida (no existe, es ella misma o esta en un sprint posterior).&quot;</span>
+<span class="fc" id="L399">                            .formatted(task.title(), titulo));</span>
+                }
+<span class="fc" id="L401">            }</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">            resultado.add(validas.size() == task.dependsOnOrEmpty().size() ? task : withDependsOn(task, validas));</span>
+<span class="fc" id="L403">        }</span>
+<span class="fc" id="L404">        return new DependencyCheck(resultado, warnings);</span>
+    }
+
+    private static ProposedTask withDependsOn(ProposedTask task, List&lt;String&gt; dependsOn) {
+<span class="fc" id="L408">        return new ProposedTask(task.title(), task.description(), task.reason(), task.type(), task.epic(),</span>
+<span class="fc" id="L409">                task.sprint(), task.priority(), task.estimatedHours(), task.dueDate(), task.assigneeIds(),</span>
+<span class="fc" id="L410">                task.assigneeNames(), dependsOn);</span>
+    }
+
+    /**
+     * Lo medible del reparto, contra las horas de cada persona y no en absoluto:
+     * quien tiene la mitad de horas debe llevar la mitad, y eso no es un
+     * desequilibrio. Se avisa si alguien pasa de su capacidad en un sprint, si
+     * usa mucho menos de la suya que quien mas usa, o si alguien sin horas tiene
+     * tareas. No se corrige inventando o quitando tareas: eso lo decidio el reparto
+     * del modelo.
+     *
+     * &lt;p&gt;Quien se queda sin nada en un sprint porque sus preferencias dicen que no
+     * esta (vacaciones, examenes) no es un desequilibrio, pero aqui no se puede
+     * leer eso del texto libre. Si el propio modelo lo ha explicado en sus avisos,
+     * nombrando a esa persona, no se repite con un aviso que lo contradice.&lt;/p&gt;
+     */
+    private List&lt;String&gt; capacityWarnings(List&lt;ProposedTask&gt; tasks, PlanTeam team,
+                                          List&lt;AiTaskScheduler.Window&gt; ventanas, List&lt;String&gt; modelWarnings) {
+<span class="fc" id="L428">        String explicado = TextNormalizer.plain(String.join(&quot; &quot;, modelWarnings));</span>
+<span class="fc" id="L429">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L430">        List&lt;PlanTeam.Member&gt; disponibles = team.members().stream().filter(PlanTeam.Member::available).toList();</span>
+
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        for (int sprint = 1; sprint &lt;= ventanas.size(); sprint++) {</span>
+<span class="fc" id="L433">            Map&lt;Long, BigDecimal&gt; horas = hoursBySprint(tasks, sprint);</span>
+<span class="fc" id="L434">            long dias = ventanas.get(sprint - 1).days();</span>
+
+<span class="fc" id="L436">            Map&lt;PlanTeam.Member, BigDecimal&gt; uso = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">            for (PlanTeam.Member member : disponibles) {</span>
+<span class="fc" id="L438">                BigDecimal suyas = horas.getOrDefault(member.userId(), BigDecimal.ZERO);</span>
+<span class="fc" id="L439">                BigDecimal capacidad = member.capacityFor(dias);</span>
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">                if (capacidad.signum() == 0) continue;</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">                if (suyas.compareTo(capacidad) &gt; 0) {</span>
+<span class="fc" id="L442">                    warnings.add(&quot;En el sprint %d, %s tiene %s h y solo dispone de %s h: revisa el reparto.&quot;</span>
+<span class="fc" id="L443">                            .formatted(sprint, member.name(), plano(suyas), plano(capacidad)));</span>
+                }
+<span class="fc" id="L445">                uso.put(member, suyas.divide(capacidad, 4, RoundingMode.HALF_UP));</span>
+<span class="fc" id="L446">            }</span>
+
+<span class="fc" id="L448">            Map.Entry&lt;PlanTeam.Member, BigDecimal&gt; maximo = uso.entrySet().stream()</span>
+<span class="fc" id="L449">                    .max(Map.Entry.comparingByValue()).orElse(null);</span>
+<span class="pc bpc" id="L450" title="1 of 6 branches missed.">            if (uso.size() &lt; 2 || maximo == null || maximo.getValue().signum() == 0) continue;</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">            for (Map.Entry&lt;PlanTeam.Member, BigDecimal&gt; entry : uso.entrySet()) {</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">                boolean parado = entry.getValue().signum() == 0;</span>
+<span class="fc bfc" id="L453" title="All 4 branches covered.">                if (parado &amp;&amp; explicado.contains(TextNormalizer.plain(entry.getKey().name()))) continue;</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">                if (maximo.getValue().subtract(entry.getValue()).compareTo(UTILIZATION_GAP_THRESHOLD) &gt; 0) {</span>
+<span class="fc" id="L455">                    warnings.add((&quot;En el sprint %d, %s usa el %d%% de sus horas frente al %d%% de %s: &quot;</span>
+<span class="fc" id="L456">                            + &quot;revisa el reparto.&quot;).formatted(sprint, entry.getKey().name(),</span>
+<span class="fc" id="L457">                            percent(entry.getValue()), percent(maximo.getValue()), maximo.getKey().name()));</span>
+                }
+<span class="fc" id="L459">            }</span>
+        }
+
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        for (PlanTeam.Member member : team.members()) {</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">            if (member.available()) continue;</span>
+<span class="fc" id="L464">            long suyas = tasks.stream().filter(task -&gt; task.assigneeIdsOrEmpty().contains(member.userId())).count();</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">            if (suyas &gt; 0) {</span>
+<span class="fc" id="L466">                warnings.add(&quot;%s no tiene horas disponibles y se le %s: revisa el reparto.&quot;.formatted(member.name(),</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">                        suyas == 1 ? &quot;ha asignado 1 tarea&quot; : &quot;han asignado &quot; + suyas + &quot; tareas&quot;));</span>
+            }
+<span class="fc" id="L469">        }</span>
+<span class="fc" id="L470">        return warnings;</span>
+    }
+
+    /**
+     * Horas de cada persona en un sprint. Cada responsable de una tarea se lleva
+     * sus horas completas, no repartidas: cada uno invierte ese tiempo.
+     */
+    private static Map&lt;Long, BigDecimal&gt; hoursBySprint(List&lt;ProposedTask&gt; tasks, int sprint) {
+<span class="fc" id="L478">        Map&lt;Long, BigDecimal&gt; horas = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L479" title="All 2 branches covered.">        for (ProposedTask task : tasks) {</span>
+<span class="pc bpc" id="L480" title="1 of 4 branches missed.">            if (!Objects.equals(task.sprint(), sprint) || task.estimatedHours() == null) continue;</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">            for (Long id : task.assigneeIdsOrEmpty()) {</span>
+<span class="fc" id="L482">                horas.merge(id, task.estimatedHours(), BigDecimal::add);</span>
+<span class="fc" id="L483">            }</span>
+<span class="fc" id="L484">        }</span>
+<span class="fc" id="L485">        return horas;</span>
+    }
+
+    private static int percent(BigDecimal share) {
+<span class="fc" id="L489">        return share.multiply(BigDecimal.valueOf(100)).setScale(0, RoundingMode.HALF_UP).intValue();</span>
+    }
+
+    /** Las tareas que el modelo ha dejado marcadas como incompletas, para que el usuario las revise. */
+    private List&lt;String&gt; pendingWarnings(List&lt;ProposedTask&gt; tasks) {
+<span class="fc" id="L494">        return tasks.stream()</span>
+<span class="fc bfc" id="L495" title="All 4 branches covered.">                .filter(task -&gt; task.reason() != null &amp;&amp; task.reason().toUpperCase(Locale.ROOT).startsWith(&quot;PENDIENTE:&quot;))</span>
+<span class="fc" id="L496">                .map(task -&gt; &quot;«%s»: %s&quot;.formatted(task.title(), task.reason()))</span>
+<span class="fc" id="L497">                .toList();</span>
+    }
+
+    /** Un sprint sin fecha exacta confirmada segun el propio documento, tal y como lo ha marcado el modelo. */
+    private List&lt;String&gt; sprintGoalWarnings(Map&lt;Integer, ParsedPlan.SprintGoal&gt; goals, int numSprints) {
+<span class="fc" id="L502">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L503" title="All 2 branches covered.">        for (int numero = 1; numero &lt;= numSprints; numero++) {</span>
+<span class="fc" id="L504">            ParsedPlan.SprintGoal goal = goals.get(numero);</span>
+<span class="fc bfc" id="L505" title="All 4 branches covered.">            if (goal != null &amp;&amp; !goal.definitiva()) {</span>
+<span class="fc" id="L506">                warnings.add(&quot;El sprint %d no tiene fecha exacta confirmada segun el documento.&quot;.formatted(numero));</span>
+            }
+        }
+<span class="fc" id="L509">        return warnings;</span>
+    }
+
+    /**
+     * El propio modelo dice que criterios de evaluacion o requisitos ha detectado
+     * y que tareas los cubren ({@code criterios_detectados}, ver el prompt). Si
+     * alguno se queda sin ninguna tarea asociada, se avisa en vez de dejarlo
+     * pasar en silencio: no se corrige inventando una tarea, porque eso ya le
+     * tocaba decidirlo al reparto del modelo.
+     */
+    private List&lt;String&gt; criteriaWarnings(List&lt;ParsedPlan.Criterion&gt; criteria) {
+<span class="fc" id="L520">        return criteria.stream()</span>
+<span class="fc" id="L521">                .filter(ParsedPlan.Criterion::sinCobertura)</span>
+<span class="fc" id="L522">                .map(criterion -&gt; &quot;El criterio '%s' no tiene ninguna tarea asociada; revisalo manualmente.&quot;</span>
+<span class="fc" id="L523">                        .formatted(criterion.texto()))</span>
+<span class="fc" id="L524">                .toList();</span>
+    }
+
+    /** Horas y tareas de cada persona, contadas sobre el plan: no sobre lo que dice el modelo de si mismo. */
+    private List&lt;MemberWorkload&gt; workload(List&lt;ProposedTask&gt; tasks, PlanTeam team,
+                                          List&lt;AiTaskScheduler.Window&gt; ventanas) {
+<span class="fc" id="L530">        return team.members().stream().map(member -&gt; {</span>
+<span class="fc" id="L531">            List&lt;ProposedTask&gt; suyas = tasks.stream()</span>
+<span class="fc" id="L532">                    .filter(task -&gt; task.assigneeIdsOrEmpty().contains(member.userId()))</span>
+<span class="fc" id="L533">                    .toList();</span>
+<span class="fc" id="L534">            BigDecimal horas = suyas.stream()</span>
+<span class="pc bpc" id="L535" title="1 of 2 branches missed.">                    .map(task -&gt; task.estimatedHours() == null ? BigDecimal.ZERO : task.estimatedHours())</span>
+<span class="fc" id="L536">                    .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L537">            BigDecimal capacidad = ventanas.stream()</span>
+<span class="fc" id="L538">                    .map(ventana -&gt; member.capacityFor(ventana.days()))</span>
+<span class="fc" id="L539">                    .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L540">            return new MemberWorkload(member.userId(), member.name(), suyas.size(), horas, capacidad);</span>
+<span class="fc" id="L541">        }).toList();</span>
+    }
+
+    /** Lleva al tablero solo las tareas que el usuario ha aceptado. */
+    @Transactional
+    public List&lt;TaskResponse&gt; apply(Long projectId, ApplyPlanRequest request) {
+<span class="fc" id="L547">        Project project = projectService.getProject(projectId);</span>
+<span class="fc" id="L548">        Board board = boardService.getBoard(request.boardId());</span>
+
+<span class="fc bfc" id="L550" title="All 2 branches covered.">        if (!board.getProject().getId().equals(projectId)) {</span>
+<span class="fc" id="L551">            throw new BusinessRuleException(&quot;El tablero indicado no pertenece a este proyecto&quot;);</span>
+        }
+<span class="fc" id="L553">        BoardColumn column = board.getColumns().stream()</span>
+<span class="fc" id="L554">                .min(Comparator.comparingInt(BoardColumn::getPosition))</span>
+<span class="pc" id="L555">                .orElseThrow(() -&gt; new BusinessRuleException(&quot;El tablero no tiene columnas&quot;));</span>
+
+<span class="fc" id="L557">        User creator = SecurityUtils.currentUserId().flatMap(userRepository::findById).orElse(null);</span>
+<span class="fc" id="L558">        int position = (int) taskRepository.countByBoardColumn_Id(column.getId());</span>
+
+        // Solo se asigna a gente que pertenezca al equipo del proyecto.
+<span class="fc" id="L561">        Set&lt;Long&gt; allowed = project.getTeam().getMembers().stream()</span>
+<span class="fc" id="L562">                .map(member -&gt; member.getUser().getId())</span>
+<span class="fc" id="L563">                .collect(Collectors.toSet());</span>
+
+<span class="fc" id="L565">        List&lt;Task&gt; created = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L566" title="All 2 branches covered.">        for (ProposedTask proposed : request.tasks()) {</span>
+<span class="fc" id="L567">            Set&lt;User&gt; assignees = proposed.assigneeIdsOrEmpty().stream()</span>
+<span class="fc" id="L568">                    .filter(allowed::contains)</span>
+<span class="fc" id="L569">                    .map(id -&gt; userRepository.findById(id).orElse(null))</span>
+<span class="fc" id="L570">                    .filter(Objects::nonNull)</span>
+<span class="fc" id="L571">                    .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+
+<span class="fc" id="L573">            created.add(taskRepository.save(Task.builder()</span>
+<span class="fc" id="L574">                    .title(proposed.title().trim())</span>
+<span class="fc" id="L575">                    .description(descripcion(proposed))</span>
+<span class="fc bfc" id="L576" title="All 2 branches covered.">                    .type(proposed.type() == null ? TaskType.TAREA : proposed.type())</span>
+<span class="pc bpc" id="L577" title="1 of 4 branches missed.">                    .epic(proposed.epic() == null || proposed.epic().isBlank() ? null : proposed.epic().strip())</span>
+<span class="fc bfc" id="L578" title="All 2 branches covered.">                    .priority(proposed.priority() == null ? TaskPriority.MEDIA : proposed.priority())</span>
+<span class="fc" id="L579">                    .estimatedHours(proposed.estimatedHours())</span>
+<span class="fc" id="L580">                    .dueDate(proposed.dueDate())</span>
+<span class="fc" id="L581">                    .boardColumn(column)</span>
+<span class="fc" id="L582">                    .assignees(assignees)</span>
+<span class="fc" id="L583">                    .createdBy(creator)</span>
+<span class="fc" id="L584">                    .aiGenerated(true)</span>
+<span class="fc" id="L585">                    .position(position++)</span>
+<span class="fc" id="L586">                    .build()));</span>
+<span class="fc" id="L587">        }</span>
+
+<span class="fc" id="L589">        activityService.record(project, ActivityAction.GENERACION_IA, &quot;Board&quot;, board.getId(),</span>
+<span class="fc" id="L590">                &quot;Anadio %d %s generadas con IA a '%s'&quot;.formatted(</span>
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">                        created.size(), created.size() == 1 ? &quot;tarea&quot; : &quot;tareas&quot;, column.getName()));</span>
+
+<span class="fc" id="L593">        return taskMapper.toResponses(created);</span>
+    }
+
+    /** Lo que se hace y de donde sale, en la descripcion de la tarea del tablero. */
+    private String descripcion(ProposedTask proposed) {
+<span class="pc bpc" id="L598" title="1 of 4 branches missed.">        boolean hayDescripcion = proposed.description() != null &amp;&amp; !proposed.description().isBlank();</span>
+<span class="pc bpc" id="L599" title="1 of 4 branches missed.">        boolean hayMotivo = proposed.reason() != null &amp;&amp; !proposed.reason().isBlank();</span>
+<span class="pc bpc" id="L600" title="1 of 4 branches missed.">        if (hayDescripcion &amp;&amp; hayMotivo) return proposed.description().strip() + &quot;\n\nMotivo: &quot; + proposed.reason().strip();</span>
+<span class="pc bpc" id="L601" title="1 of 2 branches missed.">        if (hayDescripcion) return proposed.description().strip();</span>
+<span class="fc bfc" id="L602" title="All 2 branches covered.">        return hayMotivo ? proposed.reason().strip() : null;</span>
+    }
+
+    private List&lt;Task&gt; existingTasks(Project project) {
+<span class="fc bfc" id="L606" title="All 2 branches covered.">        if (project.getBoards().isEmpty()) return List.of();</span>
+<span class="fc" id="L607">        return taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(project.getBoards().get(0).getId());</span>
+    }
+
+    /**
+     * Al modelo se le dice que no repita tareas, pero puede que aun asi coincida
+     * con algo que ya esta en el tablero: la comprobacion se hace tambien aqui,
+     * que es determinista.
+     */
+    private List&lt;ProposedTask&gt; withoutDuplicates(List&lt;ProposedTask&gt; proposed, List&lt;Task&gt; existing) {
+<span class="fc" id="L616">        List&lt;String&gt; known = existing.stream().map(task -&gt; TextNormalizer.keywords(task.getTitle())).toList();</span>
+
+<span class="fc" id="L618">        List&lt;ProposedTask&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L619" title="All 2 branches covered.">        for (ProposedTask task : proposed) {</span>
+<span class="fc" id="L620">            String candidate = TextNormalizer.keywords(task.title());</span>
+<span class="fc" id="L621">            boolean repeated = known.stream()</span>
+<span class="fc bfc" id="L622" title="All 2 branches covered.">                    .anyMatch(title -&gt; title.equals(candidate)</span>
+<span class="pc bpc" id="L623" title="3 of 6 branches missed.">                            || (title.length() &gt; 12 &amp;&amp; (title.contains(candidate) || candidate.contains(title))));</span>
+<span class="fc bfc" id="L624" title="All 2 branches covered.">            if (repeated) {</span>
+<span class="fc" id="L625">                log.debug(&quot;IA: descartada «{}» por repetir una tarea existente&quot;, task.title());</span>
+<span class="fc" id="L626">                continue;</span>
+            }
+<span class="fc" id="L628">            result.add(task);</span>
+<span class="fc" id="L629">        }</span>
+<span class="fc" id="L630">        return result;</span>
+    }
+
+    /**
+     * El mensaje de usuario: todo lo que cambia de una ejecucion a otra, por
+     * apartados, para que el modelo distinga el calendario, el equipo y el
+     * documento completo.
+     */
+    String buildPrompt(String text, Optional&lt;String&gt; criteriaExcerpt, PlanTeam team, LocalDate start, int sprintDays,
+                       List&lt;AiTaskScheduler.Window&gt; fixedSprints, List&lt;Task&gt; existing) {
+<span class="fc" id="L640">        StringBuilder prompt = new StringBuilder();</span>
+        // Sin esto el modelo planifica en el ano en que se entreno.
+<span class="fc" id="L642">        prompt.append(&quot;Fecha de hoy: &quot;).append(LocalDate.now()).append('\n');</span>
+<span class="fc" id="L643">        prompt.append(&quot;Fecha de inicio: &quot;).append(start).append('\n');</span>
+<span class="fc" id="L644">        prompt.append(&quot;Duracion del sprint: &quot;).append(sprintDays).append(&quot; dias&quot;)</span>
+<span class="pc bpc" id="L645" title="2 of 4 branches missed.">              .append(sprintDays % 7 == 0 ? &quot; (&quot; + sprintDays / 7 + (sprintDays == 7 ? &quot; semana)&quot; : &quot; semanas)&quot;) : &quot;&quot;)</span>
+<span class="fc" id="L646">              .append('\n');</span>
+
+<span class="fc bfc" id="L648" title="All 2 branches covered.">        if (fixedSprints != null) {</span>
+<span class="fc" id="L649">            prompt.append(&quot;Fecha de entrega: &quot;).append(fixedSprints.get(fixedSprints.size() - 1).end()).append('\n');</span>
+        }
+
+<span class="fc" id="L652">        prompt.append(&quot;\nSPRINTS\n&quot;);</span>
+<span class="fc bfc" id="L653" title="All 2 branches covered.">        if (fixedSprints != null) {</span>
+<span class="fc" id="L654">            prompt.append(&quot;Son fijos: usa exactamente estos numeros, uno por cada sprint de la lista. &quot;)</span>
+<span class="fc" id="L655">                  .append(&quot;La capacidad util es el maximo de horas de cada persona en ese sprint.\n&quot;);</span>
+<span class="fc bfc" id="L656" title="All 2 branches covered.">            for (int i = 0; i &lt; fixedSprints.size(); i++) {</span>
+<span class="fc" id="L657">                AiTaskScheduler.Window sprint = fixedSprints.get(i);</span>
+<span class="fc" id="L658">                BigDecimal total = team.members().stream()</span>
+<span class="fc" id="L659">                        .map(member -&gt; member.usefulCapacityFor(sprint.days()))</span>
+<span class="fc" id="L660">                        .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L661">                prompt.append(&quot;- Sprint &quot;).append(i + 1).append(&quot;: &quot;).append(sprint.start())</span>
+<span class="fc" id="L662">                      .append(&quot; a &quot;).append(sprint.end()).append(&quot; · capacidad util: &quot;)</span>
+<span class="fc" id="L663">                      .append(team.members().stream()</span>
+<span class="fc" id="L664">                              .map(member -&gt; member.name() + &quot; &quot; + plano(member.usefulCapacityFor(sprint.days())) + &quot; h&quot;)</span>
+<span class="fc" id="L665">                              .collect(Collectors.joining(&quot;, &quot;)))</span>
+<span class="fc" id="L666">                      .append(&quot; (equipo &quot;).append(plano(total)).append(&quot; h)\n&quot;);</span>
+            }
+        } else {
+<span class="fc" id="L669">            prompt.append(&quot;No hay fecha de entrega fijada: decide cuantos sprints hacen falta &quot;)</span>
+<span class="fc" id="L670">                  .append(&quot;(entre 1 y &quot;).append(MAX_SPRINTS).append(&quot;) y ponlo en \&quot;resumen.num_sprints\&quot;. &quot;)</span>
+<span class="fc" id="L671">                  .append(&quot;Empiezan el &quot;).append(start).append(&quot; y cada uno dura &quot;).append(sprintDays)</span>
+<span class="fc" id="L672">                  .append(&quot; dias.\n&quot;);</span>
+        }
+
+<span class="fc" id="L675">        prompt.append(&quot;\nEQUIPO (&quot;).append(team.members().size())</span>
+<span class="fc bfc" id="L676" title="All 2 branches covered.">              .append(team.members().size() == 1 ? &quot; persona)\n&quot; : &quot; personas)\n&quot;);</span>
+<span class="fc bfc" id="L677" title="All 2 branches covered.">        for (PlanTeam.Member member : team.members()) {</span>
+<span class="fc" id="L678">            prompt.append(&quot;- &quot;).append(member.name());</span>
+<span class="fc bfc" id="L679" title="All 2 branches covered.">            if (member.leader()) prompt.append(&quot; (lider)&quot;);</span>
+<span class="fc" id="L680">            prompt.append(&quot; | &quot;).append(member.hoursPerWeek()).append(&quot; h/semana&quot;);</span>
+<span class="fc bfc" id="L681" title="All 2 branches covered.">            if (!member.available()) {</span>
+<span class="fc" id="L682">                prompt.append(&quot; (no disponible)&quot;);</span>
+<span class="fc bfc" id="L683" title="All 2 branches covered.">            } else if (fixedSprints == null) {</span>
+<span class="fc" id="L684">                prompt.append(&quot; | capacidad util: &quot;).append(plano(member.usefulCapacityFor(sprintDays)))</span>
+<span class="fc" id="L685">                      .append(&quot; h por sprint&quot;);</span>
+            }
+<span class="fc" id="L687">            prompt.append(&quot; | rol y preferencias: &quot;)</span>
+<span class="fc bfc" id="L688" title="All 2 branches covered.">                  .append(member.preferences().isBlank() ? &quot;sin especificar&quot; : member.preferences().replace('\n', ' '))</span>
+<span class="fc" id="L689">                  .append('\n');</span>
+<span class="fc" id="L690">        }</span>
+
+<span class="fc bfc" id="L692" title="All 2 branches covered.">        if (!existing.isEmpty()) {</span>
+<span class="fc" id="L693">            prompt.append(&quot;\nYA ESTA EN EL TABLERO (no lo repitas)\n&quot;);</span>
+<span class="fc" id="L694">            existing.forEach(task -&gt; prompt.append(&quot;- &quot;).append(task.getTitle()).append('\n'));</span>
+        }
+
+        // Va aparte y siempre entero, aunque el documento de mas abajo este recortado
+        // por longitud: si esto solo apareciera en la parte recortada, el reparto
+        // ignoraria por completo lo que puntua o es obligatorio.
+<span class="fc" id="L700">        criteriaExcerpt.ifPresent(excerpt -&gt; prompt.append(&quot;\nCRITERIOS DE EVALUACION Y REQUISITOS DETECTADOS EN EL &quot;)</span>
+<span class="fc" id="L701">                .append(&quot;DOCUMENTO\n(puede que este fragmento no aparezca completo en el documento de mas abajo, &quot;)</span>
+<span class="fc" id="L702">                .append(&quot;si es largo; no lo ignores por eso)\n&quot;).append(excerpt).append('\n'));</span>
+
+<span class="fc" id="L704">        prompt.append(&quot;\nDOCUMENTO DEL PROYECTO\n&quot;).append(text).append('\n');</span>
+<span class="fc" id="L705">        return prompt.toString();</span>
+    }
+
+    private static String plano(BigDecimal value) {
+<span class="fc" id="L709">        return value.stripTrailingZeros().toPlainString();</span>
+    }
+
+    // ---------------------------------------------------------------------
+    // Interpretar la respuesta
+    // ---------------------------------------------------------------------
+
+    /** Lo que se pudo leer de una respuesta: las tareas, cuantos sprints hacen falta y el objetivo de cada uno. */
+<span class="fc" id="L717">    record ParsedPlan(List&lt;ProposedTask&gt; tasks, Integer numSprints, Map&lt;Integer, SprintGoal&gt; goals,</span>
+                      List&lt;String&gt; modelWarnings, List&lt;Criterion&gt; criteria) {
+
+        /** El objetivo de un sprint, y si su fecha es definitiva o esta pendiente de confirmar. */
+<span class="fc" id="L721">        record SprintGoal(String objetivo, boolean definitiva) {</span>
+        }
+
+        /**
+         * Un criterio de evaluacion, apartado puntuable o requisito obligatorio que
+         * el propio modelo dice haber detectado en el documento, y que titulos de
+         * tarea dice que lo cubren. Sirve para comprobar en Java que no se queda
+         * ninguno sin tarea, sin depender de que el modelo se autoevalue bien.
+         */
+<span class="fc" id="L730">        record Criterion(String texto, String importancia, List&lt;String&gt; tareasRelacionadas) {</span>
+
+            boolean sinCobertura() {
+<span class="pc bpc" id="L733" title="1 of 4 branches missed.">                return tareasRelacionadas == null || tareasRelacionadas.isEmpty();</span>
+            }
+        }
+    }
+
+    /** La respuesta no es un plan: se le devuelve al modelo como error a corregir. */
+    static class InvalidPlanException extends RuntimeException {
+        InvalidPlanException(String message) {
+<span class="fc" id="L741">            super(message);</span>
+<span class="fc" id="L742">        }</span>
+    }
+
+    /**
+     * Lee el JSON del modelo. Se aceptan las claves en espanol que pide el prompt y
+     * sus equivalentes en ingles, por si el modelo las cambia; lo que no se acepta
+     * es algo sin lista de tareas.
+     */
+    ParsedPlan parse(String content) {
+        JsonNode root;
+        try {
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">            root = objectMapper.readTree(content == null ? &quot;&quot; : content);</span>
+<span class="fc" id="L754">        } catch (Exception ex) {</span>
+<span class="fc" id="L755">            throw new InvalidPlanException(&quot;La respuesta no era JSON valido. Responde solo con el objeto JSON.&quot;);</span>
+<span class="fc" id="L756">        }</span>
+<span class="pc bpc" id="L757" title="2 of 4 branches missed.">        JsonNode array = root == null ? null : root.isArray() ? root : first(root, &quot;tareas&quot;, &quot;tasks&quot;);</span>
+<span class="pc bpc" id="L758" title="2 of 4 branches missed.">        if (array == null || !array.isArray()) {</span>
+<span class="nc" id="L759">            throw new InvalidPlanException(&quot;La respuesta no tenia la lista \&quot;tareas\&quot;. Usa exactamente la forma pedida.&quot;);</span>
+        }
+
+<span class="fc" id="L762">        List&lt;ProposedTask&gt; tasks = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L763" title="All 2 branches covered.">        for (JsonNode node : array) {</span>
+<span class="fc" id="L764">            String title = text(node, 200, &quot;titulo&quot;, &quot;title&quot;);</span>
+<span class="pc bpc" id="L765" title="1 of 2 branches missed.">            if (title == null) continue;</span>
+
+<span class="fc" id="L767">            tasks.add(new ProposedTask(</span>
+                    title,
+<span class="fc" id="L769">                    text(node, 2000, &quot;descripcion&quot;, &quot;description&quot;),</span>
+<span class="fc" id="L770">                    text(node, 500, &quot;motivo&quot;, &quot;reason&quot;),</span>
+<span class="fc" id="L771">                    type(text(node, 40, &quot;tipo&quot;, &quot;type&quot;)),</span>
+<span class="fc" id="L772">                    text(node, 100, &quot;epica&quot;, &quot;epic&quot;),</span>
+<span class="fc" id="L773">                    integer(first(node, &quot;sprint&quot;)),</span>
+<span class="fc" id="L774">                    priority(text(node, 20, &quot;prioridad&quot;, &quot;priority&quot;)),</span>
+<span class="fc" id="L775">                    hours(first(node, &quot;horas&quot;, &quot;estimatedHours&quot;, &quot;hours&quot;)),</span>
+                    null,
+<span class="fc" id="L777">                    List.of(),</span>
+<span class="fc" id="L778">                    assigneeNamesOf(node),</span>
+<span class="fc" id="L779">                    stringList(first(node, &quot;depende_de&quot;, &quot;dependsOn&quot;))));</span>
+
+<span class="pc bpc" id="L781" title="1 of 2 branches missed.">            if (tasks.size() &gt;= properties.getMaxTasks()) break;</span>
+<span class="fc" id="L782">        }</span>
+
+<span class="pc bpc" id="L784" title="1 of 2 branches missed.">        JsonNode resumen = root.isArray() ? null : first(root, &quot;resumen&quot;, &quot;summary&quot;);</span>
+<span class="fc bfc" id="L785" title="All 2 branches covered.">        Integer numSprints = resumen == null ? null : integer(first(resumen, &quot;num_sprints&quot;, &quot;numSprints&quot;));</span>
+
+<span class="fc" id="L787">        Map&lt;Integer, ParsedPlan.SprintGoal&gt; goals = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L788" title="1 of 2 branches missed.">        JsonNode sprints = root.isArray() ? null : first(root, &quot;sprints&quot;);</span>
+<span class="pc bpc" id="L789" title="1 of 4 branches missed.">        if (sprints != null &amp;&amp; sprints.isArray()) {</span>
+<span class="fc bfc" id="L790" title="All 2 branches covered.">            for (JsonNode sprint : sprints) {</span>
+<span class="fc" id="L791">                Integer numero = integer(first(sprint, &quot;numero&quot;, &quot;number&quot;));</span>
+<span class="fc" id="L792">                String objetivo = text(sprint, 300, &quot;objetivo&quot;, &quot;goal&quot;);</span>
+<span class="fc" id="L793">                boolean definitiva = bool(first(sprint, &quot;fecha_definitiva&quot;, &quot;definitive&quot;), true);</span>
+<span class="pc bpc" id="L794" title="2 of 4 branches missed.">                if (numero != null &amp;&amp; objetivo != null) goals.put(numero, new ParsedPlan.SprintGoal(objetivo, definitiva));</span>
+<span class="fc" id="L795">            }</span>
+        }
+
+<span class="pc bpc" id="L798" title="1 of 2 branches missed.">        List&lt;String&gt; modelWarnings = root.isArray() ? List.of() : stringList(first(root, &quot;avisos&quot;, &quot;warnings&quot;));</span>
+
+<span class="fc" id="L800">        List&lt;ParsedPlan.Criterion&gt; criteria = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L801" title="All 2 branches covered.">        JsonNode criteriosNode = resumen == null ? null : first(resumen, &quot;criterios_detectados&quot;, &quot;detectedCriteria&quot;);</span>
+<span class="pc bpc" id="L802" title="1 of 4 branches missed.">        if (criteriosNode != null &amp;&amp; criteriosNode.isArray()) {</span>
+<span class="fc bfc" id="L803" title="All 2 branches covered.">            for (JsonNode node : criteriosNode) {</span>
+<span class="fc" id="L804">                String criterio = text(node, 500, &quot;criterio&quot;, &quot;criterion&quot;);</span>
+<span class="pc bpc" id="L805" title="1 of 2 branches missed.">                if (criterio == null) continue;</span>
+<span class="fc" id="L806">                criteria.add(new ParsedPlan.Criterion(criterio, text(node, 100, &quot;peso_o_importancia&quot;, &quot;weight&quot;),</span>
+<span class="fc" id="L807">                        stringList(first(node, &quot;tareas_relacionadas&quot;, &quot;relatedTasks&quot;))));</span>
+<span class="fc" id="L808">            }</span>
+        }
+
+<span class="fc" id="L811">        return new ParsedPlan(tasks, numSprints, goals, modelWarnings, criteria);</span>
+    }
+
+    /** El primer campo presente de los que se le pasan, o null. */
+    private static JsonNode first(JsonNode node, String... fields) {
+<span class="fc bfc" id="L816" title="All 2 branches covered.">        for (String field : fields) {</span>
+<span class="fc" id="L817">            JsonNode value = node.get(field);</span>
+<span class="pc bpc" id="L818" title="2 of 6 branches missed.">            if (value != null &amp;&amp; !value.isNull() &amp;&amp; !value.isMissingNode()) return value;</span>
+        }
+<span class="fc" id="L820">        return null;</span>
+    }
+
+    private static String text(JsonNode node, int max, String... fields) {
+<span class="fc" id="L824">        JsonNode value = first(node, fields);</span>
+<span class="pc bpc" id="L825" title="1 of 4 branches missed.">        if (value == null || value.isContainerNode()) return null;</span>
+<span class="fc" id="L826">        String limpio = value.asText(&quot;&quot;).strip();</span>
+<span class="pc bpc" id="L827" title="1 of 2 branches missed.">        if (limpio.isBlank()) return null;</span>
+<span class="pc bpc" id="L828" title="1 of 2 branches missed.">        return limpio.length() &gt; max ? limpio.substring(0, max) : limpio;</span>
+    }
+
+    /** Un numero, venga como numero o como texto (&quot;Sprint 2&quot;, &quot;4h&quot;). */
+    private static Integer integer(JsonNode value) {
+<span class="pc bpc" id="L833" title="1 of 2 branches missed.">        if (value == null) return null;</span>
+<span class="fc bfc" id="L834" title="All 2 branches covered.">        if (value.isNumber()) return value.asInt();</span>
+<span class="fc" id="L835">        String digitos = value.asText(&quot;&quot;).replaceAll(&quot;[^0-9]&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L836" title="2 of 4 branches missed.">        if (digitos.isEmpty() || digitos.length() &gt; 6) return null;</span>
+<span class="fc" id="L837">        return Integer.parseInt(digitos);</span>
+    }
+
+    private static BigDecimal hours(JsonNode value) {
+<span class="pc bpc" id="L841" title="1 of 2 branches missed.">        if (value == null) return null;</span>
+        double horas;
+<span class="fc bfc" id="L843" title="All 2 branches covered.">        if (value.isNumber()) {</span>
+<span class="fc" id="L844">            horas = value.asDouble();</span>
+        } else {
+<span class="fc" id="L846">            String limpio = value.asText(&quot;&quot;).replace(',', '.').replaceAll(&quot;[^0-9.]&quot;, &quot;&quot;);</span>
+            try {
+<span class="pc bpc" id="L848" title="1 of 2 branches missed.">                horas = limpio.isEmpty() ? 0 : Double.parseDouble(limpio);</span>
+<span class="nc" id="L849">            } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L850">                return null;</span>
+<span class="fc" id="L851">            }</span>
+        }
+<span class="pc bpc" id="L853" title="2 of 4 branches missed.">        if (horas &lt;= 0 || horas &gt; 100) return null;</span>
+<span class="fc" id="L854">        return BigDecimal.valueOf(horas).stripTrailingZeros();</span>
+    }
+
+    /** Un booleano, venga como booleano o como texto (&quot;si&quot;/&quot;no&quot;). Si no se entiende, el valor por defecto. */
+    private static boolean bool(JsonNode value, boolean defecto) {
+<span class="pc bpc" id="L859" title="3 of 6 branches missed.">        if (value == null || value.isNull() || value.isMissingNode()) return defecto;</span>
+<span class="pc bpc" id="L860" title="1 of 2 branches missed.">        if (value.isBoolean()) return value.asBoolean();</span>
+<span class="nc" id="L861">        String texto = value.asText(&quot;&quot;).strip().toLowerCase(Locale.ROOT);</span>
+<span class="nc bnc" id="L862" title="All 4 branches missed.">        if (texto.equals(&quot;false&quot;) || texto.equals(&quot;no&quot;)) return false;</span>
+<span class="nc bnc" id="L863" title="All 6 branches missed.">        if (texto.equals(&quot;true&quot;) || texto.equals(&quot;si&quot;) || texto.equals(&quot;sí&quot;)) return true;</span>
+<span class="nc" id="L864">        return defecto;</span>
+    }
+
+    /** &quot;Alta&quot;, &quot;ALTA&quot; o &quot;alta&quot; son lo mismo. Lo que no se entiende, media. */
+    private static TaskPriority priority(String raw) {
+<span class="fc" id="L869">        String valor = TextNormalizer.plain(raw);</span>
+<span class="pc bpc" id="L870" title="1 of 2 branches missed.">        if (valor.startsWith(&quot;crit&quot;)) return TaskPriority.CRITICA;</span>
+<span class="fc bfc" id="L871" title="All 4 branches covered.">        if (valor.startsWith(&quot;alt&quot;) || valor.startsWith(&quot;high&quot;)) return TaskPriority.ALTA;</span>
+<span class="pc bpc" id="L872" title="2 of 4 branches missed.">        if (valor.startsWith(&quot;baj&quot;) || valor.startsWith(&quot;low&quot;)) return TaskPriority.BAJA;</span>
+<span class="fc" id="L873">        return TaskPriority.MEDIA;</span>
+    }
+
+    /** &quot;Historia de usuario&quot;, &quot;Tarea&quot;, &quot;Bug&quot;... Si no se entiende, se deja en blanco: se lee como TAREA. */
+    private static TaskType type(String raw) {
+<span class="fc" id="L878">        String valor = TextNormalizer.plain(raw);</span>
+<span class="pc bpc" id="L879" title="1 of 4 branches missed.">        if (valor.startsWith(&quot;historia&quot;) || valor.startsWith(&quot;story&quot;)) return TaskType.HISTORIA;</span>
+<span class="pc bpc" id="L880" title="1 of 4 branches missed.">        if (valor.startsWith(&quot;tarea&quot;) || valor.startsWith(&quot;task&quot;)) return TaskType.TAREA;</span>
+<span class="pc bpc" id="L881" title="1 of 2 branches missed.">        if (valor.startsWith(&quot;bug&quot;)) return TaskType.BUG;</span>
+<span class="pc bpc" id="L882" title="2 of 4 branches missed.">        if (valor.startsWith(&quot;epica&quot;) || valor.startsWith(&quot;epic&quot;)) return TaskType.EPICA;</span>
+<span class="pc bpc" id="L883" title="1 of 2 branches missed.">        if (valor.startsWith(&quot;incidencia&quot;)) return TaskType.INCIDENCIA;</span>
+<span class="fc" id="L884">        return null;</span>
+    }
+
+    /**
+     * Los nombres de a quien se reparte una tarea. Se acepta, por robustez ante
+     * como el modelo decida darle forma: un array bajo la clave en plural
+     * (&quot;asignados&quot;/&quot;assignees&quot;), un array bajo la clave en singular (si el modelo
+     * mezcla formato), o un unico texto bajo la clave en singular (compatibilidad
+     * con el formato de antes de admitir varios responsables).
+     */
+    private static List&lt;String&gt; assigneeNamesOf(JsonNode node) {
+<span class="fc" id="L895">        JsonNode plural = first(node, &quot;asignados&quot;, &quot;assignees&quot;);</span>
+<span class="pc bpc" id="L896" title="1 of 4 branches missed.">        if (plural != null &amp;&amp; plural.isArray()) return stringList(plural);</span>
+
+<span class="fc" id="L898">        JsonNode singular = first(node, &quot;asignado&quot;, &quot;assignee&quot;);</span>
+<span class="pc bpc" id="L899" title="1 of 4 branches missed.">        if (singular != null &amp;&amp; singular.isArray()) return stringList(singular);</span>
+
+<span class="fc" id="L901">        String unico = text(node, 150, &quot;asignado&quot;, &quot;assignee&quot;);</span>
+<span class="pc bpc" id="L902" title="1 of 2 branches missed.">        return unico == null ? List.of() : List.of(unico);</span>
+    }
+
+    /** Una lista de textos del modelo, sin los vacios. */
+    private static List&lt;String&gt; stringList(JsonNode node) {
+<span class="pc bpc" id="L907" title="1 of 4 branches missed.">        if (node == null || !node.isArray()) return List.of();</span>
+<span class="fc" id="L908">        List&lt;String&gt; values = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L909" title="All 2 branches covered.">        for (JsonNode item : node) {</span>
+<span class="pc bpc" id="L910" title="1 of 2 branches missed.">            String value = item.isTextual() ? item.asText(&quot;&quot;).strip() : item.toString();</span>
+<span class="pc bpc" id="L911" title="1 of 2 branches missed.">            if (!value.isBlank()) values.add(value);</span>
+<span class="fc" id="L912">        }</span>
+<span class="fc" id="L913">        return values;</span>
+    }
+
+    private static String abbreviate(String value) {
+<span class="pc bpc" id="L917" title="1 of 2 branches missed.">        if (value == null) return &quot;&quot;;</span>
+<span class="pc bpc" id="L918" title="1 of 2 branches missed.">        return value.length() &lt;= 300 ? value : value.substring(0, 300) + &quot;…&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

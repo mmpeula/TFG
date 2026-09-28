@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TeamController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.team</a> &gt; <span class="el_source">TeamController.java</span></div><h1>TeamController.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.team;
+
+import com.tfg.kanban.team.dto.TeamMemberResponse;
+import com.tfg.kanban.team.dto.UpdateMemberNotesRequest;
+import com.tfg.kanban.team.dto.UpdateMemberRoleRequest;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * Quien esta en el equipo de un workspace y con que rol. El equipo lo crea y lo
+ * borra su workspace (/api/workspaces), y se entra en el por invitacion
+ * (/api/teams/{id}/invitations): aqui no hay forma de meter a nadie sin que acepte.
+ */
+@RestController
+@RequestMapping(&quot;/api/teams&quot;)
+@RequiredArgsConstructor
+@Tag(name = &quot;Equipos&quot;, description = &quot;Miembros de cada equipo y su rol&quot;)
+public class TeamController {
+
+    private final TeamService teamService;
+
+    @Operation(summary = &quot;Miembros del equipo&quot;)
+    @PreAuthorize(&quot;@access.isTeamMember(#id)&quot;)
+    @GetMapping(&quot;/{id}/members&quot;)
+    public List&lt;TeamMemberResponse&gt; findMembers(@PathVariable Long id) {
+<span class="fc" id="L35">        return teamService.findMembers(id);</span>
+    }
+
+    @Operation(summary = &quot;Cambiar el rol de un miembro&quot;,
+            description = &quot;Solo el RESPONSABLE. No se puede dejar al equipo sin ningun RESPONSABLE.&quot;)
+    @PreAuthorize(&quot;@access.canManageTeam(#id)&quot;)
+    @PatchMapping(&quot;/{id}/members/{userId}&quot;)
+    public TeamMemberResponse updateMemberRole(@PathVariable Long id, @PathVariable Long userId,
+                                               @Valid @RequestBody UpdateMemberRoleRequest request) {
+<span class="fc" id="L44">        return teamService.updateMemberRole(id, userId, request);</span>
+    }
+
+    @Operation(summary = &quot;Indicaciones permanentes de un miembro para generar el plan&quot;,
+            description = &quot;Lo que se tiene en cuenta de esa persona al repartir trabajo: en que &quot;
+                    + &quot;se maneja, que prefiere y que conviene evitarle. Se guarda y vale para todas las &quot;
+                    + &quot;ejecuciones siguientes. Solo el RESPONSABLE.&quot;)
+    @PreAuthorize(&quot;@access.canManageTeam(#id)&quot;)
+    @PatchMapping(&quot;/{id}/members/{userId}/notes&quot;)
+    public TeamMemberResponse updateMemberNotes(@PathVariable Long id, @PathVariable Long userId,
+                                                @Valid @RequestBody UpdateMemberNotesRequest request) {
+<span class="fc" id="L55">        return teamService.updateMemberNotes(id, userId, request);</span>
+    }
+
+    @Operation(summary = &quot;Expulsar a un miembro o salirse del equipo&quot;,
+            description = &quot;El RESPONSABLE puede expulsar a cualquiera; cualquier miembro puede salirse el mismo.&quot;)
+    @ApiResponses(@ApiResponse(responseCode = &quot;204&quot;, description = &quot;Miembro eliminado&quot;))
+    @PreAuthorize(&quot;@access.canManageTeam(#id) or @access.isSelf(#userId)&quot;)
+    @DeleteMapping(&quot;/{id}/members/{userId}&quot;)
+    public ResponseEntity&lt;Void&gt; removeMember(@PathVariable Long id, @PathVariable Long userId) {
+<span class="fc" id="L64">        teamService.removeMember(id, userId);</span>
+<span class="fc" id="L65">        return ResponseEntity.noContent().build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

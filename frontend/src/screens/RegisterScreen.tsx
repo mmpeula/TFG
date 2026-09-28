@@ -94,7 +94,7 @@ export function RegisterScreen() {
             </div>
 
             <div>
-              <label className={styles.label} htmlFor="password">Contrasena</label>
+              <label className={styles.label} htmlFor="password">Contraseña</label>
               <input
                 id="password" type="password" autoComplete="new-password" required minLength={8}
                 className={styles.control}
@@ -104,7 +104,7 @@ export function RegisterScreen() {
             </div>
 
             <div>
-              <label className={styles.label} htmlFor="confirmPassword">Repite la contrasena</label>
+              <label className={styles.label} htmlFor="confirmPassword">Repite la contraseña</label>
               <input
                 id="confirmPassword" type="password" autoComplete="new-password" required minLength={8}
                 className={styles.control}
@@ -112,7 +112,7 @@ export function RegisterScreen() {
                 aria-invalid={passwordsMismatch}
               />
               {passwordsMismatch
-                ? <p className={styles.fieldError}>Las dos contrasenas no coinciden.</p>
+                ? <p className={styles.fieldError}>Las dos contraseñas no coinciden.</p>
                 : <p className={styles.hint}>Escribela igual que arriba.</p>}
             </div>
 

@@ -1,5 +1,6 @@
 import styles from './Avatar.module.css'
 import { initials } from '@/lib/format'
+import { useAvatarImage } from '@/hooks/useData'
 import type { UserSummary } from '@/types/api'
 
 /*
@@ -21,17 +22,34 @@ function colorFor(id?: number): string {
 
 interface Props {
   user?: Pick<UserSummary, 'id' | 'fullName'> | null
+  /** Si el usuario tiene foto de perfil, se muestra en vez de las iniciales. */
+  avatarUrl?: string | null
   size?: number
   title?: string
 }
 
-export function Avatar({ user, size = 22, title }: Props) {
+export function Avatar({ user, avatarUrl, size = 22, title }: Props) {
+  const { data: photoUrl } = useAvatarImage(avatarUrl)
+  const label = title ?? user?.fullName ?? 'Sin asignar'
+
+  if (photoUrl) {
+    return (
+      <img
+        className={styles.avatar}
+        style={{ width: size, height: size, objectFit: 'cover' }}
+        src={photoUrl}
+        alt={label}
+        title={label}
+      />
+    )
+  }
+
   return (
     <span
       className={styles.avatar}
-      title={title ?? user?.fullName ?? 'Sin asignar'}
+      title={label}
       style={{ width: size, height: size, background: colorFor(user?.id), fontSize: Math.max(9, Math.round(size * 0.4)) }}
-      aria-label={user?.fullName ?? 'Sin asignar'}
+      aria-label={label}
     >
       {initials(user?.fullName)}
     </span>

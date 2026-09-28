@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TaskMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.task</a> &gt; <span class="el_source">TaskMapper.java</span></div><h1>TaskMapper.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.task;
+
+import com.tfg.kanban.common.CountByEntity;
+import com.tfg.kanban.domain.model.Task;
+import com.tfg.kanban.domain.repository.AttachmentRepository;
+import com.tfg.kanban.domain.repository.CommentRepository;
+import com.tfg.kanban.task.dto.TaskResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Conversion de tareas a DTO.
+ *
+ * Los contadores de comentarios y adjuntos se resuelven con una unica consulta
+ * agrupada por lote de tareas, en lugar de una consulta por tarjeta.
+ */
+@Component
+@RequiredArgsConstructor
+public class TaskMapper {
+
+    private final CommentRepository commentRepository;
+    private final AttachmentRepository attachmentRepository;
+
+    public TaskResponse toResponse(Task task) {
+<span class="fc" id="L29">        return TaskResponse.from(task,</span>
+<span class="fc" id="L30">                commentRepository.countByTask_Id(task.getId()),</span>
+<span class="fc" id="L31">                attachmentRepository.countByTask_Id(task.getId()));</span>
+    }
+
+    public List&lt;TaskResponse&gt; toResponses(List&lt;Task&gt; tasks) {
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (tasks.isEmpty()) {</span>
+<span class="fc" id="L36">            return List.of();</span>
+        }
+<span class="fc" id="L38">        List&lt;Long&gt; ids = tasks.stream().map(Task::getId).toList();</span>
+<span class="fc" id="L39">        Map&lt;Long, Long&gt; comments = toMap(commentRepository.countByTaskIds(ids));</span>
+<span class="fc" id="L40">        Map&lt;Long, Long&gt; attachments = toMap(attachmentRepository.countByTaskIds(ids));</span>
+
+<span class="fc" id="L42">        return tasks.stream()</span>
+<span class="fc" id="L43">                .map(task -&gt; TaskResponse.from(task,</span>
+<span class="fc" id="L44">                        comments.getOrDefault(task.getId(), 0L),</span>
+<span class="fc" id="L45">                        attachments.getOrDefault(task.getId(), 0L)))</span>
+<span class="fc" id="L46">                .toList();</span>
+    }
+
+    private Map&lt;Long, Long&gt; toMap(List&lt;CountByEntity&gt; counts) {
+<span class="fc" id="L50">        return counts.stream().collect(Collectors.toMap(CountByEntity::entityId, CountByEntity::total));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

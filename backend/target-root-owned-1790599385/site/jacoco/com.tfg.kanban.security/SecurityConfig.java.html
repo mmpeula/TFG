@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecurityConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.security</a> &gt; <span class="el_source">SecurityConfig.java</span></div><h1>SecurityConfig.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.security;
+
+import com.tfg.kanban.common.RestAccessDeniedHandler;
+import com.tfg.kanban.common.RestAuthenticationEntryPoint;
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
+
+/**
+ * Configuracion de seguridad: API stateless protegida con JWT y RBAC
+ * sobre las cuentas ADMIN / DOCENTE / MIEMBRO y la responsabilidad por equipo.
+ *
+ * La autorizacion real vive en {@link AccessService}, invocado desde las
+ * anotaciones {@code @PreAuthorize} de los controladores: el rol que cuenta es el
+ * que el usuario tiene en el equipo dueno del recurso, no su rol global. La
+ * unica excepcion es ADMIN: un rol global sin equipo, reservado a la gestion
+ * de cuentas de la plataforma ({@code UserController}).
+ */
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+@EnableConfigurationProperties(JwtProperties.class)
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    /** Rutas publicas: health check, autenticacion y documentacion de la API. */
+<span class="fc" id="L44">    private static final String[] PUBLIC_ENDPOINTS = {</span>
+            &quot;/api/health&quot;,
+            &quot;/api/health/**&quot;,
+            &quot;/api/auth/**&quot;,
+            &quot;/actuator/health&quot;,
+            &quot;/actuator/health/**&quot;,
+            &quot;/v3/api-docs&quot;,
+            &quot;/v3/api-docs/**&quot;,
+            &quot;/swagger-ui.html&quot;,
+            &quot;/swagger-ui/**&quot;
+    };
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RestAuthenticationEntryPoint authenticationEntryPoint;
+    private final RestAccessDeniedHandler accessDeniedHandler;
+    private final CorsProperties corsProperties;
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+<span class="fc" id="L63">        http</span>
+<span class="fc" id="L64">                .csrf(csrf -&gt; csrf.disable())</span>
+<span class="fc" id="L65">                .cors(cors -&gt; cors.configurationSource(corsConfigurationSource()))</span>
+<span class="fc" id="L66">                .sessionManagement(session -&gt; session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))</span>
+<span class="fc" id="L67">                .exceptionHandling(ex -&gt; ex</span>
+<span class="fc" id="L68">                        .authenticationEntryPoint(authenticationEntryPoint)</span>
+<span class="fc" id="L69">                        .accessDeniedHandler(accessDeniedHandler))</span>
+<span class="fc" id="L70">                .authorizeHttpRequests(auth -&gt; auth</span>
+<span class="fc" id="L71">                        .requestMatchers(HttpMethod.OPTIONS, &quot;/**&quot;).permitAll()</span>
+<span class="fc" id="L72">                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()</span>
+                        // El control fino (rol dentro del equipo dueno del recurso) se hace
+                        // con @PreAuthorize + AccessService en cada endpoint. Aqui solo se
+                        // exige estar autenticado.
+<span class="fc" id="L76">                        .anyRequest().authenticated())</span>
+<span class="fc" id="L77">                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);</span>
+
+<span class="fc" id="L79">        return http.build();</span>
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+<span class="fc" id="L84">        return new BCryptPasswordEncoder();</span>
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+<span class="fc" id="L89">        return configuration.getAuthenticationManager();</span>
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+<span class="fc" id="L94">        CorsConfiguration configuration = new CorsConfiguration();</span>
+<span class="fc" id="L95">        configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());</span>
+<span class="fc" id="L96">        configuration.setAllowedMethods(List.of(&quot;GET&quot;, &quot;POST&quot;, &quot;PUT&quot;, &quot;PATCH&quot;, &quot;DELETE&quot;, &quot;OPTIONS&quot;));</span>
+<span class="fc" id="L97">        configuration.setAllowedHeaders(List.of(&quot;*&quot;));</span>
+<span class="fc" id="L98">        configuration.setAllowCredentials(true);</span>
+<span class="fc" id="L99">        configuration.setMaxAge(3600L);</span>
+
+<span class="fc" id="L101">        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();</span>
+<span class="fc" id="L102">        source.registerCorsConfiguration(&quot;/**&quot;, configuration);</span>
+<span class="fc" id="L103">        return source;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

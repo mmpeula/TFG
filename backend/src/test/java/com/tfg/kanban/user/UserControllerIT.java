@@ -4,11 +4,12 @@ import com.tfg.kanban.AbstractApiIT;
 import com.tfg.kanban.domain.model.Role;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class UserControllerIT extends AbstractApiIT {
 
@@ -242,4 +243,52 @@ class UserControllerIT extends AbstractApiIT {
     // tests de integracion es compartido con el resto de clases y siempre tiene
     // al menos el administrador que crea AdminBootstrapRunner al arrancar, asi
     // que "queda un unico ADMIN en toda la base de datos" no es reproducible aqui.
+
+    @Test
+    @DisplayName("Subir, descargar y quitar la foto de perfil")
+    void avatarLifecycle() throws Exception {
+        TestUser user = registerUser(Role.MIEMBRO);
+        MockMultipartFile foto = new MockMultipartFile("file", "foto.png", "image/png",
+                new byte[] {1, 2, 3, 4});
+
+        mockMvc.perform(authorized(get("/api/auth/me"), user))
+                .andExpect(jsonPath("$.avatarUrl").doesNotExist());
+
+        mockMvc.perform(multipart("/api/users/{id}/avatar", user.id())
+                        .file(foto)
+                        .header(HttpHeaders.AUTHORIZATION, user.bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.avatarUrl").value("/api/users/" + user.id() + "/avatar"));
+
+        mockMvc.perform(authorized(get("/api/users/{id}/avatar", user.id()), user))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/png"))
+                .andExpect(content().bytes(new byte[] {1, 2, 3, 4}));
+
+        mockMvc.perform(authorized(delete("/api/users/{id}/avatar", user.id()), user))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(authorized(get("/api/auth/me"), user))
+                .andExpect(jsonPath("$.avatarUrl").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Nadie sube ni quita la foto de perfil de otra persona, salvo el administrador")
+    void avatarIsOnlyEditableBySelfOrAdmin() throws Exception {
+        TestUser admin = registerUser(Role.ADMIN);
+        TestUser user = registerUser(Role.MIEMBRO);
+        TestUser other = registerUser(Role.MIEMBRO);
+        MockMultipartFile foto = new MockMultipartFile("file", "foto.png", "image/png",
+                new byte[] {1, 2, 3, 4});
+
+        mockMvc.perform(multipart("/api/users/{id}/avatar", user.id())
+                        .file(foto)
+                        .header(HttpHeaders.AUTHORIZATION, other.bearer()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(multipart("/api/users/{id}/avatar", user.id())
+                        .file(foto)
+                        .header(HttpHeaders.AUTHORIZATION, admin.bearer()))
+                .andExpect(status().isOk());
+    }
 }

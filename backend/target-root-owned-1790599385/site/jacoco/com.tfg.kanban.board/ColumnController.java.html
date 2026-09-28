@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ColumnController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.board</a> &gt; <span class="el_source">ColumnController.java</span></div><h1>ColumnController.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.board;
+
+import com.tfg.kanban.board.dto.ColumnRequest;
+import com.tfg.kanban.board.dto.ColumnResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/api/columns&quot;)
+@RequiredArgsConstructor
+@Tag(name = &quot;Columnas&quot;, description = &quot;Columnas de un tablero Kanban&quot;)
+public class ColumnController {
+
+    private final BoardService boardService;
+
+    @Operation(summary = &quot;Editar una columna&quot;,
+            description = &quot;Solo el RESPONSABLE. No se puede fijar un limite WIP menor que las tareas que ya tiene.&quot;)
+    @ApiResponses({
+            @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Columna actualizada&quot;),
+            @ApiResponse(responseCode = &quot;409&quot;, description = &quot;El limite WIP es menor que el numero de tareas&quot;)
+    })
+    @PreAuthorize(&quot;@access.canManageColumn(#id)&quot;)
+    @PutMapping(&quot;/{id}&quot;)
+    public ColumnResponse update(@PathVariable Long id, @Valid @RequestBody ColumnRequest request) {
+<span class="fc" id="L32">        return boardService.updateColumn(id, request);</span>
+    }
+
+    @Operation(summary = &quot;Borrar una columna&quot;,
+            description = &quot;Solo el RESPONSABLE, y solo si esta vacia y no es la ultima del tablero.&quot;)
+    @ApiResponses({
+            @ApiResponse(responseCode = &quot;204&quot;, description = &quot;Columna borrada&quot;),
+            @ApiResponse(responseCode = &quot;409&quot;, description = &quot;La columna tiene tareas o es la ultima&quot;)
+    })
+    @PreAuthorize(&quot;@access.canManageColumn(#id)&quot;)
+    @DeleteMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;Void&gt; delete(@PathVariable Long id) {
+<span class="fc" id="L44">        boardService.deleteColumn(id);</span>
+<span class="fc" id="L45">        return ResponseEntity.noContent().build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -15,11 +15,14 @@ public record UserResponse(
         String fullName,
         @Schema(description = "Rol global del usuario") Role role,
         boolean enabled,
-        Instant createdAt
+        Instant createdAt,
+        @Schema(description = "URL de la foto de perfil; null si no tiene y se muestran las iniciales")
+        String avatarUrl
 ) {
 
     public static UserResponse from(User user) {
+        String avatarUrl = user.getAvatarStoredName() == null ? null : "/api/users/%d/avatar".formatted(user.getId());
         return new UserResponse(user.getId(), user.getEmail(), user.getFullName(),
-                user.getRole(), user.isEnabled(), user.getCreatedAt());
+                user.getRole(), user.isEnabled(), user.getCreatedAt(), avatarUrl);
     }
 }

@@ -7,15 +7,18 @@ import com.tfg.kanban.domain.model.Role;
 import com.tfg.kanban.domain.model.User;
 import com.tfg.kanban.domain.repository.UserRepository;
 import com.tfg.kanban.security.SecurityUtils;
+import com.tfg.kanban.storage.FileStorageService;
 import com.tfg.kanban.user.dto.UpdateGlobalRoleRequest;
 import com.tfg.kanban.user.dto.UpdateUserRequest;
 import com.tfg.kanban.user.dto.UserResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +27,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final FileStorageService fileStorageService;
 
     public PageResponse<UserResponse> search(String search, Pageable pageable) {
         String term = StringUtils.hasText(search) ? search.trim() : "";
@@ -101,6 +105,46 @@ public class UserService {
     @Transactional
     public void enable(Long id) {
         getUser(id).setEnabled(true);
+    }
+
+    /** Sustituye la foto de perfil, borrando la anterior si habia una. */
+    @Transactional
+    public UserResponse uploadAvatar(Long id, MultipartFile file) {
+        User user = getUser(id);
+        String storedName = fileStorageService.store(file);
+        String previous = user.getAvatarStoredName();
+        user.setAvatarStoredName(storedName);
+        user.setAvatarContentType(file.getContentType());
+        if (previous != null) {
+            fileStorageService.delete(previous);
+        }
+        return UserResponse.from(user);
+    }
+
+    /** Quita la foto de perfil; el usuario vuelve a mostrar sus iniciales. */
+    @Transactional
+    public void removeAvatar(Long id) {
+        User user = getUser(id);
+        String previous = user.getAvatarStoredName();
+        if (previous == null) {
+            return;
+        }
+        user.setAvatarStoredName(null);
+        user.setAvatarContentType(null);
+        fileStorageService.delete(previous);
+    }
+
+    public AvatarFile loadAvatar(Long id) {
+        User user = getUser(id);
+        if (user.getAvatarStoredName() == null) {
+            throw new ResourceNotFoundException("Este usuario no tiene foto de perfil");
+        }
+        Resource resource = fileStorageService.loadAsResource(user.getAvatarStoredName());
+        return new AvatarFile(resource, user.getAvatarContentType());
+    }
+
+    /** Contenido de la foto de perfil junto con su tipo MIME, en una sola lectura del usuario. */
+    public record AvatarFile(Resource resource, String contentType) {
     }
 
     private void ensureNotLastAdmin() {

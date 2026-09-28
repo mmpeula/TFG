@@ -234,25 +234,70 @@ export function useMemberMutations(teamId?: number) {
   }
 }
 
-/** Editar el propio perfil: nombre siempre, contrasena solo si se rellena. */
+/** Editar el propio perfil: nombre siempre, contraseña solo si se rellena. */
 export function useUserMutations(userId?: number) {
   const queryClient = useQueryClient()
   const { pushToast } = useUi()
   const onError = useOnError()
+
+  const onProfileChanged = () => {
+    // "auth","me" lleva el token como tercer trozo de la key: se invalida por
+    // prefijo para no tener que conocerlo aqui.
+    queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
+  }
+
+  // La URL de la foto no cambia al sustituirla (siempre /users/{id}/avatar), asi
+  // que sin esto el navegador seguiria mostrando la imagen cacheada de antes.
+  const onAvatarChanged = () => {
+    onProfileChanged()
+    queryClient.invalidateQueries({ queryKey: ['avatar-image'] })
+  }
 
   return {
     update: useMutation({
       mutationFn: (payload: { fullName: string; currentPassword?: string; password?: string }) =>
         users.update(userId!, payload),
       onSuccess: () => {
-        // "auth","me" lleva el token como tercer trozo de la key: se invalida por
-        // prefijo para no tener que conocerlo aqui.
-        queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
+        onProfileChanged()
         pushToast('Perfil actualizado')
       },
       onError,
     }),
+    changePassword: useMutation({
+      mutationFn: (payload: { currentPassword: string; password: string; fullName: string }) =>
+        users.update(userId!, payload),
+      onSuccess: () => {
+        onProfileChanged()
+        pushToast('Contraseña actualizada')
+      },
+      onError,
+    }),
+    uploadAvatar: useMutation({
+      mutationFn: (file: File) => users.uploadAvatar(userId!, file),
+      onSuccess: () => { onAvatarChanged(); pushToast('Foto de perfil actualizada') },
+      onError,
+    }),
+    removeAvatar: useMutation({
+      mutationFn: () => users.removeAvatar(userId!),
+      onSuccess: () => { onAvatarChanged(); pushToast('Foto de perfil eliminada') },
+      onError,
+    }),
   }
+}
+
+/**
+ * Foto de perfil de un usuario: se descarga con axios (para que lleve el token
+ * de sesion) y se cachea como URL temporal, asi no se vuelve a pedir mientras
+ * el avatar se repite en varios sitios de la misma pantalla.
+ */
+export function useAvatarImage(avatarUrl?: string | null) {
+  return useQuery({
+    queryKey: ['avatar-image', avatarUrl],
+    queryFn: () => users.avatarBlob(avatarUrl!),
+    enabled: !!avatarUrl,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
 }
 
 /**

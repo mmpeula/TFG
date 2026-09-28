@@ -6,18 +6,24 @@ import com.tfg.kanban.user.dto.UpdateUserRequest;
 import com.tfg.kanban.user.dto.UserResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/users")
@@ -73,6 +79,38 @@ public class UserController {
     @PatchMapping("/{id}/enable")
     public ResponseEntity<Void> enable(@PathVariable Long id) {
         userService.enable(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Subir la foto de perfil",
+            description = "Solo el propio usuario o el administrador. Peticion multipart/form-data con el "
+                    + "campo 'file'; sustituye la foto anterior si habia una.")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+            schema = @Schema(type = "object", requiredProperties = "file")))
+    @PreAuthorize("@access.isSelf(#id) or hasRole('ADMIN')")
+    @PostMapping(value = "/{id}/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public UserResponse uploadAvatar(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
+        return userService.uploadAvatar(id, file);
+    }
+
+    @Operation(summary = "Descargar la foto de perfil")
+    @PreAuthorize("@access.isSelf(#id) or hasRole('ADMIN')")
+    @GetMapping("/{id}/avatar")
+    public ResponseEntity<Resource> downloadAvatar(@PathVariable Long id) {
+        UserService.AvatarFile avatar = userService.loadAvatar(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE,
+                        avatar.contentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : avatar.contentType())
+                .body(avatar.resource());
+    }
+
+    @Operation(summary = "Quitar la foto de perfil",
+            description = "Solo el propio usuario o el administrador. Vuelve a mostrar las iniciales.")
+    @ApiResponses(@ApiResponse(responseCode = "204", description = "Foto eliminada"))
+    @PreAuthorize("@access.isSelf(#id) or hasRole('ADMIN')")
+    @DeleteMapping("/{id}/avatar")
+    public ResponseEntity<Void> removeAvatar(@PathVariable Long id) {
+        userService.removeAvatar(id);
         return ResponseEntity.noContent().build();
     }
 }

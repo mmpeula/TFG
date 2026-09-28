@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActivityService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.activity</a> &gt; <span class="el_source">ActivityService.java</span></div><h1>ActivityService.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.activity;
+
+import com.tfg.kanban.activity.dto.ActivityLogResponse;
+import com.tfg.kanban.common.PageResponse;
+import com.tfg.kanban.domain.model.ActivityAction;
+import com.tfg.kanban.domain.model.ActivityLog;
+import com.tfg.kanban.domain.model.Project;
+import com.tfg.kanban.domain.model.User;
+import com.tfg.kanban.domain.repository.ActivityLogRepository;
+import com.tfg.kanban.domain.repository.UserRepository;
+import com.tfg.kanban.security.SecurityUtils;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+
+/**
+ * Registro del historial de actividad.
+ *
+ * Cada operacion relevante del dominio (crear/editar/borrar/mover tareas, comentar,
+ * adjuntar ficheros, gestionar miembros...) llama a {@link #record}. El panel de
+ * estadisticas de fases posteriores se construira sobre esta tabla.
+ */
+@Service
+@RequiredArgsConstructor
+public class ActivityService {
+
+    private final ActivityLogRepository activityLogRepository;
+    private final UserRepository userRepository;
+
+    /** Guarda una entrada atribuida al usuario autenticado (o sin usuario si es un proceso automatico). */
+    @Transactional
+    public void record(Project project, ActivityAction action, String entityType, Long entityId, String details) {
+<span class="fc" id="L36">        User author = SecurityUtils.currentUserId()</span>
+<span class="fc" id="L37">                .flatMap(userRepository::findById)</span>
+<span class="fc" id="L38">                .orElse(null);</span>
+
+<span class="fc" id="L40">        activityLogRepository.save(ActivityLog.builder()</span>
+<span class="fc" id="L41">                .project(project)</span>
+<span class="fc" id="L42">                .user(author)</span>
+<span class="fc" id="L43">                .action(action)</span>
+<span class="fc" id="L44">                .entityType(entityType)</span>
+<span class="fc" id="L45">                .entityId(entityId)</span>
+<span class="fc" id="L46">                .details(truncate(details))</span>
+<span class="fc" id="L47">                .occurredAt(Instant.now())</span>
+<span class="fc" id="L48">                .build());</span>
+<span class="fc" id="L49">    }</span>
+
+    @Transactional(readOnly = true)
+    public PageResponse&lt;ActivityLogResponse&gt; findByProject(Long projectId, Pageable pageable) {
+<span class="fc" id="L53">        return PageResponse.of(</span>
+<span class="fc" id="L54">                activityLogRepository.findByProject_IdOrderByOccurredAtDesc(projectId, pageable),</span>
+                ActivityLogResponse::from);
+    }
+
+    private String truncate(String details) {
+<span class="fc bfc" id="L59" title="All 4 branches covered.">        if (details == null || details.length() &lt;= 1000) {</span>
+<span class="fc" id="L60">            return details;</span>
+        }
+<span class="fc" id="L62">        return details.substring(0, 997) + &quot;...&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

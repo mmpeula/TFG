@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkspaceAiController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.ai</a> &gt; <span class="el_source">WorkspaceAiController.java</span></div><h1>WorkspaceAiController.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.ai;
+
+import com.tfg.kanban.ai.dto.AiPlanResponse;
+import com.tfg.kanban.ai.dto.ChatRequest;
+import com.tfg.kanban.ai.dto.ChatResponse;
+import com.tfg.kanban.ai.dto.PlanOptions;
+import com.tfg.kanban.common.ApiError;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * Lo que la IA hace sobre un workspace.
+ *
+ * &lt;p&gt;Dos cosas distintas conviven aqui a proposito: &lt;b&gt;preguntar&lt;/b&gt;, que solo
+ * devuelve texto y nunca escribe, y &lt;b&gt;proponer tareas&lt;/b&gt;, que devuelve una
+ * propuesta que el usuario tiene que aceptar despues. El modelo no toca el
+ * tablero por su cuenta en ninguno de los dos casos.&lt;/p&gt;
+ */
+@RestController
+@RequestMapping(&quot;/api/workspaces/{workspaceId}/ai&quot;)
+@RequiredArgsConstructor
+@Tag(name = &quot;IA&quot;, description = &quot;Generar plan y asistente del workspace&quot;)
+public class WorkspaceAiController {
+
+    private final AssistantChatService assistantChatService;
+    private final AiPlanService aiPlanService;
+
+    @Operation(summary = &quot;Preguntar al asistente&quot;,
+            description = &quot;&quot;&quot;
+                    Responde en texto sobre el estado real del workspace: tareas, columnas,
+                    fechas, personas y comentarios. No modifica nada.
+                    &quot;&quot;&quot;)
+    @ApiResponses({
+            @ApiResponse(responseCode = &quot;200&quot;, description = &quot;Respuesta generada&quot;),
+            @ApiResponse(responseCode = &quot;403&quot;, description = &quot;No se pertenece a este workspace&quot;,
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = &quot;503&quot;, description = &quot;Groq no esta disponible&quot;,
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @PreAuthorize(&quot;@access.canReadProject(#workspaceId)&quot;)
+    @PostMapping(&quot;/chat&quot;)
+    public ChatResponse chat(@PathVariable Long workspaceId, @Valid @RequestBody ChatRequest request) {
+<span class="nc" id="L52">        return assistantChatService.answer(workspaceId, request);</span>
+    }
+
+    @Operation(summary = &quot;Proponer tareas a partir de una descripcion&quot;,
+            description = &quot;&quot;&quot;
+                    Convierte una descripcion escrita a mano en una propuesta de tareas
+                    repartidas. No crea nada: se aplican con
+                    POST /api/projects/{id}/ai-plan/apply.
+                    &quot;&quot;&quot;)
+    @PreAuthorize(&quot;@access.canManageProject(#workspaceId)&quot;)
+    @PostMapping(&quot;/plan&quot;)
+    public AiPlanResponse proposeFromText(@PathVariable Long workspaceId,
+                                          @Valid @RequestBody TextRequest request) {
+<span class="nc" id="L65">        return aiPlanService.generateFromText(workspaceId, request.text(), request.options());</span>
+    }
+
+    @Schema(description = &quot;Descripcion libre del trabajo, mas los ajustes de esta generacion&quot;, example = &quot;&quot;&quot;
+            {&quot;text&quot;:&quot;Tenemos que hacer una practica de bases de datos con modelo E/R y consultas SQL&quot;,
+             &quot;options&quot;:{&quot;startDate&quot;:&quot;2026-10-01&quot;,&quot;sprintDays&quot;:14}}
+            &quot;&quot;&quot;)
+<span class="fc" id="L72">    public record TextRequest(</span>
+            @NotBlank(message = &quot;escribe de que va el trabajo&quot;) String text,
+            @Valid PlanOptions options
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

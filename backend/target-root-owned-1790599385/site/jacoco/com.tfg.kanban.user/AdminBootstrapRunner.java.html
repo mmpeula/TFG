@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminBootstrapRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.user</a> &gt; <span class="el_source">AdminBootstrapRunner.java</span></div><h1>AdminBootstrapRunner.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.user;
+
+import com.tfg.kanban.domain.model.Role;
+import com.tfg.kanban.domain.model.User;
+import com.tfg.kanban.domain.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Deja siempre una cuenta ADMIN lista para entrar, porque ese rol no se puede
+ * pedir al registrarse (RF-01) ni conceder desde la aplicacion sin que ya
+ * exista un administrador antes: sin este arranque, nadie podria llegar nunca
+ * al primero.
+ *
+ * &lt;p&gt;Si ya hay algun ADMIN no hace nada. Si el correo configurado en
+ * {@link AdminProperties} pertenece a una cuenta existente, esa cuenta se
+ * asciende (y se reactiva si estaba deshabilitada) en vez de duplicarla.&lt;/p&gt;
+ */
+<span class="fc" id="L24">@Slf4j</span>
+@Component
+@RequiredArgsConstructor
+public class AdminBootstrapRunner implements ApplicationRunner {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final AdminProperties adminProperties;
+
+    @Override
+    @Transactional
+    public void run(ApplicationArguments args) {
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (userRepository.existsByRole(Role.ADMIN)) {</span>
+<span class="nc" id="L37">            return;</span>
+        }
+
+<span class="fc" id="L40">        String email = adminProperties.getEmail().trim().toLowerCase();</span>
+<span class="fc" id="L41">        User admin = userRepository.findByEmailIgnoreCase(email).orElseGet(() -&gt; User.builder()</span>
+<span class="fc" id="L42">                .email(email)</span>
+<span class="fc" id="L43">                .fullName(&quot;Administrador&quot;)</span>
+<span class="fc" id="L44">                .passwordHash(passwordEncoder.encode(adminProperties.getPassword()))</span>
+<span class="fc" id="L45">                .build());</span>
+
+<span class="fc" id="L47">        admin.setRole(Role.ADMIN);</span>
+<span class="fc" id="L48">        admin.setEnabled(true);</span>
+<span class="fc" id="L49">        userRepository.save(admin);</span>
+
+<span class="fc" id="L51">        log.info(&quot;Cuenta de administrador lista: {}&quot;, email);</span>
+<span class="fc" id="L52">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

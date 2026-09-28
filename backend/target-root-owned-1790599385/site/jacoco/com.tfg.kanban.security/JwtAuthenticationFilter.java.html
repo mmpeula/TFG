@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JwtAuthenticationFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">planifia-backend</a> &gt; <a href="index.source.html" class="el_package">com.tfg.kanban.security</a> &gt; <span class="el_source">JwtAuthenticationFilter.java</span></div><h1>JwtAuthenticationFilter.java</h1><pre class="source lang-java linenums">package com.tfg.kanban.security;
+
+import io.jsonwebtoken.Claims;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.lang.NonNull;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+/**
+ * Lee el token del cabecera {@code Authorization: Bearer &lt;token&gt;} y, si es valido,
+ * deja la autenticacion en el {@link SecurityContextHolder}.
+ *
+ * No corta la cadena si no hay token: de eso se encarga la configuracion de
+ * autorizacion de {@link SecurityConfig}.
+ */
+<span class="fc" id="L28">@Slf4j</span>
+@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final String BEARER_PREFIX = &quot;Bearer &quot;;
+
+    private final JwtService jwtService;
+
+    @Override
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain filterChain) throws ServletException, IOException {
+
+<span class="fc" id="L42">        String token = extractToken(request);</span>
+<span class="fc bfc" id="L43" title="All 4 branches covered.">        if (token != null &amp;&amp; SecurityContextHolder.getContext().getAuthentication() == null) {</span>
+<span class="fc" id="L44">            jwtService.parse(token).ifPresent(claims -&gt; authenticate(request, claims));</span>
+        }
+<span class="fc" id="L46">        filterChain.doFilter(request, response);</span>
+<span class="fc" id="L47">    }</span>
+
+    private void authenticate(HttpServletRequest request, Claims claims) {
+<span class="fc" id="L50">        String role = claims.get(JwtService.CLAIM_ROLE, String.class);</span>
+<span class="fc" id="L51">        Number userId = claims.get(JwtService.CLAIM_USER_ID, Number.class);</span>
+
+        // Firma valida pero sin rol o sin id no es una sesion utilizable: toda la
+        // autorizacion cuelga de esos dos claims. Se deja pasar sin autenticar, que
+        // acaba en 401, en lugar de montar un principal con &quot;ROLE_null&quot; y un id
+        // nulo que luego revienta en cualquier comprobacion de permisos.
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">        if (role == null || userId == null) {</span>
+<span class="nc" id="L58">            log.debug(&quot;Token JWT sin rol o sin id de usuario: se ignora&quot;);</span>
+<span class="nc" id="L59">            return;</span>
+        }
+
+<span class="fc" id="L62">        AppUserDetails principal =</span>
+<span class="fc" id="L63">                new AppUserDetails(userId.longValue(), claims.getSubject(), &quot;ROLE_&quot; + role);</span>
+<span class="fc" id="L64">        UsernamePasswordAuthenticationToken authentication =</span>
+<span class="fc" id="L65">                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());</span>
+<span class="fc" id="L66">        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));</span>
+<span class="fc" id="L67">        SecurityContextHolder.getContext().setAuthentication(authentication);</span>
+<span class="fc" id="L68">    }</span>
+
+    private String extractToken(HttpServletRequest request) {
+<span class="fc" id="L71">        String header = request.getHeader(HttpHeaders.AUTHORIZATION);</span>
+<span class="fc bfc" id="L72" title="All 4 branches covered.">        if (StringUtils.hasText(header) &amp;&amp; header.startsWith(BEARER_PREFIX)) {</span>
+<span class="fc" id="L73">            return header.substring(BEARER_PREFIX.length()).trim();</span>
+        }
+<span class="fc" id="L75">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
