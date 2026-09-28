@@ -22,6 +22,11 @@
 
 .hint { font-weight: 400; color: var(--color-neutral-500); }
 
+.coverEditor { display: flex; align-items: center; gap: var(--space-3); }
+.coverPreview { width: 56px; height: 56px; border-radius: var(--radius-md); object-fit: cover; flex: none; }
+.coverBadge { width: 56px; height: 56px; border-radius: var(--radius-md); flex: none; display: grid; place-items: center; font-size: 16px; font-weight: 800; color: var(--color-neutral-100); }
+.coverActions { display: flex; align-items: center; gap: var(--space-2); }
+
 /* Aviso de que el resto del formulario llega despues, solo al crear. */
 .createHint { font-size: 13px; line-height: 1.5; color: var(--color-neutral-600); margin: 0; }
 

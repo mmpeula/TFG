@@ -10,9 +10,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { ActivityFeed } from '@/components/home/ActivityFeed'
 import { Section } from './Section'
 import styles from './WorkspaceSettingsScreen.module.css'
-import {
-  useActivity, useBoardMutations, useProject, useProjectBoards, useWorkspace, useWorkspaceMutations,
-} from '@/hooks/useData'
+import { useActivity, useWorkspace, useWorkspaceMutations } from '@/hooks/useData'
 import { canManage } from '@/lib/roles'
 import { formatDate } from '@/lib/format'
 import { DEFAULT_SPRINT_DAYS } from '@/lib/sprints'
@@ -22,8 +20,8 @@ import { ROUTES } from '@/app/routes'
  * Ajustes del workspace: lo que se toca una vez y no se vuelve a mirar.
  *
  * Vive detras del engranaje y no en las pestanas a proposito: sacar de aqui el
- * guion, los tableros o el borrado a la navegacion principal solo anadiria ruido
- * al 99 % de las veces que se entra al workspace a mirar el tablero.
+ * borrado a la navegacion principal solo anadiria ruido al 99 % de las veces
+ * que se entra al workspace a mirar el tablero.
  */
 export function WorkspaceSettingsScreen() {
   const { workspaceId: param } = useParams()
@@ -31,11 +29,8 @@ export function WorkspaceSettingsScreen() {
   const navigate = useNavigate()
 
   const { data: workspace, isPending } = useWorkspace(workspaceId)
-  const { data: project } = useProject(workspaceId)
-  const { data: boards } = useProjectBoards(workspaceId)
   const { data: activity } = useActivity(workspaceId)
   const mutations = useWorkspaceMutations(workspaceId)
-  const boardMutations = useBoardMutations(boards?.[0]?.id, workspaceId)
 
   const [editOpen, setEditOpen] = useState(false)
 
@@ -87,44 +82,6 @@ export function WorkspaceSettingsScreen() {
               </div>
             </dl>
           </Section>
-
-          <Section title="Tableros" count={boards?.length}>
-            {boards?.length === 0 ? (
-              <EmptyState title="Sin tableros" body="Este workspace todavia no tiene ninguno." />
-            ) : (
-              <div className={styles.rows}>
-                {boards?.map((board) => (
-                  <div key={board.id} className={styles.row}>
-                    <div className={styles.rowText}>
-                      <div className={styles.rowName}>{board.name}</div>
-                      <div className={styles.rowMeta}>{board.description || 'Sin descripcion'}</div>
-                    </div>
-                    <Button variant="secondary" small onClick={() => navigate(ROUTES.tableroById(workspaceId))}>
-                      Abrir
-                    </Button>
-                    {manageable && boards.length > 1 && (
-                      <ConfirmDialog
-                        trigger={
-                          <Button variant="ghost" small aria-label="Borrar tablero">
-                            <Trash2 size={13} strokeWidth={2.75} />
-                          </Button>
-                        }
-                        title={`Borrar «${board.name}»`}
-                        description="Se borraran sus columnas y tareas."
-                        onConfirm={() => boardMutations.removeBoard.mutateAsync(board.id)}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Section>
-
-          {project?.briefing && (
-            <Section title="Enunciado guardado" subtitle="lo que se lee al generar el plan para proponer tareas">
-              <p className={styles.briefing}>{project.briefing}</p>
-            </Section>
-          )}
 
           <Section title="Actividad reciente">
             {activity && activity.content.length > 0 ? (

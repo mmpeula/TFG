@@ -17,7 +17,7 @@ import java.time.LocalDate;
          "color":"arena","icon":"BD","teamId":1,"boardId":9,"myRole":"RESPONSABLE",
          "totalTasks":8,"doneTasks":3,"pendingTasks":5,"progress":37,"memberCount":4,
          "startDate":"2026-10-01","deadline":"2026-12-15","sprintDays":14,
-         "lastActivityAt":"2026-09-02T18:04:00Z"}
+         "lastActivityAt":"2026-09-02T18:04:00Z","coverUrl":null}
         """)
 public record WorkspaceResponse(
         Long id,
@@ -39,6 +39,8 @@ public record WorkspaceResponse(
         @Schema(description = "Ultimo movimiento registrado en el workspace") Instant lastActivityAt,
         @Schema(description = "False si soporte lo tiene suspendido: sigue en la lista, pero no se "
                 + "puede abrir ni tocar nada suyo hasta que lo reactiven")
-        boolean enabled
+        boolean enabled,
+        @Schema(description = "URL de la foto del workspace; null si no tiene y se muestran color e icono")
+        String coverUrl
 ) {
 }

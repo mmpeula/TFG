@@ -93,8 +93,9 @@ public class UserController {
         return userService.uploadAvatar(id, file);
     }
 
-    @Operation(summary = "Descargar la foto de perfil")
-    @PreAuthorize("@access.isSelf(#id) or hasRole('ADMIN')")
+    @Operation(summary = "Descargar la foto de perfil",
+            description = "El propio usuario, el administrador, o cualquiera que comparta un equipo con el.")
+    @PreAuthorize("@access.isSelf(#id) or @access.sharesTeamWith(#id) or hasRole('ADMIN')")
     @GetMapping("/{id}/avatar")
     public ResponseEntity<Resource> downloadAvatar(@PathVariable Long id) {
         UserService.AvatarFile avatar = userService.loadAvatar(id);

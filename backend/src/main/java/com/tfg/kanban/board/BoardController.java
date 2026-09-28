@@ -38,15 +38,6 @@ public class BoardController {
         return boardService.findDetail(id);
     }
 
-    @Operation(summary = "Borrar un tablero", description = "Solo el RESPONSABLE. Arrastra columnas y tareas.")
-    @ApiResponses(@ApiResponse(responseCode = "204", description = "Tablero borrado"))
-    @PreAuthorize("@access.canManageBoard(#id)")
-    @DeleteMapping("/api/boards/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        boardService.delete(id);
-        return ResponseEntity.noContent().build();
-    }
-
     @Operation(summary = "Crear una columna", description = "Solo el RESPONSABLE. Se anade al final del tablero.")
     @ApiResponses(@ApiResponse(responseCode = "201", description = "Columna creada"))
     @PreAuthorize("@access.canManageBoard(#boardId)")

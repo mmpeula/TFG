@@ -291,4 +291,27 @@ class UserControllerIT extends AbstractApiIT {
                         .header(HttpHeaders.AUTHORIZATION, admin.bearer()))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    @DisplayName("Un companero de equipo ve la foto de perfil; alguien ajeno, no")
+    void avatarIsVisibleToTeammatesOnly() throws Exception {
+        TestUser owner = registerUser(Role.MIEMBRO);
+        TestUser teammate = registerUser(Role.MIEMBRO);
+        TestUser stranger = registerUser(Role.MIEMBRO);
+        Workspace workspace = createWorkspace(owner, "Equipo con foto");
+        addMember(owner, workspace.teamId(), teammate, Role.MIEMBRO);
+
+        MockMultipartFile foto = new MockMultipartFile("file", "foto.png", "image/png",
+                new byte[] {1, 2, 3, 4});
+        mockMvc.perform(multipart("/api/users/{id}/avatar", owner.id())
+                        .file(foto)
+                        .header(HttpHeaders.AUTHORIZATION, owner.bearer()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(authorized(get("/api/users/{id}/avatar", owner.id()), teammate))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(authorized(get("/api/users/{id}/avatar", owner.id()), stranger))
+                .andExpect(status().isForbidden());
+    }
 }

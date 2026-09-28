@@ -2,8 +2,9 @@ import type { ReactNode } from 'react'
 import { CheckCircle2, Clock, PauseCircle, Users } from 'lucide-react'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Tag } from '@/components/ui/Tag'
+import { WorkspaceBadge } from './WorkspaceBadge'
 import styles from './WorkspaceCard.module.css'
-import { colorOf, iconOf, lastActivityLabel } from '@/lib/workspace'
+import { colorOf, lastActivityLabel } from '@/lib/workspace'
 import type { WorkspaceResponse } from '@/types/api'
 
 /**
@@ -41,9 +42,7 @@ export function WorkspaceCard({
         <span className={styles.rail} style={{ background: color }} aria-hidden="true" />
 
         <div className={styles.head}>
-          <span className={styles.badge} style={{ background: color }} aria-hidden="true">
-            {iconOf(workspace)}
-          </span>
+          <WorkspaceBadge workspace={workspace} className={styles.badge} />
           <span className={styles.title}>{workspace.name}</span>
         </div>
 

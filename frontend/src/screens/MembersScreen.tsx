@@ -105,7 +105,7 @@ export function MembersScreen() {
                 return (
                   <li key={member.id} className={styles.member}>
                     <div className={styles.memberRow}>
-                      <Avatar user={member.user} size={34} />
+                      <Avatar user={member.user} avatarUrl={member.user.avatarUrl} size={34} />
                       <div className={styles.identity}>
                         <div className={styles.name}>
                           {member.user.fullName}
@@ -184,7 +184,7 @@ export function MembersScreen() {
                 {pendientes.map((invitacion) => (
                   <li key={invitacion.id} className={styles.member}>
                     <div className={styles.memberRow}>
-                      <Avatar user={invitacion.invited} size={34} />
+                      <Avatar user={invitacion.invited} avatarUrl={invitacion.invited.avatarUrl} size={34} />
                       <div className={styles.identity}>
                         <div className={styles.name}>{invitacion.invited.fullName}</div>
                         <div className={styles.mail}>{invitacion.invited.email}</div>

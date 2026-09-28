@@ -215,4 +215,17 @@ class AccessServiceTest {
         assertThat(accessService.isTeamMember(3L)).isFalse();
         assertThat(accessService.canManageTeam(3L)).isFalse();
     }
+
+    @Test
+    @DisplayName("sharesTeamWith es cierto entre companeros de equipo, falso con un desconocido o con uno mismo")
+    void sharesTeamWithChecksAnySharedTeam() {
+        when(teamMemberRepository.sharesTeam(1L, 2L)).thenReturn(true);
+        when(teamMemberRepository.sharesTeam(1L, 3L)).thenReturn(false);
+
+        assertThat(accessService.sharesTeamWith(2L)).isTrue();
+        assertThat(accessService.sharesTeamWith(3L)).isFalse();
+        // Uno mismo no necesita esta regla: isSelf ya lo cubre, y no hace falta
+        // gastar una consulta en comprobar que alguien comparte equipo consigo mismo.
+        assertThat(accessService.sharesTeamWith(1L)).isFalse();
+    }
 }

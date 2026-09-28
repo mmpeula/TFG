@@ -127,7 +127,9 @@ export function WorkspacesScreen() {
         onSubmit={async (payload) => {
           const workspace = await create.mutateAsync(payload)
           // Se entra directamente: crear y quedarse mirando la lista no sirve de nada.
+          // La foto (si se eligio una) sigue subiendose de fondo tras la navegacion.
           navigate(ROUTES.planById(workspace.id))
+          return workspace
         }}
       />
     </HomeShell>

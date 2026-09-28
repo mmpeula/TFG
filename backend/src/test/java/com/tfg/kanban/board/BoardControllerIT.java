@@ -99,33 +99,4 @@ class BoardControllerIT extends AbstractApiIT {
         mockMvc.perform(authorized(get("/api/projects/{id}/boards", projectId), ajeno))
                 .andExpect(status().isForbidden());
     }
-
-    @Test
-    @DisplayName("Solo el RESPONSABLE borra el tablero, y se lleva columnas y tareas")
-    void onlyResponsableDeletesBoard() throws Exception {
-        TestUser responsable = registerUser(Role.MIEMBRO);
-        TestUser miembro = registerUser(Role.MIEMBRO);
-        Workspace workspace = createWorkspace(responsable, "Equipo borrado");
-        Long teamId = workspace.teamId();
-        addMember(responsable, teamId, miembro, Role.MIEMBRO);
-        Long projectId = workspace.id();
-        Long boardId = workspace.boardId();
-        long[] columns = columnIds(responsable, boardId);
-        Long taskId = createTask(miembro, columns[0], "Tarea que se va con el tablero");
-
-        mockMvc.perform(authorized(delete("/api/boards/{id}", boardId), miembro))
-                .andExpect(status().isForbidden());
-
-        mockMvc.perform(authorized(delete("/api/boards/{id}", boardId), responsable))
-                .andExpect(status().isNoContent());
-
-        mockMvc.perform(authorized(get("/api/boards/{id}", boardId), responsable))
-                .andExpect(status().isForbidden());
-        // La tarea desaparece con el tablero (cascada), no queda huerfana.
-        mockMvc.perform(authorized(get("/api/tasks/{id}", taskId), responsable))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(authorized(get("/api/projects/{id}/boards", projectId), responsable))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
-    }
 }

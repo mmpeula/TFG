@@ -141,7 +141,9 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
               <span className={styles.propValue}>
                 {task.assignees.length === 0
                   ? <Avatar size={20} />
-                  : task.assignees.map((assignee) => <Avatar key={assignee.id} user={assignee} size={20} />)}
+                  : task.assignees.map((assignee) => (
+                      <Avatar key={assignee.id} user={assignee} avatarUrl={assignee.avatarUrl} size={20} />
+                    ))}
                 {task.assignees.length === 0
                   ? 'Sin asignar'
                   : task.assignees.map((assignee) => assignee.fullName).join(', ')}
@@ -277,7 +279,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
               {comments?.content.length === 0 && <p className={styles.hint}>Todavia no hay comentarios.</p>}
               {comments?.content.map((item) => (
                 <div key={item.id} className={styles.comment}>
-                  <Avatar user={item.author} size={26} />
+                  <Avatar user={item.author} avatarUrl={item.author.avatarUrl} size={26} />
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <p className={styles.commentBody}>
                       <strong>{item.author.fullName}</strong> {item.content}

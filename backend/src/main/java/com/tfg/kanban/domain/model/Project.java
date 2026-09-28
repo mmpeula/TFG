@@ -78,6 +78,13 @@ public class Project extends Auditable {
     @Column(name = "ICON", length = 8)
     private String icon;
 
+    /** Nombre con el que se guarda la foto de portada en el almacenamiento de ficheros; null si no tiene. */
+    @Column(name = "COVER_STORED_NAME", length = 255)
+    private String coverStoredName;
+
+    @Column(name = "COVER_CONTENT_TYPE", length = 100)
+    private String coverContentType;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "STATUS", nullable = false, length = 20)
     @Builder.Default

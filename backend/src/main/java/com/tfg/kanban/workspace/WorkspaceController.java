@@ -12,9 +12,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -81,5 +86,38 @@ public class WorkspaceController {
     @DeleteMapping("/{workspaceId}")
     public void delete(@PathVariable Long workspaceId) {
         workspaceService.delete(workspaceId);
+    }
+
+    @Operation(summary = "Subir la foto del workspace",
+            description = "Solo el RESPONSABLE. Peticion multipart/form-data con el campo 'file'; "
+                    + "sustituye la foto anterior si habia una.")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+            schema = @Schema(type = "object", requiredProperties = "file")))
+    @PreAuthorize("@access.canManageProject(#workspaceId)")
+    @PostMapping(value = "/{workspaceId}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public WorkspaceResponse uploadPhoto(@PathVariable Long workspaceId, @RequestPart("file") MultipartFile file) {
+        return workspaceService.uploadCover(workspaceId, file);
+    }
+
+    @Operation(summary = "Descargar la foto del workspace",
+            description = "Cualquier miembro del equipo puede verla.")
+    @PreAuthorize("@access.canReadProject(#workspaceId)")
+    @GetMapping("/{workspaceId}/photo")
+    public ResponseEntity<Resource> downloadPhoto(@PathVariable Long workspaceId) {
+        WorkspaceService.CoverFile cover = workspaceService.loadCover(workspaceId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE,
+                        cover.contentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : cover.contentType())
+                .body(cover.resource());
+    }
+
+    @Operation(summary = "Quitar la foto del workspace",
+            description = "Solo el RESPONSABLE. Vuelve a mostrarse con su color e icono.")
+    @ApiResponses(@ApiResponse(responseCode = "204", description = "Foto eliminada"))
+    @PreAuthorize("@access.canManageProject(#workspaceId)")
+    @DeleteMapping("/{workspaceId}/photo")
+    public ResponseEntity<Void> removePhoto(@PathVariable Long workspaceId) {
+        workspaceService.removeCover(workspaceId);
+        return ResponseEntity.noContent().build();
     }
 }

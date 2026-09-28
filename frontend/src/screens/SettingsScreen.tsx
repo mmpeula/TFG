@@ -4,6 +4,7 @@ import { HomeShell } from '@/components/shell/HomeShell'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Tag } from '@/components/ui/Tag'
 import { Section } from './Section'
 import styles from './SettingsScreen.module.css'
@@ -255,8 +256,7 @@ function ChangePasswordForm({ user, onClose }: { user: UserResponse; onClose: ()
       <div className={styles.form}>
         <label className={styles.label}>
           Contraseña actual
-          <input
-            type="password"
+          <PasswordInput
             autoComplete="current-password"
             className={styles.control}
             value={currentPassword}
@@ -271,8 +271,7 @@ function ChangePasswordForm({ user, onClose }: { user: UserResponse; onClose: ()
 
         <label className={styles.label}>
           Nueva contraseña
-          <input
-            type="password"
+          <PasswordInput
             autoComplete="new-password"
             className={styles.control}
             value={password}
@@ -285,8 +284,7 @@ function ChangePasswordForm({ user, onClose }: { user: UserResponse; onClose: ()
 
         <label className={styles.label}>
           Repite la nueva contraseña
-          <input
-            type="password"
+          <PasswordInput
             autoComplete="new-password"
             className={styles.control}
             value={confirmPassword}

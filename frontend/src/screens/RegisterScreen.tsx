@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { Loader2, Waves } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Segmented } from '@/components/ui/Controls'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 import styles from './Auth.module.css'
 import { auth } from '@/api/endpoints'
 import { toErrorMessage } from '@/lib/api-client'
@@ -95,8 +96,8 @@ export function RegisterScreen() {
 
             <div>
               <label className={styles.label} htmlFor="password">Contraseña</label>
-              <input
-                id="password" type="password" autoComplete="new-password" required minLength={8}
+              <PasswordInput
+                id="password" autoComplete="new-password" required minLength={8}
                 className={styles.control}
                 value={password} onChange={(event) => setPassword(event.target.value)}
               />
@@ -105,8 +106,8 @@ export function RegisterScreen() {
 
             <div>
               <label className={styles.label} htmlFor="confirmPassword">Repite la contraseña</label>
-              <input
-                id="confirmPassword" type="password" autoComplete="new-password" required minLength={8}
+              <PasswordInput
+                id="confirmPassword" autoComplete="new-password" required minLength={8}
                 className={styles.control}
                 value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)}
                 aria-invalid={passwordsMismatch}

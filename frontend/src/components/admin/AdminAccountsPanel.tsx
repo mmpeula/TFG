@@ -102,7 +102,7 @@ export function AdminAccountsPanel() {
                   .filter(Boolean)
                   .join(' ')}
               >
-                <Avatar user={person} size={30} />
+                <Avatar user={person} avatarUrl={person.avatarUrl} size={30} />
 
                 <span className={styles.cellName}>
                   {person.fullName}

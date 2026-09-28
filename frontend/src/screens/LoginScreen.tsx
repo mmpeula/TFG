@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { Loader2, Waves } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 import styles from './Auth.module.css'
 import { auth } from '@/api/endpoints'
 import { toErrorMessage } from '@/lib/api-client'
@@ -56,8 +57,8 @@ export function LoginScreen() {
 
             <div>
               <label className={styles.label} htmlFor="password">Contraseña</label>
-              <input
-                id="password" type="password" autoComplete="current-password" required className={styles.control}
+              <PasswordInput
+                id="password" autoComplete="current-password" required className={styles.control}
                 value={password} onChange={(event) => setPassword(event.target.value)}
               />
             </div>

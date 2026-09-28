@@ -144,4 +144,16 @@ public class AccessService {
     public boolean isSelf(Long userId) {
         return SecurityUtils.currentUserId().filter(userId::equals).isPresent();
     }
+
+    /**
+     * Coincidir en un equipo (en cualquiera, con cualquier rol) es lo que hace
+     * falta para ver la foto de perfil de otra persona: no mas que lo que ya se
+     * ve de ella en la lista de miembros, los comentarios o las tareas asignadas.
+     */
+    public boolean sharesTeamWith(Long otherUserId) {
+        return SecurityUtils.currentUserId()
+                .filter(userId -> !userId.equals(otherUserId))
+                .map(userId -> teamMemberRepository.sharesTeam(userId, otherUserId))
+                .orElse(false);
+    }
 }

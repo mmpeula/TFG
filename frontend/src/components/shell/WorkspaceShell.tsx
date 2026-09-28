@@ -5,13 +5,13 @@ import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Tooltip } from '@/components/ui/Controls'
 import { Assistant } from '@/components/assistant/Assistant'
+import { WorkspaceBadge } from '@/components/workspace/WorkspaceBadge'
 import { ShortcutsDialog } from './ShortcutsDialog'
 import { useShortcuts } from '@/hooks/useShortcuts'
 import styles from './WorkspaceShell.module.css'
 import { ROUTES } from '@/app/routes'
 import { useAuth } from '@/state/context'
 import { useWorkspaces } from '@/hooks/useData'
-import { colorOf, iconOf } from '@/lib/workspace'
 import { canManage } from '@/lib/roles'
 import type { WorkspaceResponse } from '@/types/api'
 
@@ -82,11 +82,7 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
             {isTeacher ? 'Panel docente' : 'Mis espacios de trabajo'}
           </button>
           <h1 className={styles.name}>
-            {workspace && (
-              <span className={styles.badge} style={{ background: colorOf(workspace) }} aria-hidden="true">
-                {iconOf(workspace)}
-              </span>
-            )}
+            {workspace && <WorkspaceBadge workspace={workspace} className={styles.badge} />}
             {workspace?.name ?? 'Workspace'}
           </h1>
         </div>

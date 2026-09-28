@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 
 /**
  * El tablero de cada workspace y sus columnas. El tablero nace con su workspace
- * (ver {@link DefaultBoard}); aqui se lee, se borra y se editan sus columnas.
+ * (ver {@link DefaultBoard}); aqui se lee y se editan sus columnas.
  */
 @Service
 @RequiredArgsConstructor
@@ -57,14 +57,6 @@ public class BoardService {
                 .toList();
 
         return BoardResponse.detail(board, roleInBoard(board), columnResponses);
-    }
-
-    @Transactional
-    public void delete(Long boardId) {
-        Board board = getBoard(boardId);
-        activityService.record(board.getProject(), ActivityAction.BORRADO, "Board", board.getId(),
-                "Borro el tablero '%s'".formatted(board.getName()));
-        boardRepository.delete(board);
     }
 
     @Transactional

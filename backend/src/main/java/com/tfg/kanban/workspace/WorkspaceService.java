@@ -9,13 +9,16 @@ import com.tfg.kanban.domain.model.*;
 import com.tfg.kanban.domain.repository.*;
 import com.tfg.kanban.domain.spec.ProjectSpecifications;
 import com.tfg.kanban.security.SecurityUtils;
+import com.tfg.kanban.storage.FileStorageService;
 import com.tfg.kanban.workspace.dto.CreateWorkspaceRequest;
 import com.tfg.kanban.workspace.dto.UpdateWorkspaceRequest;
 import com.tfg.kanban.workspace.dto.WorkspaceResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.*;
@@ -43,6 +46,7 @@ public class WorkspaceService {
     private final ActivityLogRepository activityLogRepository;
     private final UserRepository userRepository;
     private final ActivityService activityService;
+    private final FileStorageService fileStorageService;
 
     /**
      * Todos los workspaces del usuario, con los numeros que se ven en la tarjeta.
@@ -232,6 +236,8 @@ public class WorkspaceService {
 
         Instant last = lastActivity != null ? lastActivity
                 : project.getUpdatedAt() != null ? project.getUpdatedAt() : project.getCreatedAt();
+        String coverUrl = project.getCoverStoredName() == null ? null
+                : "/api/workspaces/%d/photo".formatted(project.getId());
 
         return new WorkspaceResponse(
                 project.getId(), project.getName(), project.getDescription(),
@@ -240,7 +246,47 @@ public class WorkspaceService {
                 total, done, total - done,
                 total == 0 ? 0 : Math.round(done * 100f / total),
                 memberCount, project.getStartDate(), project.getDeadline(), project.getSprintDays(), last,
-                project.isEnabled());
+                project.isEnabled(), coverUrl);
+    }
+
+    /** Sustituye la foto del workspace, borrando la anterior si habia una. */
+    @Transactional
+    public WorkspaceResponse uploadCover(Long workspaceId, MultipartFile file) {
+        Project project = getProject(workspaceId);
+        String storedName = fileStorageService.store(file);
+        String previous = project.getCoverStoredName();
+        project.setCoverStoredName(storedName);
+        project.setCoverContentType(file.getContentType());
+        if (previous != null) {
+            fileStorageService.delete(previous);
+        }
+        return findById(workspaceId);
+    }
+
+    /** Quita la foto del workspace; vuelve a mostrarse con su color e icono. */
+    @Transactional
+    public void removeCover(Long workspaceId) {
+        Project project = getProject(workspaceId);
+        String previous = project.getCoverStoredName();
+        if (previous == null) {
+            return;
+        }
+        project.setCoverStoredName(null);
+        project.setCoverContentType(null);
+        fileStorageService.delete(previous);
+    }
+
+    public CoverFile loadCover(Long workspaceId) {
+        Project project = getProject(workspaceId);
+        if (project.getCoverStoredName() == null) {
+            throw new ResourceNotFoundException("Este workspace no tiene foto");
+        }
+        Resource resource = fileStorageService.loadAsResource(project.getCoverStoredName());
+        return new CoverFile(resource, project.getCoverContentType());
+    }
+
+    /** Contenido de la foto del workspace junto con su tipo MIME, en una sola lectura del proyecto. */
+    public record CoverFile(Resource resource, String contentType) {
     }
 
     public Project getProject(Long workspaceId) {

@@ -40,7 +40,7 @@ export function AssigneePicker({ members, selected, onChange, align = 'left', cl
           <span className={styles.avatars}>
             {selected.length === 0
               ? <Avatar size={20} />
-              : selected.map((user) => <Avatar key={user.id} user={user} size={20} />)}
+              : selected.map((user) => <Avatar key={user.id} user={user} avatarUrl={user.avatarUrl} size={20} />)}
           </span>
           {selected.length === 0 ? 'Sin asignar' : selected.map((user) => user.fullName).join(', ')}
         </button>
@@ -57,7 +57,7 @@ export function AssigneePicker({ members, selected, onChange, align = 'left', cl
               active={selectedIds.includes(member.user.id)}
               onClick={() => toggle(member.user.id)}
             >
-              <Avatar user={member.user} size={20} />
+              <Avatar user={member.user} avatarUrl={member.user.avatarUrl} size={20} />
               {member.user.fullName}
             </DropdownItem>
           ))}

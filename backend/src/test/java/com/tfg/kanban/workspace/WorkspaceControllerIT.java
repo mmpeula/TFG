@@ -4,11 +4,12 @@ import com.tfg.kanban.AbstractApiIT;
 import com.tfg.kanban.domain.model.Role;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * El workspace es la fachada que ve el estudiante. Lo que se fija aqui es que
@@ -201,6 +202,64 @@ class WorkspaceControllerIT extends AbstractApiIT {
         mockMvc.perform(authorized(get("/api/workspaces/{id}", workspaceId), user))
                 .andExpect(status().isForbidden());
         mockMvc.perform(authorized(get("/api/boards/{id}", boardId), user))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Subir, ver y quitar la foto del workspace")
+    void photoLifecycle() throws Exception {
+        TestUser user = registerUser(Role.MIEMBRO);
+        Long workspaceId = createWorkspace(user, "Con foto").id();
+        MockMultipartFile foto = new MockMultipartFile("file", "foto.png", "image/png",
+                new byte[] {1, 2, 3, 4});
+
+        mockMvc.perform(authorized(get("/api/workspaces/{id}", workspaceId), user))
+                .andExpect(jsonPath("$.coverUrl").doesNotExist());
+
+        mockMvc.perform(multipart("/api/workspaces/{id}/photo", workspaceId)
+                        .file(foto)
+                        .header(HttpHeaders.AUTHORIZATION, user.bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverUrl").value("/api/workspaces/" + workspaceId + "/photo"));
+
+        mockMvc.perform(authorized(get("/api/workspaces/{id}/photo", workspaceId), user))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/png"))
+                .andExpect(content().bytes(new byte[] {1, 2, 3, 4}));
+
+        mockMvc.perform(authorized(delete("/api/workspaces/{id}/photo", workspaceId), user))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(authorized(get("/api/workspaces/{id}", workspaceId), user))
+                .andExpect(jsonPath("$.coverUrl").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Un MIEMBRO ve la foto pero solo el RESPONSABLE la sube o la quita; un extrano no ve nada")
+    void photoPermissions() throws Exception {
+        TestUser owner = registerUser(Role.MIEMBRO);
+        TestUser member = registerUser(Role.MIEMBRO);
+        TestUser stranger = registerUser(Role.MIEMBRO);
+        Long workspaceId = createWorkspace(owner, "Con permisos").id();
+        var detail = mockMvc.perform(authorized(get("/api/workspaces/{id}", workspaceId), owner)).andReturn();
+        addMember(owner, json(detail).get("teamId").asLong(), member, Role.MIEMBRO);
+
+        MockMultipartFile foto = new MockMultipartFile("file", "foto.png", "image/png",
+                new byte[] {1, 2, 3, 4});
+
+        mockMvc.perform(multipart("/api/workspaces/{id}/photo", workspaceId)
+                        .file(foto)
+                        .header(HttpHeaders.AUTHORIZATION, member.bearer()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(multipart("/api/workspaces/{id}/photo", workspaceId)
+                        .file(foto)
+                        .header(HttpHeaders.AUTHORIZATION, owner.bearer()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(authorized(get("/api/workspaces/{id}/photo", workspaceId), member))
+                .andExpect(status().isOk());
+        mockMvc.perform(authorized(get("/api/workspaces/{id}/photo", workspaceId), stranger))
                 .andExpect(status().isForbidden());
     }
 }

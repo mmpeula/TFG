@@ -103,4 +103,12 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
             where t.id = :taskId and m.user.id = :userId and p.enabled = true
             """)
     Optional<Role> findRoleByTask(Long taskId, Long userId);
+
+    /** Si dos personas coinciden en algun equipo, sin importar en cual ni su rol. */
+    @Query("""
+            select case when count(m1) > 0 then true else false end
+            from TeamMember m1, TeamMember m2
+            where m1.team = m2.team and m1.user.id = :userIdA and m2.user.id = :userIdB
+            """)
+    boolean sharesTeam(Long userIdA, Long userIdB);
 }

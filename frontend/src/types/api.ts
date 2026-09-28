@@ -35,7 +35,7 @@ export type ActivityAction =
   | 'CREACION' | 'ACTUALIZACION' | 'BORRADO' | 'MOVIMIENTO'
   | 'ASIGNACION' | 'COMENTARIO' | 'GENERACION_IA'
 
-export interface UserSummary { id: number; fullName: string; email: string }
+export interface UserSummary { id: number; fullName: string; email: string; avatarUrl: string | null }
 
 export interface UserResponse {
   id: number
@@ -308,6 +308,8 @@ export interface WorkspaceResponse {
   lastActivityAt?: string
   /** False si soporte lo tiene suspendido: sigue en la lista, pero no se puede abrir. */
   enabled: boolean
+  /** URL de la foto del workspace; null si no tiene y se muestran color e icono. */
+  coverUrl: string | null
 }
 
 export interface ChatTurn {

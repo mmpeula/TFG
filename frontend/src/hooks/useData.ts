@@ -102,7 +102,41 @@ export function useWorkspaceMutations(workspaceId?: number) {
       onSuccess: () => { invalidate(); pushToast('Workspace borrado') },
       onError,
     }),
+    uploadPhoto: useMutation({
+      // Admite un id explicito porque, al crear, el workspace no lo tiene
+      // todavia cuando se monta este hook: solo existe tras el alta.
+      mutationFn: ({ file, targetId }: { file: File; targetId?: number }) =>
+        workspaces.uploadPhoto(targetId ?? workspaceId!, file),
+      onSuccess: () => {
+        invalidate()
+        // La URL de la foto no cambia al sustituirla (siempre la misma ruta), asi
+        // que sin esto el navegador seguiria mostrando la imagen cacheada de antes.
+        queryClient.invalidateQueries({ queryKey: ['workspace-cover'] })
+        pushToast('Foto del workspace actualizada')
+      },
+      onError,
+    }),
+    removePhoto: useMutation({
+      mutationFn: (targetId?: number) => workspaces.removePhoto(targetId ?? workspaceId!),
+      onSuccess: () => {
+        invalidate()
+        queryClient.invalidateQueries({ queryKey: ['workspace-cover'] })
+        pushToast('Foto del workspace eliminada')
+      },
+      onError,
+    }),
   }
+}
+
+/** Foto de un workspace: se descarga con axios (para que lleve el token) y se cachea como URL temporal. */
+export function useWorkspaceCoverImage(coverUrl?: string | null) {
+  return useQuery({
+    queryKey: ['workspace-cover', coverUrl],
+    queryFn: () => workspaces.photoBlob(coverUrl!),
+    enabled: !!coverUrl,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
 }
 
 /**
@@ -351,11 +385,6 @@ export function useBoardMutations(boardId?: number, projectId?: number) {
   }
 
   return {
-    removeBoard: useMutation({
-      mutationFn: (id: number) => boards.remove(id),
-      onSuccess: () => { invalidate(); pushToast('Tablero borrado') },
-      onError,
-    }),
     createColumn: useMutation({
       mutationFn: (payload: { name: string; wipLimit?: number | null }) => boards.createColumn(boardId!, payload),
       onSuccess: () => { invalidate(); pushToast('Columna creada') },

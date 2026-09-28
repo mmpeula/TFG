@@ -63,6 +63,22 @@ export const workspaces = {
         timeout: PLAN_TIMEOUT,
       })
       .then((r) => r.data),
+
+  uploadPhoto: (workspaceId: number, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiClient
+      .post<WorkspaceResponse>(`/workspaces/${workspaceId}/photo`, form, {
+        headers: { 'Content-Type': undefined },
+      })
+      .then((r) => r.data)
+  },
+  removePhoto: (workspaceId: number) => apiClient.delete<void>(`/workspaces/${workspaceId}/photo`),
+  /** La foto pasa por axios para que lleve el token; se entrega como URL temporal. */
+  photoBlob: async (coverUrl: string) => {
+    const response = await apiClient.get<Blob>(coverUrl.replace(/^\/api/, ''), { responseType: 'blob' })
+    return URL.createObjectURL(response.data)
+  },
 }
 
 /**
@@ -174,7 +190,6 @@ export const boards = {
   byProject: (projectId: number) =>
     apiClient.get<BoardResponse[]>(`/projects/${projectId}/boards`).then((r) => r.data),
   get: (boardId: number) => apiClient.get<BoardResponse>(`/boards/${boardId}`).then((r) => r.data),
-  remove: (boardId: number) => apiClient.delete(`/boards/${boardId}`).then(() => undefined),
   createColumn: (boardId: number, payload: { name: string; wipLimit?: number | null }) =>
     apiClient.post<ColumnResponse>(`/boards/${boardId}/columns`, payload).then((r) => r.data),
   updateColumn: (columnId: number, payload: { name: string; wipLimit?: number | null }) =>
