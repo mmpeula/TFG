@@ -43,7 +43,7 @@ export function WorkspaceSettingsScreen() {
       ) : (
         <div className={styles.layout}>
           <Section
-            title="Datos del workspace"
+            title="Datos del espacio de trabajo"
             action={
               manageable && (
                 <Button small variant="secondary" onClick={() => setEditOpen(true)}>
@@ -97,7 +97,7 @@ export function WorkspaceSettingsScreen() {
                 trigger={
                   <Button variant="secondary" small>
                     <Trash2 size={13} strokeWidth={2.75} />
-                    Borrar este workspace
+                    Borrar este espacio de trabajo
                   </Button>
                 }
                 title={`Borrar «${workspace.name}»`}

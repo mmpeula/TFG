@@ -8,8 +8,8 @@ import type {
 } from '@/types/api'
 
 /**
- * Generar un plan puede costar varias llamadas a Groq: si el primero no
- * pasa la validacion, se le devuelve para que lo corrija hasta dos veces.
+ * El plan completo de todos los sprints sale de una sola respuesta de DeepSeek,
+ * que con un documento largo puede tardar unos minutos.
  */
 const PLAN_TIMEOUT = 600_000
 
@@ -47,10 +47,14 @@ export const workspaces = {
   remove: (workspaceId: number) =>
     apiClient.delete(`/workspaces/${workspaceId}`).then(() => undefined),
 
-  /** Pregunta en texto libre sobre el workspace. Nunca escribe en el tablero. */
-  ask: (workspaceId: number, message: string, history: ChatTurn[]) =>
+  /**
+   * Pregunta en texto libre sobre el espacio de trabajo. Nunca escribe en el
+   * tablero. `taskId` es la tarea abierta en el panel, si la hay: el asistente
+   * entra en detalle sobre ella sin que haga falta repetirsela.
+   */
+  ask: (workspaceId: number, message: string, history: ChatTurn[], taskId?: number | null) =>
     apiClient
-      .post<ChatResponse>(`/workspaces/${workspaceId}/ai/chat`, { message, history }, {
+      .post<ChatResponse>(`/workspaces/${workspaceId}/ai/chat`, { message, history, taskId }, {
         // Generar un plan tarda; el resto de llamadas no deberian esperar tanto.
         timeout: 240000,
       })
@@ -150,7 +154,7 @@ export const projects = {
     apiClient
       .get<PageResponse<ActivityLogResponse>>(`/projects/${projectId}/activity`, { params: { size: 30 } })
       .then((r) => r.data),
-  /** Pide a Groq un plan a partir del guion guardado. No toca el tablero. */
+  /** Pide a DeepSeek un plan a partir del guion guardado. No toca el tablero. */
   aiPlan: (projectId: number, options: PlanOptions) =>
     apiClient
       .post<AiPlanResponse>(`/projects/${projectId}/ai-plan`, options, { timeout: PLAN_TIMEOUT })
@@ -174,7 +178,7 @@ export const projects = {
     apiClient
       .post<TaskResponse[]>(`/projects/${projectId}/ai-plan/apply`, { boardId, tasks })
       .then((r) => r.data),
-  /** Busca una fecha de inicio en el documento sin generar nada: no llama a Groq. */
+  /** Busca una fecha de inicio en el documento sin generar nada: no llama a DeepSeek. */
   detectStartDate: (projectId: number, file: File) => {
     const form = new FormData()
     form.append('file', file)
@@ -204,6 +208,7 @@ export interface TaskPayload {
   priority?: TaskPriority
   dueDate?: string | null
   estimatedHours?: number | null
+  actualHours?: number | null
   assigneeIds?: number[]
 }
 

@@ -14,7 +14,7 @@ import { formatDate } from '@/lib/format'
 export function PrivacyNote() {
   return (
     <p className={styles.privacy}>
-      El enunciado, el equipo y las tareas se envian a Groq para generar el plan. Nada se escribe en
+      El enunciado, el equipo y las tareas se envian a DeepSeek para generar el plan. Nada se escribe en
       el tablero sin que lo confirmes.
     </p>
   )
@@ -180,7 +180,7 @@ export function AiWorkbench({
           <p className={styles.autoNote}>
             <CalendarDays size={13} strokeWidth={2.5} />
             Calendario automatico: de {formatDate(workspaceStartDate)} a {formatDate(workspaceDeadline)}, con
-            la duracion de sprint del workspace.
+            la duracion de sprint del espacio de trabajo.
             <button type="button" className={styles.autoChange} onClick={onGoToSettings}>
               Cambiar en Ajustes
             </button>
@@ -261,7 +261,6 @@ function TeamEditor({
         <div className={styles.teamHead} aria-hidden="true">
           <span>Persona</span>
           <span>Preferencias y restricciones</span>
-          <span>h/semana</span>
           <span />
         </div>
       )}
@@ -276,7 +275,7 @@ function TeamEditor({
               <input
                 className={styles.input}
                 value={person.preferences}
-                placeholder="Prefiere backend; vacaciones la semana 3…"
+                placeholder="Prefiere backend; menos horas esta vez; vacaciones la semana 3…"
                 aria-label={`Preferencias de ${person.name}`}
                 maxLength={600}
                 onChange={(event) => cambiar(person.userId, { preferences: event.target.value })}
@@ -294,17 +293,6 @@ function TeamEditor({
                 </button>
               )}
             </div>
-            <input
-              type="number"
-              min={0}
-              max={60}
-              className={styles.input}
-              value={person.hoursPerWeek}
-              aria-label={`Horas por semana de ${person.name}`}
-              onChange={(event) =>
-                cambiar(person.userId, { hoursPerWeek: Math.max(0, Math.min(60, Number(event.target.value) || 0)) })
-              }
-            />
             <button
               type="button"
               className={styles.teamRemove}
@@ -334,19 +322,18 @@ function TeamEditor({
       )}
 
       <span className={styles.optional}>
-        Las horas por semana son solo para este reparto: con ellas se calcula cuanto le cabe en
-        cada sprint. Las preferencias son la ficha de cada persona —el rol incluido, si hace
-        falta decirlo— : pulsa <Check size={11} strokeWidth={2.75} /> para guardarlas y que
-        valgan tambien en los proximos planes.
+        Las preferencias son la ficha de cada persona —el rol incluido, y si tiene menos o mas
+        tiempo que de costumbre esta vez—: pulsa <Check size={11} strokeWidth={2.75} /> para
+        guardarlas y que valgan tambien en los proximos planes.
       </span>
     </div>
   )
 }
 
 /**
- * Reparto resultante: cuantas tareas y horas le tocan a cada persona, contra las
- * horas de las que dispone. La barra es cuanto de su tiempo ocupa, no cuanto
- * lleva frente a los demas: quien tiene la mitad de horas debe llevar la mitad.
+ * Reparto resultante: cuantas tareas y horas le tocan a cada persona. La barra
+ * es relativa a quien mas horas lleva del propio equipo, no contra una
+ * capacidad fija: no hay horas por semana con las que compararla.
  */
 export function WorkloadSummary({ workload }: { workload: MemberWorkload[] }) {
   if (workload.length === 0) return null
@@ -354,22 +341,21 @@ export function WorkloadSummary({ workload }: { workload: MemberWorkload[] }) {
   // dejar una barra vacia sin explicacion.
   const sinTareas = workload.filter((item) => item.tasks === 0).length
   const total = workload.reduce((sum, item) => sum + item.tasks, 0)
+  const maxHoras = Math.max(0, ...workload.map((item) => item.hours))
 
   return (
     <div className={styles.workload}>
       <span className={styles.workloadTitle}>Reparto del trabajo</span>
       {workload.map((item) => {
-        const pasado = item.hours > item.capacityHours
-        const uso = item.capacityHours > 0 ? Math.min(item.hours / item.capacityHours, 1) : pasado ? 1 : 0
+        const uso = maxHoras > 0 ? item.hours / maxHoras : 0
         return (
-          <div key={item.memberId} className={[styles.workloadRow, pasado && styles.workloadOver]
-            .filter(Boolean).join(' ')}>
+          <div key={item.memberId} className={styles.workloadRow}>
             <span className={styles.workloadName}>{item.memberName}</span>
             <span className={styles.workloadBar}>
               <span className={styles.workloadFill} style={{ width: `${uso * 100}%` }} />
             </span>
             <span className={styles.workloadValue}>
-              {item.tasks} {item.tasks === 1 ? 'tarea' : 'tareas'} · {item.hours} h de {item.capacityHours} h
+              {item.tasks} {item.tasks === 1 ? 'tarea' : 'tareas'} · {item.hours} h
             </span>
           </div>
         )
@@ -528,7 +514,7 @@ export function ProposalPanel({
           Propuesta: {tasks.length} tareas en {sprints.length} {sprints.length === 1 ? 'sprint' : 'sprints'}
         </h3>
         <span className={styles.note}>
-          {selected.length} seleccionadas · modelo {model} en local
+          {selected.length} seleccionadas · modelo {model}
         </span>
       </header>
 

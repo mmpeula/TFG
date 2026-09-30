@@ -5,12 +5,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 
-@Schema(description = "Plan propuesto por Groq: sprints, tareas repartidas y avisos",
+@Schema(description = "Plan propuesto por DeepSeek: sprints, tareas repartidas y avisos",
         example = """
-        {"status":"ok","projectId":5,"model":"openai/gpt-oss-120b","source":"documento: guion-practica2.pdf",
+        {"status":"ok","projectId":5,"model":"deepseek-flash","source":"documento: guion-practica2.pdf",
          "message":"18 tareas en 3 sprints, repartidas entre 3 personas",
          "durationWeeks":6,"sprints":[],"tasks":[],"workload":[],"warnings":[],
-         "attempts":1,"generatedAt":"2026-09-23T18:40:00Z"}
+         "generatedAt":"2026-09-23T18:40:00Z"}
         """)
 public record AiPlanResponse(
         String status,
@@ -26,10 +26,8 @@ public record AiPlanResponse(
         List<ProposedTask> tasks,
         @Schema(description = "Horas y tareas de cada persona, contadas sobre las tareas del plan")
         List<MemberWorkload> workload,
-        @Schema(description = "Avisos del modelo y reglas que el plan sigue sin cumplir tras los reintentos")
+        @Schema(description = "Avisos del modelo y reglas que el servidor ha comprobado que el plan no cumple")
         List<String> warnings,
-        @Schema(description = "Llamadas al modelo que ha costado: 1 si el primer plan era valido")
-        int attempts,
         Instant generatedAt
 ) {
 
@@ -40,11 +38,10 @@ public record AiPlanResponse(
      */
     public static AiPlanResponse of(Long projectId, String model, String source, Integer durationWeeks,
                                     List<PlannedSprint> sprints, List<ProposedTask> tasks,
-                                    List<MemberWorkload> workload, List<String> warnings, int duplicates,
-                                    int attempts) {
+                                    List<MemberWorkload> workload, List<String> warnings, int duplicates) {
         return new AiPlanResponse("ok", projectId, model, source,
                 message(tasks.size(), sprints.size(), workload.size(), duplicates),
-                durationWeeks, sprints, tasks, workload, warnings, attempts, Instant.now());
+                durationWeeks, sprints, tasks, workload, warnings, Instant.now());
     }
 
     private static String message(int propuestas, int sprints, int personas, int duplicadas) {

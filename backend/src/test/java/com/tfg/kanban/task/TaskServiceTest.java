@@ -90,7 +90,7 @@ class TaskServiceTest {
         when(boardService.getColumn(11L)).thenReturn(doing);
         when(taskRepository.countByBoardColumn_Id(11L)).thenReturn(2L);
 
-        TaskRequest request = new TaskRequest("Nueva tarea", null, null, null, null, null, null);
+        TaskRequest request = new TaskRequest("Nueva tarea", null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> taskService.create(11L, request))
                 .isInstanceOf(BusinessRuleException.class)
@@ -145,7 +145,7 @@ class TaskServiceTest {
         when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 99L)).thenReturn(false);
 
-        TaskRequest request = new TaskRequest("Tarea", null, null, TaskPriority.ALTA, null, null, List.of(99L));
+        TaskRequest request = new TaskRequest("Tarea", null, null, TaskPriority.ALTA, null, null, null, List.of(99L));
 
         assertThatThrownBy(() -> taskService.update(1L, request))
                 .isInstanceOf(BusinessRuleException.class)
@@ -184,7 +184,7 @@ class TaskServiceTest {
         when(userRepository.findById(3L)).thenReturn(Optional.of(luis));
         when(taskRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, List.of(2L, 3L));
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, null, List.of(2L, 3L));
         taskService.create(11L, request);
 
         ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
@@ -202,7 +202,7 @@ class TaskServiceTest {
         when(userRepository.findById(2L)).thenReturn(Optional.of(ana));
         when(taskRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, List.of(2L, 2L));
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, null, List.of(2L, 2L));
         taskService.create(11L, request);
 
         ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
@@ -219,7 +219,7 @@ class TaskServiceTest {
         when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 99L)).thenReturn(false);
         when(userRepository.findById(2L)).thenReturn(Optional.of(User.builder().id(2L).fullName("Ana").build()));
 
-        TaskRequest request = new TaskRequest("Tarea", null, null, TaskPriority.ALTA, null, null, List.of(2L, 99L));
+        TaskRequest request = new TaskRequest("Tarea", null, null, TaskPriority.ALTA, null, null, null, List.of(2L, 99L));
 
         assertThatThrownBy(() -> taskService.update(1L, request))
                 .isInstanceOf(BusinessRuleException.class)
@@ -239,7 +239,7 @@ class TaskServiceTest {
         when(userRepository.findById(2L)).thenReturn(Optional.of(ana));
         when(userRepository.findById(3L)).thenReturn(Optional.of(luis));
 
-        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, List.of(2L, 3L));
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, null, List.of(2L, 3L));
         taskService.update(1L, request);
 
         verify(activityService).record(eq(project), eq(ActivityAction.ASIGNACION), eq("Task"), eq(1L), anyString());
@@ -253,7 +253,7 @@ class TaskServiceTest {
         existing.getAssignees().add(ana);
         when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
 
-        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, List.of());
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, null, List.of());
         taskService.update(1L, request);
 
         verify(activityService).record(eq(project), eq(ActivityAction.ASIGNACION), eq("Task"), eq(1L),
@@ -274,7 +274,7 @@ class TaskServiceTest {
         when(userRepository.findById(3L)).thenReturn(Optional.of(luis));
 
         // Mismo conjunto, pero en el orden inverso al que ya tenia.
-        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, List.of(3L, 2L));
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, null, List.of(3L, 2L));
         taskService.update(1L, request);
 
         verify(activityService, never()).record(any(), eq(ActivityAction.ASIGNACION), any(), any(), anyString());

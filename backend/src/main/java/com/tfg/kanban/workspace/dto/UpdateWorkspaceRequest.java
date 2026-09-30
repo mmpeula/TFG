@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
-@Schema(description = "Datos editables de un workspace", example = """
+@Schema(description = "Datos editables de un espacio de trabajo", example = """
         {"name":"Bases de Datos","description":"Practica 2","color":"oliva","icon":"BD",
          "startDate":"2026-10-01","deadline":"2026-12-15","sprintDays":14}
         """)

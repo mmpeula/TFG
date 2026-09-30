@@ -104,7 +104,7 @@ class AiPlanControllerIT extends AbstractApiIT {
         Contexto ctx = contexto();
         String options = """
                 {"startDate":"2027-01-04","sprintDays":14,
-                 "team":[{"userId":%d,"hoursPerWeek":12,"preferences":"Backend; Java"}]}
+                 "team":[{"userId":%d,"preferences":"Backend; Java"}]}
                 """.formatted(ctx.miembro().id());
 
         // Con la IA apagada se llega hasta el modelo y responde 503: prueba que la

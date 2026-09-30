@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCorners, useSensor, useSensors,
@@ -20,7 +20,7 @@ import styles from './BoardScreen.module.css'
 import {
   useBoard, useBoardMutations, useProjectBoards, useTaskMutations, useTeamMembers, useWorkspace,
 } from '@/hooks/useData'
-import { useUi } from '@/state/context'
+import { useAssistant, useUi } from '@/state/context'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { canManage, canWrite } from '@/lib/roles'
 import { deriveSignals, taskBadge } from '@/lib/signals'
@@ -33,6 +33,7 @@ export function BoardScreen() {
   const projectId = Number(workspaceIdParam)
   const navigate = useNavigate()
   const { highlighted, pushToast } = useUi()
+  const { setActiveTask } = useAssistant()
 
   const { data: workspace } = useWorkspace(projectId)
   const { data: boards, isPending: loadingBoards } = useProjectBoards(projectId)
@@ -46,6 +47,13 @@ export function BoardScreen() {
 
   const [onlySignals, setOnlySignals] = useState(false)
   const [openTask, setOpenTask] = useState<TaskResponse | null>(null)
+  // El asistente sabe de que tarea hablar mientras el panel esta abierto, sin que
+  // haya que repetirsela en cada pregunta; se limpia sola al cerrar el panel o al
+  // salir de esta pantalla.
+  useEffect(() => {
+    setActiveTask(openTask ? { id: openTask.id, title: openTask.title } : null)
+    return () => setActiveTask(null)
+  }, [openTask, setActiveTask])
   const [dragging, setDragging] = useState<TaskResponse | null>(null)
   const [overColumn, setOverColumn] = useState<number | null>(null)
   const [mobileColumn, setMobileColumn] = useState<number | null>(null)
@@ -155,8 +163,8 @@ export function BoardScreen() {
         <Skeleton label="Cargando el tablero…" lines={4} />
       ) : !board ? (
         <EmptyState
-          title="Este workspace todavia no tiene tablero"
-          body="Es un workspace de antes de que el tablero se creara solo al empezar. Contacta con el responsable."
+          title="Este espacio de trabajo todavia no tiene tablero"
+          body="Es un espacio de trabajo de antes de que el tablero se creara solo al empezar. Contacta con el responsable."
         />
       ) : (
         <>
@@ -206,7 +214,7 @@ export function BoardScreen() {
           {sinTareas ? (
             <EmptyState
               icon={<Columns3 size={22} strokeWidth={2.75} />}
-              title="Este workspace esta vacio"
+              title="Este espacio de trabajo esta vacio"
               body={
                 writable
                   ? 'Empieza creando tu primera tarea. Tambien puedes generar el plan con IA a partir del enunciado.'

@@ -36,7 +36,7 @@ export function AdminScreen() {
             onChange={setSeccion}
             options={[
               { value: 'cuentas', label: 'Cuentas' },
-              { value: 'workspaces', label: 'Workspaces' },
+              { value: 'workspaces', label: 'Espacios de trabajo' },
             ]}
           />
         </header>

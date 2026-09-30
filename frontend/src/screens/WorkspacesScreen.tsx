@@ -66,28 +66,28 @@ export function WorkspacesScreen() {
                 ? pendientes > 0
                   ? `Hola${nombre ? `, ${nombre}` : ''}. Tienes ${pendientes} ${pendientes === 1 ? 'tarea pendiente' : 'tareas pendientes'} en total.`
                   : `Hola${nombre ? `, ${nombre}` : ''}. No te queda nada pendiente.`
-                : 'Una asignatura, una practica o un trabajo en grupo: cada cosa, su workspace.'}
+                : 'Una asignatura, una practica o un trabajo en grupo: cada cosa, su espacio de trabajo.'}
           </p>
         </div>
         <Button onClick={() => setFormOpen(true)}>
           <Plus size={15} strokeWidth={2.75} />
-          Nuevo workspace
+          Nuevo espacio de trabajo
         </Button>
       </header>
 
       <InvitationsBanner />
 
       {isPending ? (
-        <Skeleton label="Cargando tus workspaces…" lines={3} />
+        <Skeleton label="Cargando tus espacios de trabajo…" lines={3} />
       ) : nadaQueMostrar ? (
         <EmptyState
           icon={<LayoutGrid size={22} strokeWidth={2.75} />}
-          title="Todavia no tienes ningun workspace"
+          title="Todavia no tienes ningun espacio de trabajo"
           body="Crea uno por cada asignatura o trabajo. Nace con su tablero listo: Por hacer, En progreso y Hecho."
           action={
             <Button onClick={() => setFormOpen(true)}>
               <Plus size={15} strokeWidth={2.75} />
-              Crear mi primer workspace
+              Crear mi primer espacio de trabajo
             </Button>
           }
         />

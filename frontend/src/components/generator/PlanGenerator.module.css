@@ -200,7 +200,7 @@
 }
 .teamHead, .teamRow {
   display: grid;
-  grid-template-columns: minmax(110px, 1fr) minmax(160px, 2.4fr) 76px 28px;
+  grid-template-columns: minmax(110px, 1fr) minmax(160px, 2.4fr) 28px;
   gap: var(--space-2);
   align-items: center;
 }
@@ -243,7 +243,7 @@
 
 @media (max-width: 720px) {
   .teamHead { display: none; }
-  .teamRow { grid-template-columns: 1fr 70px 28px; }
+  .teamRow { grid-template-columns: 1fr 28px; }
   .teamRow .teamName { grid-column: 1 / -1; }
 }
 
@@ -266,9 +266,6 @@
 .workloadFill { display: block; height: 100%; background: var(--color-accent-2-500); border-radius: 999px; }
 .workloadValue { font-size: 12px; color: var(--color-accent-2-800); white-space: nowrap; }
 .workloadNote { font-size: 12px; color: var(--color-accent-2-800); font-style: italic; }
-/* Mas horas de las que tiene: el mismo rojo que la prioridad critica. */
-.workloadOver .workloadFill { background: #b42318; }
-.workloadOver .workloadValue { color: #b42318; font-weight: 600; }
 @media (max-width: 767px) {
   .workloadRow { grid-template-columns: 1fr auto; }
   .workloadBar { display: none; }

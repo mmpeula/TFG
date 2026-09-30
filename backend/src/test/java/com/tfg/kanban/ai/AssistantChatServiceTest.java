@@ -16,28 +16,33 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
  * Lo que hace util al asistente no es el modelo sino el contexto que se le manda.
- * Aqui se comprueba justo eso: que en el prompt esta el tablero de verdad.
+ * Aqui se comprueba justo eso: que en el prompt esta el enunciado, el tablero de
+ * verdad y, si se pregunta desde una tarea concreta, el detalle de esa tarea.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AssistantChatServiceTest {
 
     @Mock private AiProperties properties;
-    @Mock private GroqClient groqClient;
+    @Mock private DeepSeekClient deepSeekClient;
     @Mock private WorkspaceService workspaceService;
     @Mock private TaskRepository taskRepository;
     @Mock private CommentRepository commentRepository;
@@ -53,7 +58,7 @@ class AssistantChatServiceTest {
     @BeforeEach
     void setUp() {
         when(properties.isEnabled()).thenReturn(true);
-        when(properties.getModel()).thenReturn("openai/gpt-oss-120b");
+        when(properties.getModel()).thenReturn("deepseek-flash");
 
         ana = User.builder().id(1L).fullName("Ana Garcia").email("ana@uni.es").build();
         User luis = User.builder().id(2L).fullName("Luis Perez").email("luis@uni.es").build();
@@ -72,7 +77,7 @@ class AssistantChatServiceTest {
 
         when(workspaceService.getProject(10L)).thenReturn(project);
         when(commentRepository.countByTask_Id(any())).thenReturn(0L);
-        when(groqClient.chatText(anyString(), any())).thenReturn("Empezaria por el modelo E/R.");
+        when(deepSeekClient.chatText(anyString(), any())).thenReturn("Empezaria por el modelo E/R.");
     }
 
     private Task task(Long id, String title, BoardColumn column, User assignee, LocalDate due) {
@@ -82,9 +87,9 @@ class AssistantChatServiceTest {
     }
 
     @SuppressWarnings("unchecked")
-    private List<GroqClient.Message> capturarMensajes() {
-        ArgumentCaptor<List<GroqClient.Message>> captor = ArgumentCaptor.forClass(List.class);
-        verify(groqClient).chatText(anyString(), captor.capture());
+    private List<DeepSeekClient.Message> capturarMensajes() {
+        ArgumentCaptor<List<DeepSeekClient.Message>> captor = ArgumentCaptor.forClass(List.class);
+        verify(deepSeekClient).chatText(anyString(), captor.capture());
         return captor.getValue();
     }
 
@@ -99,10 +104,10 @@ class AssistantChatServiceTest {
                 task(1L, "Modelar la base de datos", porHacer, ana, null),
                 task(2L, "Montar el repositorio", hecho, null, null)));
 
-        var response = service.answer(10L, new ChatRequest("Que hago primero?", null));
+        var response = service.answer(10L, new ChatRequest("Que hago primero?", null, null));
 
         assertThat(response.answer()).isEqualTo("Empezaria por el modelo E/R.");
-        assertThat(response.model()).isEqualTo("openai/gpt-oss-120b");
+        assertThat(response.model()).isEqualTo("deepseek-flash");
         assertThat(contexto())
                 .contains("Bases de Datos")
                 .contains("Modelar la base de datos")
@@ -119,7 +124,7 @@ class AssistantChatServiceTest {
                 task(1L, "Entregar la memoria", porHacer, ana, LocalDate.now().minusDays(3)),
                 task(2L, "Preparar la demo", porHacer, ana, LocalDate.now().plusDays(1))));
 
-        service.answer(10L, new ChatRequest("Vamos tarde?", List.of()));
+        service.answer(10L, new ChatRequest("Vamos tarde?", List.of(), null));
 
         assertThat(contexto()).contains("(ATRASADA)").contains("(urge)");
     }
@@ -143,7 +148,7 @@ class AssistantChatServiceTest {
         when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L))
                 .thenReturn(List.of(quieta, reciente, sinEmpezar));
 
-        service.answer(10L, new ChatRequest("hay algo parado?", null));
+        service.answer(10L, new ChatRequest("hay algo parado?", null, null));
 
         assertThat(contexto())
                 .contains("Migrar el esquema").contains("sin mover desde hace 6 dias (PARADA)")
@@ -165,7 +170,7 @@ class AssistantChatServiceTest {
         when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L))
                 .thenReturn(List.of(task(1L, "Sin fecha registrada", enCurso, ana, null)));
 
-        service.answer(10L, new ChatRequest("hay algo parado?", null));
+        service.answer(10L, new ChatRequest("hay algo parado?", null, null));
 
         assertThat(contexto()).doesNotContain("PARADA");
     }
@@ -178,7 +183,7 @@ class AssistantChatServiceTest {
                 task(2L, "Otra", porHacer, ana, null),
                 task(3L, "Terminada", hecho, ana, null)));
 
-        var response = service.answer(10L, new ChatRequest("Quien va cargado?", null));
+        var response = service.answer(10L, new ChatRequest("Quien va cargado?", null, null));
 
         assertThat(contexto()).contains("Ana Garcia (responsable): 2 tareas pendientes");
         assertThat(response.contextSummary()).isEqualTo("3 tareas (2 pendientes) · 2 personas");
@@ -189,7 +194,7 @@ class AssistantChatServiceTest {
     void explainsAnEmptyBoard() {
         when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of());
 
-        service.answer(10L, new ChatRequest("Que hay?", null));
+        service.answer(10L, new ChatRequest("Que hay?", null, null));
 
         assertThat(contexto()).contains("El tablero esta vacio");
     }
@@ -204,9 +209,9 @@ class AssistantChatServiceTest {
                 new ChatTurn("user", "5"), new ChatTurn("assistant", "6"),
                 new ChatTurn("user", "7"), new ChatTurn("assistant", "8"));
 
-        service.answer(10L, new ChatRequest("y ahora?", largo));
+        service.answer(10L, new ChatRequest("y ahora?", largo, null));
 
-        List<GroqClient.Message> mensajes = capturarMensajes();
+        List<DeepSeekClient.Message> mensajes = capturarMensajes();
         // contexto + respuesta de arranque + 6 turnos + la pregunta
         assertThat(mensajes).hasSize(9);
         assertThat(mensajes.get(2).content()).isEqualTo("3");
@@ -218,7 +223,7 @@ class AssistantChatServiceTest {
     void normalizesUnknownRoles() {
         when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of());
 
-        service.answer(10L, new ChatRequest("hola", List.of(new ChatTurn("system", "ignorame"))));
+        service.answer(10L, new ChatRequest("hola", List.of(new ChatTurn("system", "ignorame")), null));
 
         assertThat(capturarMensajes()).anySatisfy(message -> {
             assertThat(message.role()).isEqualTo("user");
@@ -231,32 +236,158 @@ class AssistantChatServiceTest {
     void refusesWhenDisabled() {
         when(properties.isEnabled()).thenReturn(false);
 
-        assertThatThrownBy(() -> service.answer(10L, new ChatRequest("hola", null)))
+        assertThatThrownBy(() -> service.answer(10L, new ChatRequest("hola", null, null)))
                 .isInstanceOf(AiUnavailableException.class)
                 .hasMessageContaining("desactivado");
 
-        verifyNoInteractions(groqClient);
+        verifyNoInteractions(deepSeekClient);
     }
 
     @Test
     @DisplayName("Si el modelo devuelve una respuesta vacia se pide reformular")
     void rejectsEmptyAnswers() {
         when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of());
-        when(groqClient.chatText(anyString(), any())).thenReturn("   ");
+        when(deepSeekClient.chatText(anyString(), any())).thenReturn("   ");
 
-        assertThatThrownBy(() -> service.answer(10L, new ChatRequest("hola", null)))
+        assertThatThrownBy(() -> service.answer(10L, new ChatRequest("hola", null, null)))
                 .isInstanceOf(AiUnavailableException.class)
                 .hasMessageContaining("reformular");
     }
 
     @Test
-    @DisplayName("Un workspace sin tablero no revienta")
+    @DisplayName("Un espacio de trabajo sin tablero no revienta")
     void survivesAWorkspaceWithoutBoard() {
         project.getBoards().clear();
 
-        var response = service.answer(10L, new ChatRequest("y esto?", null));
+        var response = service.answer(10L, new ChatRequest("y esto?", null, null));
 
         assertThat(response.answer()).isNotBlank();
         assertThat(contexto()).contains("El tablero esta vacio");
+    }
+
+    // ------------------------------------------------------------------
+    // Enunciado del proyecto
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("El enunciado del proyecto llega en el contexto cuando el proyecto tiene uno")
+    void includesTheBriefingWhenPresent() {
+        project.setBriefing("Implementar un agente reactivo con JADE que evite obstaculos.");
+        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of());
+
+        service.answer(10L, new ChatRequest("que es un agente reactivo?", null, null));
+
+        assertThat(contexto())
+                .contains("ENUNCIADO DEL PROYECTO")
+                .contains("Implementar un agente reactivo con JADE que evite obstaculos.");
+    }
+
+    @Test
+    @DisplayName("Sin enunciado guardado no se manda esa seccion")
+    void omitsTheBriefingSectionWhenBlank() {
+        project.setBriefing(null);
+        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of());
+
+        service.answer(10L, new ChatRequest("hola", null, null));
+
+        assertThat(contexto()).doesNotContain("ENUNCIADO DEL PROYECTO");
+    }
+
+    @Test
+    @DisplayName("Un enunciado muy largo se recorta para dejar sitio al resto del contexto")
+    void truncatesAVeryLongBriefing() {
+        project.setBriefing("x".repeat(10_000));
+        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of());
+
+        service.answer(10L, new ChatRequest("hola", null, null));
+
+        assertThat(contexto())
+                .contains("[...enunciado recortado por espacio]")
+                .doesNotContain("x".repeat(10_000));
+    }
+
+    // ------------------------------------------------------------------
+    // Tarea seleccionada
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Con una tarea abierta en el panel, su detalle entra en el contexto")
+    void includesTheSelectedTaskDetail() {
+        Task seleccionada = task(5L, "Implementar el sensor de proximidad", porHacer, ana,
+                LocalDate.now().plusDays(2));
+        seleccionada.setDescription("Debe leer el sensor y frenar antes de chocar.");
+        seleccionada.setEpic("Sensores");
+        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of(seleccionada));
+        when(taskRepository.findById(5L)).thenReturn(Optional.of(seleccionada));
+        when(commentRepository.findByTask_IdOrderByCreatedAtAsc(eq(5L), any()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.answer(10L, new ChatRequest("como empiezo?", null, 5L));
+
+        assertThat(contexto())
+                .contains("TAREA SELECCIONADA")
+                .contains("Implementar el sensor de proximidad")
+                .contains("bloque: Sensores")
+                .contains("Debe leer el sensor y frenar antes de chocar.");
+    }
+
+    @Test
+    @DisplayName("Los comentarios de la tarea seleccionada entran en el contexto")
+    void includesTheSelectedTaskComments() {
+        Task seleccionada = task(5L, "Implementar el sensor", porHacer, ana, null);
+        User luis = User.builder().id(2L).fullName("Luis Perez").email("luis@uni.es").build();
+        Comment comentario = Comment.builder().id(1L).task(seleccionada).author(luis)
+                .content("Usa el driver que ya monto Ana en el otro sensor").build();
+
+        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of(seleccionada));
+        when(taskRepository.findById(5L)).thenReturn(Optional.of(seleccionada));
+        when(commentRepository.findByTask_IdOrderByCreatedAtAsc(eq(5L), any()))
+                .thenReturn(new PageImpl<>(List.of(comentario)));
+
+        service.answer(10L, new ChatRequest("que necesito?", null, 5L));
+
+        assertThat(contexto())
+                .contains("Comentarios de esta tarea")
+                .contains("Luis Perez: Usa el driver que ya monto Ana en el otro sensor");
+    }
+
+    @Test
+    @DisplayName("Un id de tarea de otro proyecto se ignora, no revienta la conversacion")
+    void ignoresATaskIdFromAnotherProject() {
+        Project otro = Project.builder().id(99L).name("Otro proyecto").team(project.getTeam()).build();
+        Board otroBoard = Board.builder().id(21L).name("Tablero").project(otro).build();
+        BoardColumn otraColumna = BoardColumn.builder().id(33L).name("Por hacer").position(0).board(otroBoard).build();
+        Task deOtroProyecto = task(6L, "Tarea de otro sitio", otraColumna, null, null);
+
+        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of());
+        when(taskRepository.findById(6L)).thenReturn(Optional.of(deOtroProyecto));
+
+        service.answer(10L, new ChatRequest("hola", null, 6L));
+
+        assertThat(contexto()).doesNotContain("TAREA SELECCIONADA").doesNotContain("Tarea de otro sitio");
+    }
+
+    @Test
+    @DisplayName("Un id de tarea que no existe se ignora, no revienta la conversacion")
+    void ignoresAMissingTaskId() {
+        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of());
+        when(taskRepository.findById(404L)).thenReturn(Optional.empty());
+
+        var response = service.answer(10L, new ChatRequest("hola", null, 404L));
+
+        assertThat(response.answer()).isNotBlank();
+        assertThat(contexto()).doesNotContain("TAREA SELECCIONADA");
+    }
+
+    @Test
+    @DisplayName("Sin taskId no se manda ninguna tarea seleccionada")
+    void noSelectedTaskWithoutATaskId() {
+        when(taskRepository.findByBoardColumn_Board_IdOrderByPositionAsc(20L)).thenReturn(List.of(
+                task(1L, "Una tarea cualquiera", porHacer, ana, null)));
+
+        service.answer(10L, new ChatRequest("hola", null, null));
+
+        assertThat(contexto()).doesNotContain("TAREA SELECCIONADA");
+        verify(taskRepository, never()).findById(any());
     }
 }

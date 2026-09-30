@@ -137,7 +137,7 @@ public class WorkspaceService {
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
         if (owner.getRole() != Role.MIEMBRO && owner.getRole() != Role.RESPONSABLE) {
-            throw new BusinessRuleException("Solo una cuenta MIEMBRO puede crear un workspace");
+            throw new BusinessRuleException("Solo una cuenta MIEMBRO puede crear un espacio de trabajo");
         }
         String name = request.name().trim();
 
@@ -169,7 +169,7 @@ public class WorkspaceService {
         Project saved = projectRepository.save(project);
 
         activityService.record(saved, ActivityAction.CREACION, "Project", saved.getId(),
-                "Creo el workspace '%s'".formatted(saved.getName()));
+                "Creo el espacio de trabajo '%s'".formatted(saved.getName()));
 
         return findById(saved.getId());
     }
@@ -192,7 +192,7 @@ public class WorkspaceService {
         }
 
         activityService.record(project, ActivityAction.ACTUALIZACION, "Project", project.getId(),
-                "Actualizo el workspace '%s'".formatted(project.getName()));
+                "Actualizo el espacio de trabajo '%s'".formatted(project.getName()));
 
         return findById(workspaceId);
     }
@@ -279,7 +279,7 @@ public class WorkspaceService {
     public CoverFile loadCover(Long workspaceId) {
         Project project = getProject(workspaceId);
         if (project.getCoverStoredName() == null) {
-            throw new ResourceNotFoundException("Este workspace no tiene foto");
+            throw new ResourceNotFoundException("Este espacio de trabajo no tiene foto");
         }
         Resource resource = fileStorageService.loadAsResource(project.getCoverStoredName());
         return new CoverFile(resource, project.getCoverContentType());
@@ -291,7 +291,7 @@ public class WorkspaceService {
 
     public Project getProject(Long workspaceId) {
         return projectRepository.findById(workspaceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Workspace", workspaceId));
+                .orElseThrow(() -> new ResourceNotFoundException("Espacio de trabajo", workspaceId));
     }
 
     private Role roleIn(Project project) {

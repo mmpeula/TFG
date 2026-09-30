@@ -16,7 +16,8 @@ import java.util.List;
          "description":"Endpoint POST /api/auth/login que devuelve un token firmado",
          "reason":"El apartado 3 pide autenticacion con JWT","type":"TAREA","epic":"Autenticacion",
          "sprint":1,"priority":"ALTA","estimatedHours":6,"dueDate":"2026-10-14",
-         "assigneeIds":[2],"assigneeNames":["Luis Perez"],"dependsOn":["Disenar el modelo de usuario"]}
+         "assigneeIds":[2],"assigneeNames":["Luis Perez"],"dependsOn":["Disenar el modelo de usuario"],
+         "labels":["backend"]}
         """)
 public record ProposedTask(
 
@@ -58,12 +59,19 @@ public record ProposedTask(
 
         @Schema(description = "Titulos de las tareas de las que depende. Ya validadas: apuntan a una tarea real "
                 + "en su sprint o en uno anterior")
-        List<String> dependsOn
+        List<String> dependsOn,
+
+        @Schema(description = "Etiquetas libres del modelo, para clasificar o exportar (p.ej. a Jira)")
+        List<String> labels
 ) {
 
     /** Nunca null, para no tener que comprobarlo en cada sitio que la recorre. */
     public List<String> dependsOnOrEmpty() {
         return dependsOn == null ? List.of() : dependsOn;
+    }
+
+    public List<String> labelsOrEmpty() {
+        return labels == null ? List.of() : labels;
     }
 
     public List<Long> assigneeIdsOrEmpty() {

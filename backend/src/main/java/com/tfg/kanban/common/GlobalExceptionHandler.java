@@ -65,7 +65,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    /** Groq no responde: no es culpa del cliente ni un fallo interno. */
+    /** DeepSeek no responde: no es culpa del cliente ni un fallo interno. */
     @ExceptionHandler(AiUnavailableException.class)
     public ResponseEntity<ApiError> handleAiUnavailable(AiUnavailableException ex, HttpServletRequest request) {
         log.warn("Modulo de IA no disponible: {}", ex.getMessage());

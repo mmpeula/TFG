@@ -180,7 +180,7 @@ export function PlanScreen() {
             <EmptyState
               icon={<Users size={22} strokeWidth={2} />}
               title="No tienes tareas asignadas aqui"
-              body="Este workspace tiene trabajo, pero ninguna tarea es tuya todavia."
+              body="Este espacio de trabajo tiene trabajo, pero ninguna tarea es tuya todavia."
               action={
                 <Button variant="secondary" onClick={() => elegirAlcance('team')}>
                   Ver todo el equipo

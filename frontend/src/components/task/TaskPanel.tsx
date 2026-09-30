@@ -60,8 +60,13 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
   const writable = canWriteRole(role)
   const responsable = canManage(role)
 
+  // Hecha, para PlanifIA, es estar en la ultima columna del tablero: no hay otro
+  // campo que lo diga. Solo ahi tiene sentido preguntar cuanto ha costado de verdad.
+  const done = columns.length > 0 && task.columnId === columns[columns.length - 1].id
+
   function patch(values: Partial<Pick<TaskResponse, 'title' | 'description' | 'type' | 'priority' | 'columnId'>> & {
     assigneeIds?: number[]
+    actualHours?: number | null
   }) {
     taskMutations.update.mutate({
       taskId: task!.id,
@@ -72,6 +77,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
         priority: values.priority ?? task!.priority,
         dueDate: task!.dueDate ?? null,
         estimatedHours: task!.estimatedHours ?? null,
+        actualHours: 'actualHours' in values ? (values.actualHours ?? null) : (task!.actualHours ?? null),
         assigneeIds: values.assigneeIds ?? task!.assignees.map((assignee) => assignee.id),
       },
     })
@@ -247,6 +253,32 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
             <span className={styles.propValue}>
               {task.estimatedHours != null ? `${task.estimatedHours} h` : '—'}
             </span>
+
+            {done && (
+              <>
+                <span className={styles.propLabel}>Horas reales</span>
+                {writable ? (
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    className={styles.propInput}
+                    defaultValue={task.actualHours ?? ''}
+                    placeholder="Cuanto ha costado de verdad"
+                    aria-label="Horas reales dedicadas a esta tarea"
+                    onBlur={(event) => {
+                      const raw = event.target.value.trim()
+                      const value = raw === '' ? null : Number(raw)
+                      if (value !== (task.actualHours ?? null)) patch({ actualHours: value })
+                    }}
+                  />
+                ) : (
+                  <span className={styles.propValue}>
+                    {task.actualHours != null ? `${task.actualHours} h` : '—'}
+                  </span>
+                )}
+              </>
+            )}
           </div>
 
           {writable && (

@@ -29,6 +29,7 @@ public record TaskResponse(
         TaskPriority priority,
         LocalDate dueDate,
         BigDecimal estimatedHours,
+        @Schema(description = "Lo que de verdad ha costado, si se ha apuntado") BigDecimal actualHours,
         @Schema(description = "true si la genero el modulo de IA") boolean aiGenerated,
         Long columnId,
         String columnName,
@@ -47,8 +48,8 @@ public record TaskResponse(
         return new TaskResponse(
                 task.getId(), task.getTitle(), task.getDescription(), task.getPosition(),
                 task.getType() == null ? TaskType.TAREA : task.getType(),
-                task.getPriority(), task.getDueDate(), task.getEstimatedHours(), task.isAiGenerated(),
-                column.getId(), column.getName(), column.getBoard().getId(),
+                task.getPriority(), task.getDueDate(), task.getEstimatedHours(), task.getActualHours(),
+                task.isAiGenerated(), column.getId(), column.getName(), column.getBoard().getId(),
                 column.getBoard().getProject().getId(),
                 UserSummary.fromAll(task.getAssignees()), UserSummary.from(task.getCreatedBy()),
                 commentCount, attachmentCount, task.getCreatedAt(), task.getUpdatedAt());

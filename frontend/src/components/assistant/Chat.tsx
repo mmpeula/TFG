@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Bot, RotateCcw, SendHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import styles from './Chat.module.css'
+import { renderMarkdown } from '@/lib/markdown'
 import type { ChatTurn } from '@/types/api'
 
 /** Solo la usa este componente: el estado del chat flotante define la suya (ver state/context). */
@@ -61,7 +62,7 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
             </span>
             <div>
               <p className={styles.welcomeText}>
-                Puedo mirar este workspace y responderte sobre el: que llevais hecho, que urge y como
+                Puedo mirar este espacio de trabajo y responderte sobre el: que llevais hecho, que urge y como
                 repartirlo. Pruebame:
               </p>
               <div className={styles.suggestions}>
@@ -97,7 +98,11 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
               </span>
             )}
             <div className={styles.bubble}>
-              <p className={styles.text}>{message.content}</p>
+              {message.role === 'assistant' ? (
+                <div className={styles.markdown}>{renderMarkdown(message.content)}</div>
+              ) : (
+                <p className={styles.text}>{message.content}</p>
+              )}
               {message.context && <span className={styles.context}>ha mirado: {message.context}</span>}
             </div>
           </div>
@@ -127,7 +132,7 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
           rows={1}
           value={value}
           disabled={disabled}
-          placeholder={placeholder ?? 'Preguntale algo sobre este workspace…'}
+          placeholder={placeholder ?? 'Preguntale algo sobre este espacio de trabajo…'}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {

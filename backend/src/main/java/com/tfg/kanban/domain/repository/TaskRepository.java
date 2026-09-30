@@ -23,4 +23,15 @@ public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificat
             from Task t where t.boardColumn.id in :columnIds group by t.boardColumn.id
             """)
     List<CountByEntity> countByColumnIds(Collection<Long> columnIds);
+
+    /**
+     * Tareas de esta persona con estimacion y horas reales apuntadas, en
+     * cualquier proyecto en el que haya trabajado (no solo el actual): es su
+     * ritmo como persona, no del proyecto. Sirve para calibrar el proximo reparto.
+     */
+    @Query("""
+            select t from Task t join t.assignees a
+            where a.id = :userId and t.estimatedHours is not null and t.actualHours is not null
+            """)
+    List<Task> findWithActualsByAssignee(Long userId);
 }

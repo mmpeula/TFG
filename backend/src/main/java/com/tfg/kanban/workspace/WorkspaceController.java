@@ -34,22 +34,22 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/workspaces")
 @RequiredArgsConstructor
-@Tag(name = "Workspaces", description = "Asignaturas, practicas y trabajos del estudiante")
+@Tag(name = "Espacios de trabajo", description = "Asignaturas, practicas y trabajos del estudiante")
 public class WorkspaceController {
 
     private final WorkspaceService workspaceService;
 
-    @Operation(summary = "Mis workspaces",
-            description = "Todos los workspaces de los que el usuario es miembro, con sus numeros de tarjeta.")
+    @Operation(summary = "Mis espacios de trabajo",
+            description = "Todos los espacios de trabajo de los que el usuario es miembro, con sus numeros de tarjeta.")
     @GetMapping
     public List<WorkspaceResponse> findMine() {
         return workspaceService.findMine();
     }
 
-    @Operation(summary = "Un workspace")
+    @Operation(summary = "Un espacio de trabajo")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Workspace encontrado"),
-            @ApiResponse(responseCode = "403", description = "No se pertenece a este workspace",
+            @ApiResponse(responseCode = "200", description = "Espacio de trabajo encontrado"),
+            @ApiResponse(responseCode = "403", description = "No se pertenece a este espacio de trabajo",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "404", description = "No existe",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
@@ -60,7 +60,7 @@ public class WorkspaceController {
         return workspaceService.findById(workspaceId);
     }
 
-    @Operation(summary = "Crear un workspace",
+    @Operation(summary = "Crear un espacio de trabajo",
             description = """
                     Crea de una vez el equipo, el proyecto y el tablero con sus columnas
                     'Por hacer', 'En progreso' y 'Hecho'. Quien lo crea queda como RESPONSABLE.
@@ -71,7 +71,7 @@ public class WorkspaceController {
         return workspaceService.create(request);
     }
 
-    @Operation(summary = "Editar un workspace")
+    @Operation(summary = "Editar un espacio de trabajo")
     @PreAuthorize("@access.canManageProject(#workspaceId)")
     @PutMapping("/{workspaceId}")
     public WorkspaceResponse update(@PathVariable Long workspaceId,
@@ -79,7 +79,7 @@ public class WorkspaceController {
         return workspaceService.update(workspaceId, request);
     }
 
-    @Operation(summary = "Borrar un workspace",
+    @Operation(summary = "Borrar un espacio de trabajo",
             description = "Arrastra tablero, columnas, tareas, comentarios, adjuntos e historial.")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@access.canManageProject(#workspaceId)")
@@ -88,7 +88,7 @@ public class WorkspaceController {
         workspaceService.delete(workspaceId);
     }
 
-    @Operation(summary = "Subir la foto del workspace",
+    @Operation(summary = "Subir la foto del espacio de trabajo",
             description = "Solo el RESPONSABLE. Peticion multipart/form-data con el campo 'file'; "
                     + "sustituye la foto anterior si habia una.")
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
@@ -99,7 +99,7 @@ public class WorkspaceController {
         return workspaceService.uploadCover(workspaceId, file);
     }
 
-    @Operation(summary = "Descargar la foto del workspace",
+    @Operation(summary = "Descargar la foto del espacio de trabajo",
             description = "Cualquier miembro del equipo puede verla.")
     @PreAuthorize("@access.canReadProject(#workspaceId)")
     @GetMapping("/{workspaceId}/photo")
@@ -111,7 +111,7 @@ public class WorkspaceController {
                 .body(cover.resource());
     }
 
-    @Operation(summary = "Quitar la foto del workspace",
+    @Operation(summary = "Quitar la foto del espacio de trabajo",
             description = "Solo el RESPONSABLE. Vuelve a mostrarse con su color e icono.")
     @ApiResponses(@ApiResponse(responseCode = "204", description = "Foto eliminada"))
     @PreAuthorize("@access.canManageProject(#workspaceId)")

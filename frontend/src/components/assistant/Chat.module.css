@@ -49,6 +49,31 @@
 .failed .bubble { background: #fdf3f2; border: 1px solid #f1cfcb; color: #922018; }
 
 .text { font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+
+.markdown { font-size: 14px; line-height: 1.55; }
+.markdown p { margin: 0 0 8px; }
+.markdown p:last-child { margin-bottom: 0; }
+.markdown ul, .markdown ol { margin: 4px 0 8px; padding-left: 20px; }
+.markdown ul:last-child, .markdown ol:last-child { margin-bottom: 0; }
+.markdown li { margin-bottom: 2px; }
+.markdown strong { font-weight: 700; }
+.markdown code {
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 12.5px;
+  background: var(--color-neutral-200);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.markdown pre {
+  background: var(--color-neutral-200);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 4px 0 8px;
+}
+.markdown pre:last-child { margin-bottom: 0; }
+.markdown pre code { background: none; padding: 0; font-size: 12.5px; }
+
 .context { display: block; font-size: 11px; color: var(--color-neutral-500); margin-top: var(--space-2); }
 
 .typing { display: inline-flex; gap: 4px; padding: 3px 0; }

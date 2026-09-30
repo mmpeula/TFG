@@ -10,7 +10,7 @@ import jakarta.validation.constraints.Size;
  * Alta de un workspace. Solo el nombre es obligatorio: es la condicion para que
  * crear el primero cueste segundos y no haya que entender el modelo de datos.
  */
-@Schema(description = "Alta de un workspace", example = """
+@Schema(description = "Alta de un espacio de trabajo", example = """
         {"name":"Bases de Datos","description":"Practica 2 - modelo E/R","color":"arena","icon":"BD",
          "sprintDays":14}
         """)

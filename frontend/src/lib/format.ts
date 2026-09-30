@@ -2,7 +2,9 @@
 export function formatDate(value?: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export function formatDateTime(value?: string | null): string {

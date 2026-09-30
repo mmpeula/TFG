@@ -89,17 +89,17 @@ export function useWorkspaceMutations(workspaceId?: number) {
   return {
     create: useMutation({
       mutationFn: (payload: WorkspacePayload) => workspaces.create(payload),
-      onSuccess: (workspace) => { invalidate(); pushToast(`Workspace «${workspace.name}» creado`) },
+      onSuccess: (workspace) => { invalidate(); pushToast(`Espacio de trabajo «${workspace.name}» creado`) },
       onError,
     }),
     update: useMutation({
       mutationFn: (payload: WorkspacePayload) => workspaces.update(workspaceId!, payload),
-      onSuccess: () => { invalidate(); pushToast('Workspace actualizado') },
+      onSuccess: () => { invalidate(); pushToast('Espacio de trabajo actualizado') },
       onError,
     }),
     remove: useMutation({
       mutationFn: () => workspaces.remove(workspaceId!),
-      onSuccess: () => { invalidate(); pushToast('Workspace borrado') },
+      onSuccess: () => { invalidate(); pushToast('Espacio de trabajo borrado') },
       onError,
     }),
     uploadPhoto: useMutation({
@@ -112,7 +112,7 @@ export function useWorkspaceMutations(workspaceId?: number) {
         // La URL de la foto no cambia al sustituirla (siempre la misma ruta), asi
         // que sin esto el navegador seguiria mostrando la imagen cacheada de antes.
         queryClient.invalidateQueries({ queryKey: ['workspace-cover'] })
-        pushToast('Foto del workspace actualizada')
+        pushToast('Foto del espacio de trabajo actualizada')
       },
       onError,
     }),
@@ -121,7 +121,7 @@ export function useWorkspaceMutations(workspaceId?: number) {
       onSuccess: () => {
         invalidate()
         queryClient.invalidateQueries({ queryKey: ['workspace-cover'] })
-        pushToast('Foto del workspace eliminada')
+        pushToast('Foto del espacio de trabajo eliminada')
       },
       onError,
     }),
@@ -220,13 +220,13 @@ export function useAdminWorkspaceMutations() {
         invalidate()
         // La lista del equipo tambien cambia: el workspace pasa a verse suspendido.
         queryClient.invalidateQueries({ queryKey: keys.workspaces })
-        pushToast(enabled ? 'Workspace reactivado' : 'Workspace suspendido')
+        pushToast(enabled ? 'Espacio de trabajo reactivado' : 'Espacio de trabajo suspendido')
       },
       onError,
     }),
     remove: useMutation({
       mutationFn: (workspaceId: number) => adminWorkspaces.remove(workspaceId),
-      onSuccess: () => { invalidate(); pushToast('Workspace borrado') },
+      onSuccess: () => { invalidate(); pushToast('Espacio de trabajo borrado') },
       onError,
     }),
   }
@@ -262,7 +262,7 @@ export function useMemberMutations(teamId?: number) {
     }),
     removeMember: useMutation({
       mutationFn: (userId: number) => teams.removeMember(teamId!, userId),
-      onSuccess: () => { invalidate(); pushToast('Ya no esta en el workspace') },
+      onSuccess: () => { invalidate(); pushToast('Ya no esta en el espacio de trabajo') },
       onError,
     }),
   }

@@ -83,18 +83,18 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
           </button>
           <h1 className={styles.name}>
             {workspace && <WorkspaceBadge workspace={workspace} className={styles.badge} />}
-            {workspace?.name ?? 'Workspace'}
+            {workspace?.name ?? 'Espacio de trabajo'}
           </h1>
         </div>
 
         <div className={styles.actions}>
           {action}
           {canManage(workspace?.myRole) && (
-            <Tooltip label="Ajustes del workspace">
+            <Tooltip label="Ajustes del espacio de trabajo">
               <button
                 className={styles.icon}
                 onClick={() => navigate(ROUTES.ajustesById(workspaceId))}
-                aria-label="Ajustes del workspace"
+                aria-label="Ajustes del espacio de trabajo"
               >
                 <Settings size={16} strokeWidth={2.75} />
               </button>
@@ -112,7 +112,7 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
       </header>
 
       {!suspendido && (
-      <nav className={styles.tabs} aria-label="Secciones del workspace">
+      <nav className={styles.tabs} aria-label="Secciones del espacio de trabajo">
         {tabs.map((tab) => (
           <button
             key={tab.to}
@@ -131,7 +131,7 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
         {suspendido ? (
           <EmptyState
             icon={<PauseCircle size={22} strokeWidth={2.75} />}
-            title="Este workspace está suspendido"
+            title="Este espacio de trabajo está suspendido"
             body="Lo ha parado quien administra la plataforma. No se ha perdido nada: el tablero, las tareas y los ficheros siguen ahí y volverán en cuanto lo reactiven."
           />
         ) : (

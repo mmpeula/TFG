@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { AssistantContext, type AssistantMessage } from './context'
+import { AssistantContext, type AssistantActiveTask, type AssistantMessage } from './context'
 
 /**
  * Conversaciones del chat de ayuda, una por workspace, y si el panel esta abierto.
@@ -11,6 +11,7 @@ import { AssistantContext, type AssistantMessage } from './context'
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const [conversations, setConversations] = useState<Record<number, AssistantMessage[]>>({})
+  const [activeTask, setActiveTask] = useState<AssistantActiveTask | null>(null)
 
   const toggle = useCallback(() => setOpen((value) => !value), [])
   const close = useCallback(() => setOpen(false), [])
@@ -32,8 +33,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ open, toggle, close, messagesOf, append, reset }),
-    [open, toggle, close, messagesOf, append, reset],
+    () => ({ open, toggle, close, messagesOf, append, reset, activeTask, setActiveTask }),
+    [open, toggle, close, messagesOf, append, reset, activeTask],
   )
 
   return <AssistantContext.Provider value={value}>{children}</AssistantContext.Provider>

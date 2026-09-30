@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/workspaces/{workspaceId}/ai")
 @RequiredArgsConstructor
-@Tag(name = "IA", description = "Generar plan y asistente del workspace")
+@Tag(name = "IA", description = "Generar plan y asistente del espacio de trabajo")
 public class WorkspaceAiController {
 
     private final AssistantChatService assistantChatService;
@@ -36,14 +36,14 @@ public class WorkspaceAiController {
 
     @Operation(summary = "Preguntar al asistente",
             description = """
-                    Responde en texto sobre el estado real del workspace: tareas, columnas,
+                    Responde en texto sobre el estado real del espacio de trabajo: tareas, columnas,
                     fechas, personas y comentarios. No modifica nada.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Respuesta generada"),
-            @ApiResponse(responseCode = "403", description = "No se pertenece a este workspace",
+            @ApiResponse(responseCode = "403", description = "No se pertenece a este espacio de trabajo",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "Groq no esta disponible",
+            @ApiResponse(responseCode = "503", description = "DeepSeek no esta disponible",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PreAuthorize("@access.canReadProject(#workspaceId)")

@@ -69,11 +69,10 @@ public class TeamMember extends Auditable {
     /**
      * Tope de las indicaciones de una persona.
      *
-     * <p>Son varias las que entran en el mismo prompt —una por miembro— y compiten
-     * por el sitio con el enunciado de la practica, que es lo que de verdad hay
-     * que planificar. Con un parrafo por persona sobra para decir en que se maneja
-     * y que conviene evitarle; un texto largo no da mejor reparto, solo empuja al
-     * enunciado fuera del contexto de un modelo pequeno.</p>
+     * <p>Son varias las que entran en el mismo prompt —una por miembro— junto al
+     * enunciado de la practica, que es lo que de verdad hay que planificar. Con un
+     * parrafo por persona sobra para decir en que se maneja y que conviene
+     * evitarle; un texto largo no da mejor reparto, solo diluye lo importante.</p>
      */
     public static final int MAX_PLAN_NOTES = 600;
 }

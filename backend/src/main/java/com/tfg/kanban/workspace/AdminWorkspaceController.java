@@ -30,12 +30,12 @@ import java.util.List;
 @RequestMapping("/api/admin/workspaces")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
-@Tag(name = "Administracion", description = "Soporte sobre las cuentas y los workspaces de la plataforma")
+@Tag(name = "Administracion", description = "Soporte sobre las cuentas y los espacios de trabajo de la plataforma")
 public class AdminWorkspaceController {
 
     private final AdminWorkspaceService adminWorkspaceService;
 
-    @Operation(summary = "Todos los workspaces de la plataforma",
+    @Operation(summary = "Todos los espacios de trabajo de la plataforma",
             description = """
                     Datos de diagnostico para dar soporte: quien esta en cada equipo, cuantas
                     tareas hay y cuando se movio por ultima vez. No incluye el contenido del
@@ -47,9 +47,9 @@ public class AdminWorkspaceController {
         return adminWorkspaceService.findAll();
     }
 
-    @Operation(summary = "Cambiar el rol de un miembro del workspace",
+    @Operation(summary = "Cambiar el rol de un miembro del espacio de trabajo",
             description = """
-                    Sirve para desatascar un workspace que se ha quedado sin nadie que pueda
+                    Sirve para desatascar un espacio de trabajo que se ha quedado sin nadie que pueda
                     administrarlo, y tambien para cualquier otro cambio de rol. Solo se puede
                     cambiar el rol de quien ya pertenece al equipo, y el equipo nunca se queda
                     sin ninguna persona responsable.
@@ -68,13 +68,13 @@ public class AdminWorkspaceController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Suspender o reactivar un workspace",
+    @Operation(summary = "Suspender o reactivar un espacio de trabajo",
             description = """
                     Suspenderlo deja al equipo sin poder abrirlo ni tocar nada suyo, pero no borra
                     nada: reactivarlo lo devuelve tal cual estaba. Es la alternativa a borrarlo
                     cuando solo hace falta pararlo un tiempo.
                     """)
-    @ApiResponses(@ApiResponse(responseCode = "204", description = "Workspace suspendido o reactivado"))
+    @ApiResponses(@ApiResponse(responseCode = "204", description = "Espacio de trabajo suspendido o reactivado"))
     @PutMapping("/{workspaceId}/enabled")
     public ResponseEntity<Void> setEnabled(@PathVariable Long workspaceId,
                                            @Valid @RequestBody SetEnabledRequest request) {
@@ -86,9 +86,9 @@ public class AdminWorkspaceController {
     public record SetEnabledRequest(@NotNull Boolean enabled) {
     }
 
-    @Operation(summary = "Borrar un workspace",
-            description = "Borra el workspace y su equipo si se queda vacio. No se puede deshacer.")
-    @ApiResponses(@ApiResponse(responseCode = "204", description = "Workspace borrado"))
+    @Operation(summary = "Borrar un espacio de trabajo",
+            description = "Borra el espacio de trabajo y su equipo si se queda vacio. No se puede deshacer.")
+    @ApiResponses(@ApiResponse(responseCode = "204", description = "Espacio de trabajo borrado"))
     @DeleteMapping("/{workspaceId}")
     public ResponseEntity<Void> delete(@PathVariable Long workspaceId) {
         adminWorkspaceService.delete(workspaceId);

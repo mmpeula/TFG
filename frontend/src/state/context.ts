@@ -29,7 +29,7 @@ export interface AuthValue {
 }
 
 /**
- * Generar una planificacion con Groq tarda: si dependiera de que Generar plan
+ * Generar una planificacion con DeepSeek tarda: si dependiera de que Generar plan
  * siguiera montada, cambiar de pestana mientras piensa perderia el resultado.
  * Este contexto vive por encima de las rutas (junto a Auth/Ui) para que la
  * generacion siga aunque el usuario se vaya a mirar el tablero, y el resultado
@@ -112,7 +112,6 @@ export interface PlanDraft {
 export interface PlanTeamDraft {
   userId: number
   name: string
-  hoursPerWeek: number
   preferences: string
   included: boolean
 }
@@ -132,6 +131,12 @@ export const EMPTY_PLAN_DRAFT: PlanDraft = {
   appliedTitles: null,
 }
 
+/** La tarea abierta en el panel, lo justo para que el asistente sepa de cual hablar y como llamarla. */
+export interface AssistantActiveTask {
+  id: number
+  title: string
+}
+
 export interface AssistantValue {
   open: boolean
   toggle: () => void
@@ -140,6 +145,13 @@ export interface AssistantValue {
   messagesOf: (workspaceId: number) => AssistantMessage[]
   append: (workspaceId: number, message: AssistantMessage) => void
   reset: (workspaceId: number) => void
+  /**
+   * La tarea que se tiene abierta en el panel, si la hay. La pone la pantalla del
+   * tablero mientras el panel esta abierto, y el asistente la manda con cada
+   * pregunta para no obligar a repetir de que tarea se habla.
+   */
+  activeTask: AssistantActiveTask | null
+  setActiveTask: (task: AssistantActiveTask | null) => void
 }
 
 export const UiContext = createContext<UiValue | null>(null)

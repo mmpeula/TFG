@@ -75,6 +75,14 @@ public class Task extends Auditable {
     @Column(name = "ESTIMATED_HOURS", precision = 6, scale = 2)
     private BigDecimal estimatedHours;
 
+    /**
+     * Horas que de verdad ha costado, si quien la ha hecho las ha apuntado.
+     * Opcional y libre: no hace falta que coincida con la estimacion. Sirve para
+     * calibrar el ritmo real de cada persona en los proximos repartos con IA.
+     */
+    @Column(name = "ACTUAL_HOURS", precision = 6, scale = 2)
+    private BigDecimal actualHours;
+
     /** true si la tarea fue creada automaticamente por el modulo de IA. */
     @Column(name = "AI_GENERATED", nullable = false)
     @Builder.Default

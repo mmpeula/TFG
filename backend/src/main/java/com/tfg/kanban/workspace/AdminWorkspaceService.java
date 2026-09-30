@@ -120,7 +120,7 @@ public class AdminWorkspaceService {
         TeamMember member = teamMemberRepository.findByTeam_IdAndUser_Id(teamId, userId)
                 .orElseThrow(() -> new BusinessRuleException(
                         "Esa persona no esta en el equipo. Desde soporte solo se puede cambiar "
-                                + "el rol de quien ya pertenece al workspace."));
+                                + "el rol de quien ya pertenece al espacio de trabajo."));
 
         if (!member.getUser().isEnabled()) {
             throw new BusinessRuleException(
@@ -159,7 +159,7 @@ public class AdminWorkspaceService {
         // Se anota antes de que deje de estar accesible, para que el equipo lo vea
         // al volver: es la explicacion de por que se quedo parado.
         activityService.record(project, ActivityAction.ACTUALIZACION, "Project", workspaceId,
-                enabled ? "Soporte reactivo el workspace" : "Soporte suspendio el workspace");
+                enabled ? "Soporte reactivo el espacio de trabajo" : "Soporte suspendio el espacio de trabajo");
         log.info("Soporte: workspace {} {}", workspaceId, enabled ? "reactivado" : "suspendido");
     }
 
@@ -209,6 +209,6 @@ public class AdminWorkspaceService {
 
     private Project getProject(Long workspaceId) {
         return projectRepository.findById(workspaceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Workspace", workspaceId));
+                .orElseThrow(() -> new ResourceNotFoundException("Espacio de trabajo", workspaceId));
     }
 }

@@ -136,6 +136,8 @@ export interface TaskResponse {
   priority: TaskPriority
   dueDate?: string
   estimatedHours?: number
+  /** Lo que de verdad ha costado, si se ha apuntado. */
+  actualHours?: number
   aiGenerated: boolean
   columnId: number
   columnName: string
@@ -220,6 +222,8 @@ export interface ProposedTask {
   assigneeNames: string[]
   /** Titulos de las tareas de las que depende. Ya validadas por el servidor. */
   dependsOn?: string[]
+  /** Etiquetas libres del modelo, para clasificar o exportar (p.ej. a Jira). */
+  labels?: string[]
 }
 
 /** Un sprint del plan: las fechas las pone el servidor. */
@@ -234,7 +238,6 @@ export interface PlannedSprint {
 /** Una persona tal y como entra en una generacion de plan. */
 export interface PlanTeamSlot {
   userId: number
-  hoursPerWeek?: number
   preferences?: string
 }
 
@@ -256,8 +259,6 @@ export interface MemberWorkload {
   memberName: string
   tasks: number
   hours: number
-  /** Horas de las que dispone en todo el plan, segun sus horas por semana. */
-  capacityHours: number
 }
 
 export interface AiPlanResponse {
@@ -273,10 +274,8 @@ export interface AiPlanResponse {
   tasks: ProposedTask[]
   /** Horas y tareas de cada persona, contadas sobre el plan. */
   workload: MemberWorkload[]
-  /** Avisos del modelo y reglas que el plan no cumple tras los reintentos. */
+  /** Avisos del modelo y reglas que el servidor ha comprobado que el plan no cumple. */
   warnings: string[]
-  /** Llamadas al modelo que ha costado: 1 si el primer plan ya era valido. */
-  attempts: number
   generatedAt: string
 }
 

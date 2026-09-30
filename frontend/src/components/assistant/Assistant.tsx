@@ -20,7 +20,7 @@ import type { ChatTurn } from '@/types/api'
  * Generar plan, que si tiene pestana y solo la ve el responsable.
  */
 export function Assistant({ workspaceId }: { workspaceId: number }) {
-  const { open, toggle, close, messagesOf, append, reset } = useAssistant()
+  const { open, toggle, close, messagesOf, append, reset, activeTask } = useAssistant()
   const messages = messagesOf(workspaceId)
 
   // Escape cierra el panel, como cualquier cosa que se abre por encima.
@@ -36,7 +36,7 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
   const ask = useMutation({
     mutationFn: (message: string) => {
       const history: ChatTurn[] = messages.map(({ role, content }) => ({ role, content }))
-      return workspacesApi.ask(workspaceId, message, history)
+      return workspacesApi.ask(workspaceId, message, history, activeTask?.id)
     },
     onSuccess: (response) => {
       append(workspaceId, {
@@ -48,7 +48,7 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
     onError: (err) => {
       const status = axios.isAxiosError(err) ? err.response?.status : undefined
       const content = status === 503
-        ? `${toErrorMessage(err)} Revisa la conexion con Groq y su API key.`
+        ? `${toErrorMessage(err)} Revisa la conexion con DeepSeek y su API key.`
         : toErrorMessage(err)
       append(workspaceId, { role: 'assistant', content, error: true })
     },
@@ -69,7 +69,9 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
             </span>
             <span className={styles.titles}>
               <span className={styles.title}>Asistente</span>
-              <span className={styles.hint}>Responde sobre este workspace</span>
+              <span className={styles.hint}>
+                {activeTask ? `Sobre «${activeTask.title}»` : 'Responde sobre este espacio de trabajo'}
+              </span>
             </span>
             <button className={styles.close} onClick={close} aria-label="Cerrar el chat">
               <X size={15} strokeWidth={2.75} />
@@ -79,6 +81,7 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
             <Chat
               messages={messages}
               pending={ask.isPending}
+              placeholder={activeTask ? `Preguntale algo sobre «${activeTask.title}»…` : undefined}
               onSend={send}
               onReset={() => reset(workspaceId)}
             />

@@ -34,7 +34,7 @@ de datos reales, y cada cifra que se muestra sale de esos cálculos:
 | Auth, equipos, proyectos, tableros, columnas, tareas, comentarios, adjuntos, actividad | **API real** |
 | Señales (`lib/signals.ts`) | Derivadas del tablero: columna por encima del WIP, fecha vencida, tarea sin tocar 4 días, tarea en curso sin responsable |
 | Pulso: KPIs, series semanales, distribuciones e insights (`lib/metrics.ts`) | Calculados de las tareas y sus fechas |
-| Copiloto | Llama a `POST /api/projects/{id}/ai-plan`, que hoy responde **501 «coming_soon»**. Se muestra tal cual, sin simular resultados |
+| Generar plan | Llama a `POST /api/projects/{id}/ai-plan` (o a sus variantes con documento o descripción), que pide a **DeepSeek** el reparto completo de todos los sprints en una sola respuesta |
 
 ## Estructura
 

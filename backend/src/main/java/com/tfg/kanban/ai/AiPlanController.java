@@ -25,7 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 /**
- * Planificacion automatica con un modelo alojado en Groq.
+ * Planificacion automatica con un modelo alojado en DeepSeek.
  *
  * Son dos pasos a proposito: <b>generar</b> no toca el tablero y <b>aplicar</b>
  * crea solo las tareas que el usuario ha aceptado. El modelo nunca escribe
@@ -41,7 +41,7 @@ public class AiPlanController {
 
     @Operation(summary = "Generar una propuesta de planificacion",
             description = """
-                    Envia a Groq el guion de la practica completo, el calendario, el equipo con
+                    Envia a DeepSeek el guion de la practica completo, el calendario, el equipo con
                     sus horas y preferencias y las tareas que ya existen, y devuelve un plan por
                     sprints, con objetivos y dependencias entre tareas. Lo medible (horas por
                     persona y sprint, dependencias validas) se comprueba en el servidor. No crea
@@ -54,7 +54,7 @@ public class AiPlanController {
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "409", description = "El proyecto no tiene guion de la practica",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "Groq no esta disponible",
+            @ApiResponse(responseCode = "503", description = "DeepSeek no esta disponible",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PreAuthorize("@access.canManageProject(#projectId)")
@@ -87,7 +87,7 @@ public class AiPlanController {
             @ApiResponse(responseCode = "200", description = "Propuesta generada a partir del documento"),
             @ApiResponse(responseCode = "409", description = "Formato no admitido o documento sin texto legible",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "503", description = "Groq no esta disponible",
+            @ApiResponse(responseCode = "503", description = "DeepSeek no esta disponible",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PreAuthorize("@access.canManageProject(#projectId)")

@@ -77,6 +77,7 @@ public class TaskService {
                 .priority(request.priority() == null ? TaskPriority.MEDIA : request.priority())
                 .dueDate(request.dueDate())
                 .estimatedHours(request.estimatedHours())
+                .actualHours(request.actualHours())
                 .boardColumn(column)
                 .assignees(resolveAssignees(column, request.assigneeIds()))
                 .createdBy(creator)
@@ -101,6 +102,7 @@ public class TaskService {
         task.setPriority(request.priority() == null ? TaskPriority.MEDIA : request.priority());
         task.setDueDate(request.dueDate());
         task.setEstimatedHours(request.estimatedHours());
+        task.setActualHours(request.actualHours());
         // Se muta la coleccion gestionada por Hibernate, no se reasigna: asi el
         // @ManyToMany refleja el cambio sobre la misma referencia que observa.
         task.getAssignees().clear();

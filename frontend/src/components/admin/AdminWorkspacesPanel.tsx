@@ -53,7 +53,7 @@ export function AdminWorkspacesPanel() {
   // Se busca en la lista viva: si se borra el que estaba abierto, el detalle se cierra solo.
   const detalle = todos.find((w) => w.id === abierto) ?? null
 
-  if (isPending) return <Skeleton label="Cargando los workspaces…" lines={3} />
+  if (isPending) return <Skeleton label="Cargando los espacios de trabajo…" lines={3} />
 
   return (
     <div className={styles.panel}>
@@ -64,8 +64,8 @@ export function AdminWorkspacesPanel() {
             className={styles.searchInput}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por workspace, creador o correo"
-            aria-label="Buscar workspaces"
+            placeholder="Buscar por espacio de trabajo, creador o correo"
+            aria-label="Buscar espacios de trabajo"
           />
         </div>
 
@@ -85,11 +85,11 @@ export function AdminWorkspacesPanel() {
       {workspaces.length === 0 ? (
         <EmptyState
           icon={<LayoutGrid size={22} strokeWidth={2.75} />}
-          title={todos.length === 0 ? 'Todavía no hay ningún workspace' : 'Sin resultados'}
+          title={todos.length === 0 ? 'Todavía no hay ningún espacio de trabajo' : 'Sin resultados'}
           body={
             todos.length === 0
-              ? 'Aquí aparecerán los workspaces de toda la plataforma en cuanto alguien cree el primero.'
-              : 'Ningún workspace coincide con ese filtro.'
+              ? 'Aquí aparecerán los espacios de trabajo de toda la plataforma en cuanto alguien cree el primero.'
+              : 'Ningún espacio de trabajo coincide con ese filtro.'
           }
         />
       ) : (
@@ -181,7 +181,7 @@ function WorkspaceDetail({
         {workspace.blocked && (
           <p className={styles.detailWarning}>
             <AlertTriangle size={14} strokeWidth={2.75} />
-            Nadie puede administrar este workspace: no queda ninguna persona responsable con la
+            Nadie puede administrar este espacio de trabajo: no queda ninguna persona responsable con la
             cuenta activa. Nombra a alguien del equipo para desatascarlo.
           </p>
         )}
@@ -265,8 +265,8 @@ function WorkspaceDetail({
         </section>
 
         <p className={styles.help}>
-          Desde aquí se ve el estado del workspace, no su contenido: las tareas, los comentarios y los
-          ficheros son del equipo. Lo que hagas queda anotado en la actividad del propio workspace.
+          Desde aquí se ve el estado del espacio de trabajo, no su contenido: las tareas, los comentarios y los
+          ficheros son del equipo. Lo que hagas queda anotado en la actividad del propio espacio de trabajo.
         </p>
 
         <div className={styles.detailDanger}>
@@ -306,7 +306,7 @@ function WorkspaceDetail({
             trigger={
               <Button variant="secondary" small>
                 <Trash2 size={13} strokeWidth={2.75} />
-                Borrar este workspace
+                Borrar este espacio de trabajo
               </Button>
             }
             title={`Borrar «${workspace.name}»`}

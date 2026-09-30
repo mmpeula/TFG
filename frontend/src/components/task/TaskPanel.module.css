@@ -66,6 +66,16 @@
   color: var(--color-neutral-800);
 }
 .propValue:hover { background: var(--color-neutral-200); }
+.propInput {
+  width: 100%;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-neutral-800);
+}
+.propInput:focus { border-color: var(--color-accent-2-500); }
 
 .sectionTitle { font-family: var(--font-body); font-size: 15px; font-weight: 700; }
 

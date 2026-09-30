@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * Deja un texto del modelo en una forma comparable.
  *
- * <p>Hace falta en dos sitios que comparan cosas escritas por un modelo pequeno:
+ * <p>Hace falta en dos sitios que comparan cosas escritas por el modelo:
  * los nombres de las personas a las que dice asignar una tarea
  * ({@link PlanTeam}) y los titulos de las tareas que propone
  * ({@link AiPlanService}, para no repetir lo que ya esta en el tablero). En los

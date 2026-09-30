@@ -12,7 +12,7 @@ import java.time.LocalDate;
  * <p>Detras es un proyecto con su equipo y su tablero, pero eso no se muestra:
  * la tarjeta solo lleva lo que sirve para decidir en cual entrar.</p>
  */
-@Schema(description = "Workspace: una asignatura, practica o trabajo", example = """
+@Schema(description = "Espacio de trabajo: una asignatura, practica o trabajo", example = """
         {"id":5,"name":"Bases de Datos","description":"Practica 2 - modelo E/R",
          "color":"arena","icon":"BD","teamId":1,"boardId":9,"myRole":"RESPONSABLE",
          "totalTasks":8,"doneTasks":3,"pendingTasks":5,"progress":37,"memberCount":4,
@@ -36,11 +36,11 @@ public record WorkspaceResponse(
         @Schema(description = "Inicio del trabajo; con la entrega define la ventana de sprints") LocalDate startDate,
         LocalDate deadline,
         @Schema(description = "Duracion del sprint en dias, la misma para todo el plan") Integer sprintDays,
-        @Schema(description = "Ultimo movimiento registrado en el workspace") Instant lastActivityAt,
+        @Schema(description = "Ultimo movimiento registrado en el espacio de trabajo") Instant lastActivityAt,
         @Schema(description = "False si soporte lo tiene suspendido: sigue en la lista, pero no se "
                 + "puede abrir ni tocar nada suyo hasta que lo reactiven")
         boolean enabled,
-        @Schema(description = "URL de la foto del workspace; null si no tiene y se muestran color e icono")
+        @Schema(description = "URL de la foto del espacio de trabajo; null si no tiene y se muestran color e icono")
         String coverUrl
 ) {
 }

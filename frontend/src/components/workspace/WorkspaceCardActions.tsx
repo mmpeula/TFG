@@ -46,7 +46,7 @@ export function WorkspaceCardActions({ workspace }: { workspace: WorkspaceRespon
               }}
             >
               <LogOut size={14} strokeWidth={2.75} />
-              Salir del workspace
+              Salir del espacio de trabajo
             </DropdownItem>
             {responsable && (
               <DropdownItem
@@ -67,7 +67,7 @@ export function WorkspaceCardActions({ workspace }: { workspace: WorkspaceRespon
         open={confirmando === 'salir'}
         onOpenChange={(abierto) => setConfirmando(abierto ? 'salir' : null)}
         title={`Salir de «${workspace.name}»`}
-        description="Dejaras de ver este workspace y sus tareas. Lo que ya hiciste se queda con el equipo."
+        description="Dejaras de ver este espacio de trabajo y sus tareas. Lo que ya hiciste se queda con el equipo."
         confirmLabel="Salir"
         isPending={removeMember.isPending}
         onConfirm={async () => {

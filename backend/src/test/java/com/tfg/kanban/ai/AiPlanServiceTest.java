@@ -36,22 +36,23 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
- * El documento se manda entero en una sola llamada a Groq: lo fragil no es la
+ * El documento se manda entero en una sola llamada a DeepSeek: lo fragil no es la
  * llamada HTTP en si, sino que al modelo le llegue el calendario y el equipo
- * bien armados, que su respuesta se interprete entera (tareas, objetivos de
- * sprint, dependencias), y que lo medible —horas, dependencias validas— se
- * compruebe en Java, no en su palabra. Eso es lo que se prueba aqui.
+ * bien armados, que su respuesta se interprete entera (epicas, tareas, objetivos
+ * de sprint, dependencias por id), y que lo medible —horas, dependencias validas—
+ * se compruebe en Java, no en su palabra. Eso es lo que se prueba aqui.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AiPlanServiceTest {
 
-    @Mock private GroqClient groqClient;
+    @Mock private DeepSeekClient deepSeekClient;
     @Mock private ProjectService projectService;
     @Mock private BoardService boardService;
     @Mock private TaskRepository taskRepository;
@@ -70,10 +71,9 @@ class AiPlanServiceTest {
         TestSecurity.authenticateAs(1L, "RESPONSABLE");
 
         properties = new AiProperties();
-        properties.setModel("openai/gpt-oss-120b");
-        properties.setMaxRetries(1);
+        properties.setModel("deepseek-flash");
 
-        service = new AiPlanService(properties, groqClient, new ObjectMapper(), projectService,
+        service = new AiPlanService(properties, deepSeekClient, new ObjectMapper(), projectService,
                 boardService, taskRepository, userRepository, activityService, taskMapper,
                 new DocumentTextExtractor(), new AiTaskScheduler());
 
@@ -104,41 +104,47 @@ class AiPlanServiceTest {
     }
 
     /**
-     * Un plan valido de dos sprints: Ana y Luis, con objetivo por sprint y una
-     * dependencia hacia atras valida (la de Luis en el sprint 2 depende de su
-     * propia tarea del sprint 1). Las fechas de "sprints"/"fecha" son
+     * Un plan valido de dos sprints y dos epicas, con dependencias por id (T2
+     * depende de T1, T4 de T2) y las fechas de "sprints"/"fecha_limite"
      * deliberadamente absurdas: sirven para comprobar que el servidor las ignora
      * y pone las suyas.
      */
     private static final String PLAN_VALIDO = """
-            {"resumen":{"duracion_semanas":4,"num_sprints":2},
+            {"proyecto":"Practica 2","resumen":"Reparto por componentes entre dos personas.",
              "sprints":[
-               {"numero":1,"inicio":"2099-01-01","fin":"2099-01-01","objetivo":"Datos y API","fecha_definitiva":true},
-               {"numero":2,"inicio":"2099-01-01","fin":"2099-01-01","objetivo":"Interfaz y pruebas","fecha_definitiva":true}
+               {"nombre":"Sprint 1","inicio":"2099-01-01","fin":"2099-01-01","objetivo":"Datos y API"},
+               {"nombre":"Sprint 2","inicio":"2099-01-01","fin":"2099-01-01","objetivo":"Interfaz y pruebas"}
+             ],
+             "epicas":[
+               {"id":"E1","titulo":"Datos","descripcion":"Modelo de datos","prioridad":"High","etiqueta":"datos"},
+               {"id":"E2","titulo":"API","descripcion":"Endpoints REST","prioridad":"High","etiqueta":"api"},
+               {"id":"E3","titulo":"Interfaz","descripcion":"Pantallas","prioridad":"Medium","etiqueta":"ui"},
+               {"id":"E4","titulo":"Calidad","descripcion":"Pruebas","prioridad":"Medium","etiqueta":"calidad"}
              ],
              "tareas":[
-               {"titulo":"Disenar el modelo de datos","descripcion":"Tablas de libros y prestamos",
-                "tipo":"Task","epica":"Datos","sprint":1,"asignado":"Ana Garcia","horas":7,
-                "prioridad":"alta","fecha":"2099-01-01","motivo":"El apartado 1 pide el modelo E/R","depende_de":[]},
-               {"titulo":"Montar la API de prestamos","descripcion":"Endpoints REST de prestamos",
-                "tipo":"Task","epica":"API","sprint":1,"asignado":"Luis Perez","horas":8,
-                "prioridad":"alta","motivo":"El apartado 2 pide la API","depende_de":["Disenar el modelo de datos"]},
-               {"titulo":"Maquetar el catalogo","descripcion":"Pantalla con el listado de libros",
-                "tipo":"Story","epica":"Interfaz","sprint":2,"asignado":"Ana","horas":6,
-                "prioridad":"media","motivo":"El apartado 3 pide consultar el catalogo","depende_de":[]},
-               {"titulo":"Escribir las pruebas de la API","descripcion":"Pruebas de integracion",
-                "tipo":"Task","epica":"Calidad","sprint":2,"asignado":"Luis Perez","horas":5,
-                "prioridad":"media","motivo":"El apartado 4 pide pruebas","depende_de":["Montar la API de prestamos"]}],
-             "avisos":[]}""";
+               {"id":"T1","epica":"E1","titulo":"Disenar el modelo de datos","descripcion":"Tablas de libros y prestamos",
+                "responsable":"Ana Garcia","prioridad":"High","horas":7,"sprint":"Sprint 1","fecha_limite":"2099-01-01",
+                "dependencias":[],"etiquetas":["backend"],"justificacion":"El apartado 1 pide el modelo E/R"},
+               {"id":"T2","epica":"E2","titulo":"Montar la API de prestamos","descripcion":"Endpoints REST de prestamos",
+                "responsable":"Luis Perez","prioridad":"High","horas":8,"sprint":"Sprint 1",
+                "dependencias":["T1"],"etiquetas":["backend"],"justificacion":"El apartado 2 pide la API"},
+               {"id":"T3","epica":"E3","titulo":"Maquetar el catalogo","descripcion":"Pantalla con el listado de libros",
+                "responsable":"Ana","prioridad":"Medium","horas":6,"sprint":"Sprint 2",
+                "dependencias":[],"justificacion":"El apartado 3 pide consultar el catalogo"},
+               {"id":"T4","epica":"E4","titulo":"Escribir las pruebas de la API","descripcion":"Pruebas de integracion",
+                "responsable":"Luis Perez","prioridad":"Medium","horas":5,"sprint":"Sprint 2",
+                "dependencias":["T2"],"justificacion":"El apartado 4 pide pruebas"}],
+             "carga_por_persona":[],
+             "riesgos":[]}""";
 
     private void modelReplies(String first, String... rest) {
-        when(groqClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString())).thenReturn(first, rest);
+        when(deepSeekClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString())).thenReturn(first, rest);
     }
 
     /** El mensaje de usuario de la primera llamada. */
     private String promptDeUsuario() {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(groqClient, atLeastOnce()).chatJson(eq(AiPlanService.SYSTEM_PROMPT), captor.capture());
+        verify(deepSeekClient, atLeastOnce()).chatJson(eq(AiPlanService.SYSTEM_PROMPT), captor.capture());
         return captor.getAllValues().get(0);
     }
 
@@ -147,28 +153,28 @@ class AiPlanServiceTest {
     // -----------------------------------------------------------------
 
     @Test
-    @DisplayName("El prompt de sistema es el fijo y se llama una sola vez")
+    @DisplayName("El prompt de sistema es el de la Scrum Master, cargado del recurso, y se llama una sola vez")
     void usesTheFixedSystemPromptOnce() {
         modelReplies(PLAN_VALIDO);
 
         service.generate(7L, null);
 
-        verify(groqClient, times(1)).chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString());
+        verify(deepSeekClient, times(1)).chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString());
         assertThat(AiPlanService.SYSTEM_PROMPT)
-                .startsWith("Eres un Scrum Master y Project Manager senior")
-                .contains("REGLAS DE REPARTO (por prioridad")
-                .contains("capacidad útil")
-                .contains("FORMATO DE SALIDA")
-                .contains("depende_de");
+                .startsWith("Eres un Scrum Master experto")
+                .contains("## Proceso")
+                .contains("## Formato de salida")
+                .contains("## Reglas")
+                .contains("\"epicas\"")
+                .contains("\"dependencias\"");
     }
 
     @Test
-    @DisplayName("El formato de salida no pide las fechas: las pone el servidor y gastarian cuota")
-    void theOutputFormatSkipsWhatTheServerComputes() {
+    @DisplayName("El prompt pide el plan entero de una vez, no por partes")
+    void theSystemPromptAsksForTheWholePlanAtOnce() {
         assertThat(AiPlanService.SYSTEM_PROMPT)
-                .doesNotContain("YYYY-MM-DD")
-                .doesNotContain("carga_por_persona")
-                .doesNotContain("duracion_semanas");
+                .contains("todas las épicas y todas las tareas de todos los sprints")
+                .contains("No lo dividas en partes");
     }
 
     @Test
@@ -190,43 +196,17 @@ class AiPlanServiceTest {
     }
 
     @Test
-    @DisplayName("Cada persona llega con sus horas, sus preferencias y su capacidad util ya calculada")
-    void teamLinesCarryRoleAndCapacity() {
+    @DisplayName("Cada persona llega con su rol y sus preferencias")
+    void teamLinesCarryRoleAndPreferences() {
         modelReplies(PLAN_VALIDO);
 
         service.generate(7L, new PlanOptions(null, null, null, List.of(
-                new PlanOptions.TeamSlot(1L, 8, "Frontend; React y maquetacion"),
-                new PlanOptions.TeamSlot(2L, 12, "Backend; Java y Spring"))));
-
-        // 8 y 12 h/semana en 14 dias son 16 y 24 h; sin el 10 % de margen, 14.4 y 21.6.
-        assertThat(promptDeUsuario())
-                .contains("- Ana García (lider) | 8 h/semana | rol y preferencias: Frontend; React y maquetacion")
-                .contains("- Luis Perez | 12 h/semana | rol y preferencias: Backend; Java y Spring")
-                .contains("capacidad util: Ana García 14.4 h, Luis Perez 21.6 h (equipo 36 h)");
-    }
-
-    @Test
-    @DisplayName("Sin fecha de entrega, cada persona lleva su capacidad util por sprint")
-    void withoutDeadlineEachPersonCarriesItsCapacityPerSprint() {
-        project.setDeadline(null);
-        modelReplies(PLAN_VALIDO);
-
-        service.generate(7L, null);
+                new PlanOptions.TeamSlot(1L, "Frontend; React y maquetacion"),
+                new PlanOptions.TeamSlot(2L, "Backend; Java y Spring"))));
 
         assertThat(promptDeUsuario())
-                .contains("- Luis Perez | 10 h/semana | capacidad util: 18 h por sprint | rol y preferencias");
-    }
-
-    @Test
-    @DisplayName("Quien tiene 0 h llega marcado como no disponible")
-    void zeroHoursIsMarkedAsUnavailable() {
-        modelReplies(PLAN_VALIDO);
-
-        service.generate(7L, new PlanOptions(null, null, null, List.of(
-                new PlanOptions.TeamSlot(1L, 10, null),
-                new PlanOptions.TeamSlot(2L, 0, null))));
-
-        assertThat(promptDeUsuario()).contains("- Luis Perez | 0 h/semana (no disponible) | rol y preferencias");
+                .contains("- Ana García (lider) | rol y preferencias: Frontend; React y maquetacion")
+                .contains("- Luis Perez | rol y preferencias: Backend; Java y Spring");
     }
 
     @Test
@@ -238,8 +218,8 @@ class AiPlanServiceTest {
         service.generate(7L, null);
 
         assertThat(promptDeUsuario())
-                .contains("Luis Perez | 10 h/semana | rol y preferencias: Evitar frontend si hay alternativa")
-                .contains("Ana García (lider) | 10 h/semana | rol y preferencias: sin especificar");
+                .contains("Luis Perez | rol y preferencias: Evitar frontend si hay alternativa")
+                .contains("Ana García (lider) | rol y preferencias: sin especificar");
     }
 
     @Test
@@ -248,10 +228,10 @@ class AiPlanServiceTest {
         modelReplies(PLAN_VALIDO);
 
         service.generate(7L, new PlanOptions(null, null, null, List.of(
-                new PlanOptions.TeamSlot(2L, 10, null),
+                new PlanOptions.TeamSlot(2L, null),
                 // No es del equipo del reparto: el docente y alguien que no existe se ignoran.
-                new PlanOptions.TeamSlot(3L, 10, null),
-                new PlanOptions.TeamSlot(99L, 10, null))));
+                new PlanOptions.TeamSlot(3L, null),
+                new PlanOptions.TeamSlot(99L, null))));
 
         assertThat(promptDeUsuario())
                 .contains("EQUIPO (1 persona)")
@@ -264,12 +244,12 @@ class AiPlanServiceTest {
     @Test
     @DisplayName("Sin nadie en el reparto no se llama al modelo")
     void anEmptyTeamIsRejected() {
-        var options = new PlanOptions(null, null, null, List.of(new PlanOptions.TeamSlot(3L, 10, null)));
+        var options = new PlanOptions(null, null, null, List.of(new PlanOptions.TeamSlot(3L, null)));
 
         assertThatThrownBy(() -> service.generate(7L, options))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("No hay nadie del equipo");
-        verifyNoInteractions(groqClient);
+        verifyNoInteractions(deepSeekClient);
     }
 
     @Test
@@ -280,8 +260,9 @@ class AiPlanServiceTest {
 
         var response = service.generate(7L, null);
 
-        assertThat(promptDeUsuario()).contains("No hay fecha de entrega fijada").contains("resumen.num_sprints");
-        verify(groqClient, times(1)).chatJson(anyString(), anyString());
+        assertThat(promptDeUsuario()).contains("No hay fecha de entrega fijada")
+                .contains("devuelve uno en \"sprints\" por cada uno");
+        verify(deepSeekClient, times(1)).chatJson(anyString(), anyString());
         assertThat(response.sprints()).hasSize(2);
         assertThat(response.sprints().get(1).end()).isEqualTo(inicio.plusDays(27));
     }
@@ -297,7 +278,6 @@ class AiPlanServiceTest {
 
         var response = service.generate(7L, null);
 
-        assertThat(response.attempts()).isEqualTo(1);
         assertThat(response.durationWeeks()).isEqualTo(4);
         assertThat(response.tasks()).hasSize(4);
 
@@ -305,16 +285,17 @@ class AiPlanServiceTest {
         assertThat(api.title()).isEqualTo("Montar la API de prestamos");
         assertThat(api.description()).isEqualTo("Endpoints REST de prestamos");
         assertThat(api.reason()).isEqualTo("El apartado 2 pide la API");
-        assertThat(api.type()).isEqualTo(TaskType.TAREA);
+        // El prompt nuevo no pide "tipo" por tarea: sin el, se deja sin clasificar.
+        assertThat(api.type()).isNull();
         assertThat(api.epic()).isEqualTo("API");
         assertThat(api.sprint()).isEqualTo(1);
         assertThat(api.priority()).isEqualTo(TaskPriority.ALTA);
         assertThat(api.estimatedHours()).isEqualByComparingTo("8");
-        assertThat(response.tasks().get(2).type()).isEqualTo(TaskType.HISTORIA);
+        assertThat(api.labels()).containsExactly("backend");
     }
 
     @Test
-    @DisplayName("El objetivo de cada sprint viene del modelo (\"goal\"), no se deja vacio")
+    @DisplayName("El objetivo de cada sprint viene del modelo, no se deja vacio")
     void sprintGoalComesFromTheModel() {
         modelReplies(PLAN_VALIDO);
 
@@ -325,8 +306,29 @@ class AiPlanServiceTest {
     }
 
     @Test
-    @DisplayName("Una dependencia valida (misma tarea o sprint anterior) se conserva en dependsOn")
-    void validDependenciesAreKept() {
+    @DisplayName("La referencia a una epica por id se resuelve a su titulo")
+    void epicReferenceResolvesToItsTitle() {
+        modelReplies(PLAN_VALIDO);
+
+        var response = service.generate(7L, null);
+
+        assertThat(response.tasks().get(0).epic()).isEqualTo("Datos");
+        assertThat(response.tasks().get(3).epic()).isEqualTo("Calidad");
+    }
+
+    @Test
+    @DisplayName("Una epica con un id que no esta en \"epicas\" conserva el id tal cual, en vez de perderse")
+    void unknownEpicIdKeepsTheRawReference() {
+        modelReplies(PLAN_VALIDO.replace("\"epica\":\"E1\"", "\"epica\":\"E9\""));
+
+        var response = service.generate(7L, null);
+
+        assertThat(response.tasks().get(0).epic()).isEqualTo("E9");
+    }
+
+    @Test
+    @DisplayName("Una dependencia por id (T1, T2...) se conserva como el titulo de la tarea previa")
+    void validDependenciesAreResolvedFromIdToTitle() {
         modelReplies(PLAN_VALIDO);
 
         var response = service.generate(7L, null);
@@ -339,9 +341,9 @@ class AiPlanServiceTest {
     @Test
     @DisplayName("Una dependencia hacia un sprint posterior se descarta y se avisa, sin tirar la tarea")
     void forwardDependencyIsDropped() {
-        modelReplies(PLAN_VALIDO.replace(
-                "\"motivo\":\"El apartado 1 pide el modelo E/R\",\"depende_de\":[]",
-                "\"motivo\":\"El apartado 1 pide el modelo E/R\",\"depende_de\":[\"Maquetar el catalogo\"]"));
+        // T1 (sprint 1) pasa a depender de T3 (sprint 2): hacia adelante, no vale.
+        modelReplies(PLAN_VALIDO.replaceFirst(
+                "\"dependencias\":\\[\\]", "\"dependencias\":[\"T3\"]"));
 
         var response = service.generate(7L, null);
 
@@ -354,30 +356,16 @@ class AiPlanServiceTest {
     }
 
     @Test
-    @DisplayName("Una dependencia hacia una tarea que no existe tambien se descarta y se avisa")
+    @DisplayName("Una dependencia hacia un id que no existe se descarta y se avisa")
     void dependencyOnAMissingTaskIsDropped() {
-        modelReplies(PLAN_VALIDO.replace("\"depende_de\":[\"Disenar el modelo de datos\"]",
-                "\"depende_de\":[\"Tarea que no existe\"]"));
+        modelReplies(PLAN_VALIDO.replace("\"dependencias\":[\"T1\"]", "\"dependencias\":[\"T99\"]"));
 
         var response = service.generate(7L, null);
 
         assertThat(response.tasks().get(1).dependsOn()).isEmpty();
         assertThat(response.warnings()).anySatisfy(aviso -> assertThat(aviso)
                 .contains("descartado una dependencia")
-                .contains("Tarea que no existe"));
-    }
-
-    @Test
-    @DisplayName("Si el modelo marca un sprint sin fecha definitiva, se avisa")
-    void notDefinitiveSprintDateBecomesAWarning() {
-        modelReplies(PLAN_VALIDO.replace(
-                "\"objetivo\":\"Interfaz y pruebas\",\"fecha_definitiva\":true",
-                "\"objetivo\":\"Interfaz y pruebas\",\"fecha_definitiva\":false"));
-
-        var response = service.generate(7L, null);
-
-        assertThat(response.warnings()).anySatisfy(aviso -> assertThat(aviso)
-                .contains("sprint 2").contains("no tiene fecha exacta confirmada"));
+                .contains("T99"));
     }
 
     @Test
@@ -395,11 +383,11 @@ class AiPlanServiceTest {
     }
 
     @Test
-    @DisplayName("El modelo puede asignar la misma tarea a varias personas cuando lo decide")
+    @DisplayName("El modelo puede asignar la misma tarea a varias personas si usa un array")
     void resolvesMultipleAssigneesAgainstTheTeam() {
         modelReplies(PLAN_VALIDO.replace(
-                "\"asignado\":\"Ana Garcia\",\"horas\":7,",
-                "\"asignado\":[\"Ana Garcia\",\"Luis Perez\"],\"horas\":7,"));
+                "\"responsable\":\"Ana Garcia\",\"prioridad\":\"High\",\"horas\":7,",
+                "\"responsable\":[\"Ana Garcia\",\"Luis Perez\"],\"prioridad\":\"High\",\"horas\":7,"));
 
         var response = service.generate(7L, null);
 
@@ -408,10 +396,10 @@ class AiPlanServiceTest {
     }
 
     @Test
-    @DisplayName("Tambien se acepta un array bajo la clave en plural \"asignados\"")
+    @DisplayName("Tambien se acepta un array bajo la clave en plural \"asignados\", por si el modelo cambia de formato")
     void resolvesAssigneesUnderThePluralKey() {
         modelReplies(PLAN_VALIDO.replace(
-                "\"asignado\":\"Ana Garcia\"", "\"asignados\":[\"Ana Garcia\",\"Luis Perez\"]"));
+                "\"responsable\":\"Ana Garcia\"", "\"asignados\":[\"Ana Garcia\",\"Luis Perez\"]"));
 
         var response = service.generate(7L, null);
 
@@ -422,8 +410,8 @@ class AiPlanServiceTest {
     @DisplayName("Un nombre del array que no esta en el equipo conserva el texto crudo, sin id")
     void keepsUnmatchedAssigneeNameAsRawText() {
         modelReplies(PLAN_VALIDO.replace(
-                "\"asignado\":\"Ana Garcia\",\"horas\":7,",
-                "\"asignado\":[\"Ana Garcia\",\"Fantasma\"],\"horas\":7,"));
+                "\"responsable\":\"Ana Garcia\",\"prioridad\":\"High\",\"horas\":7,",
+                "\"responsable\":[\"Ana Garcia\",\"Fantasma\"],\"prioridad\":\"High\",\"horas\":7,"));
 
         var response = service.generate(7L, null);
 
@@ -445,15 +433,17 @@ class AiPlanServiceTest {
         // El sprint acaba en domingo: su ultimo dia laborable es el viernes anterior.
         assertThat(response.tasks().get(0).dueDate()).isEqualTo(inicio.plusDays(11));
         assertThat(response.tasks().get(3).dueDate()).isEqualTo(inicio.plusDays(25));
-        // El plan mockeado pone "2099-01-01" en sprints e "inicio"/"fin"/"fecha": si algo de
-        // esto se colara, las fechas de arriba no cuadrarian.
+        // El plan mockeado pone "2099-01-01" en sprints e "inicio"/"fin"/"fecha_limite": si
+        // algo de esto se colara, las fechas de arriba no cuadrarian.
         assertThat(response.sprints().get(0).start()).isNotEqualTo(LocalDate.of(2099, 1, 1));
     }
 
     @Test
-    @DisplayName("La barra de reparto cuenta las horas del plan, no lo que el modelo dice de si mismo")
-    void workloadIsCountedFromTheTasks() {
-        modelReplies(PLAN_VALIDO);
+    @DisplayName("La barra de reparto cuenta las horas del plan, no lo que el modelo dice de si mismo "
+            + "(\"carga_por_persona\" se ignora)")
+    void workloadIsCountedFromTheTasksNotFromTheModelsSelfReport() {
+        modelReplies(PLAN_VALIDO.replace("\"carga_por_persona\":[]",
+                "\"carga_por_persona\":[{\"persona\":\"Ana Garcia\",\"horas\":999,\"componentes\":[\"Datos\"]}]"));
 
         var response = service.generate(7L, null);
 
@@ -469,7 +459,7 @@ class AiPlanServiceTest {
     void hourBalanceCountsFullHoursForEachCoAssignee() {
         modelReplies("""
                 {"tareas":[{"titulo":"Disenar la autenticacion","sprint":1,
-                  "asignado":["Ana Garcia","Luis Perez"],"horas":6}]}""");
+                  "responsable":["Ana Garcia","Luis Perez"],"horas":6}]}""");
 
         var response = service.generate(7L, null);
 
@@ -478,102 +468,9 @@ class AiPlanServiceTest {
     }
 
     @Test
-    @DisplayName("Cada persona lleva en el resultado la capacidad de todo el plan, para comparar con sus horas")
-    void workloadCarriesTheCapacityOfThePlan() {
-        modelReplies(PLAN_VALIDO);
-
-        var response = service.generate(7L, null);
-
-        // 10 h/semana por defecto, dos sprints de 14 dias: 20 + 20.
-        assertThat(response.workload()).allSatisfy(workload ->
-                assertThat(workload.capacityHours()).isEqualByComparingTo("40"));
-    }
-
-    /** Un plan de un solo sprint con las horas dadas para Ana y Luis. */
-    private static String unSprint(int horasAna, int horasLuis) {
-        return """
-                {"tareas":[
-                  {"titulo":"Trabajo de Ana","sprint":1,"asignado":"Ana Garcia","horas":%d},
-                  {"titulo":"Trabajo de Luis","sprint":1,"asignado":"Luis Perez","horas":%d}]}"""
-                .formatted(horasAna, horasLuis);
-    }
-
-    @Test
-    @DisplayName("Si alguien pasa de su capacidad en un sprint, se avisa")
-    void overloadIsWarned() {
-        modelReplies(unSprint(24, 10));
-
-        var response = service.generate(7L, null);
-
-        assertThat(response.warnings()).anySatisfy(aviso -> assertThat(aviso)
-                .contains("sprint 1").contains("Ana García tiene 24 h y solo dispone de 20 h"));
-    }
-
-    @Test
-    @DisplayName("Horas distintas en proporcion a la disponibilidad de cada uno no son un desequilibrio")
-    void proportionalHoursAreNotAnImbalance() {
-        modelReplies(unSprint(8, 24));
-
-        // 5 y 15 h/semana: 10 y 30 h por sprint. 8 y 24 son un 80 % para los dos.
-        var response = service.generate(7L, new PlanOptions(null, null, null, List.of(
-                new PlanOptions.TeamSlot(1L, 5, null),
-                new PlanOptions.TeamSlot(2L, 15, null))));
-
-        assertThat(response.warnings()).noneMatch(aviso -> aviso.contains("revisa el reparto"));
-    }
-
-    @Test
-    @DisplayName("Si alguien usa mucho menos de sus horas que quien mas usa las suyas, se avisa")
-    void relativeImbalanceIsWarned() {
-        modelReplies(unSprint(18, 4));
-
-        var response = service.generate(7L, null);
-
-        assertThat(response.warnings()).anySatisfy(aviso -> assertThat(aviso)
-                .contains("Luis Perez usa el 20% de sus horas frente al 90% de Ana García"));
-    }
-
-    @Test
-    @DisplayName("Quien se queda sin trabajo en un sprint sin que el modelo lo explique se avisa")
-    void idleWithoutExplanationIsWarned() {
-        modelReplies("""
-                {"tareas":[{"titulo":"Trabajo de Ana","sprint":1,"asignado":"Ana Garcia","horas":18}]}""");
-
-        var response = service.generate(7L, null);
-
-        assertThat(response.warnings()).anySatisfy(aviso -> assertThat(aviso)
-                .contains("Luis Perez usa el 0% de sus horas"));
-    }
-
-    @Test
-    @DisplayName("Si el modelo explica que alguien no esta en un sprint (vacaciones), no se le contradice")
-    void idleExplainedByTheModelIsNotWarnedAgain() {
-        modelReplies("""
-                {"tareas":[{"titulo":"Trabajo de Ana","sprint":1,"asignado":"Ana Garcia","horas":18}],
-                 "avisos":["Luis Pérez no está disponible en el sprint 1 por vacaciones"]}""");
-
-        var response = service.generate(7L, null);
-
-        assertThat(response.warnings()).noneMatch(aviso -> aviso.contains("usa el 0%"));
-    }
-
-    @Test
-    @DisplayName("Si alguien sin horas disponibles recibe tareas, se avisa")
-    void tasksForSomeoneWithoutHoursAreWarned() {
-        modelReplies(unSprint(8, 4));
-
-        var response = service.generate(7L, new PlanOptions(null, null, null, List.of(
-                new PlanOptions.TeamSlot(1L, 10, null),
-                new PlanOptions.TeamSlot(2L, 0, null))));
-
-        assertThat(response.warnings()).anySatisfy(aviso -> assertThat(aviso)
-                .contains("Luis Perez no tiene horas disponibles y se le ha asignado 1 tarea"));
-    }
-
-    @Test
-    @DisplayName("Los avisos que pone el propio modelo llegan a la respuesta")
-    void modelWarningsAreKept() {
-        modelReplies(PLAN_VALIDO.replace("\"avisos\":[]", "\"avisos\":[\"El documento no dice la duracion\"]"));
+    @DisplayName("Los riesgos que pone el propio modelo llegan a la respuesta como avisos")
+    void modelRisksBecomeWarnings() {
+        modelReplies(PLAN_VALIDO.replace("\"riesgos\":[]", "\"riesgos\":[\"El documento no dice la duracion\"]"));
 
         var response = service.generate(7L, null);
 
@@ -581,39 +478,19 @@ class AiPlanServiceTest {
     }
 
     @Test
-    @DisplayName("Un criterio detectado sin ninguna tarea relacionada se avisa, no se deja pasar en silencio")
-    void criterionWithoutAnyRelatedTaskGetsAWarning() {
-        modelReplies(PLAN_VALIDO.replace("\"duracion_semanas\":4,\"num_sprints\":2}",
-                "\"duracion_semanas\":4,\"num_sprints\":2,\"criterios_detectados\":["
-                        + "{\"criterio\":\"Presentacion final\",\"peso_o_importancia\":\"1 punto\","
-                        + "\"tareas_relacionadas\":[]}]}"));
+    @DisplayName("Tambien se acepta \"avisos\" en vez de \"riesgos\", por compatibilidad")
+    void acceptsAvisosAsAnAliasForRiesgos() {
+        modelReplies(PLAN_VALIDO.replace("\"riesgos\":[]", "\"avisos\":[\"Aviso con la clave antigua\"]"));
 
         var response = service.generate(7L, null);
 
-        assertThat(response.warnings()).anySatisfy(aviso -> assertThat(aviso)
-                .contains("Presentacion final")
-                .contains("no tiene ninguna tarea asociada"));
-    }
-
-    @Test
-    @DisplayName("Si todos los criterios detectados tienen alguna tarea relacionada, no hay aviso de cobertura")
-    void criteriaFullyCoveredProduceNoCoverageWarning() {
-        modelReplies(PLAN_VALIDO.replace("\"duracion_semanas\":4,\"num_sprints\":2}",
-                "\"duracion_semanas\":4,\"num_sprints\":2,\"criterios_detectados\":["
-                        + "{\"criterio\":\"Modelo de datos\",\"peso_o_importancia\":\"2 puntos\","
-                        + "\"tareas_relacionadas\":[\"Disenar el modelo de datos\"]}]}"));
-
-        var response = service.generate(7L, null);
-
-        assertThat(response.warnings()).noneMatch(aviso -> aviso.contains("no tiene ninguna tarea asociada"));
+        assertThat(response.warnings()).contains("Aviso con la clave antigua");
     }
 
     /**
-     * Texto real de un guion de practica de agentes con JADE: 8445 caracteres,
-     * con la rubrica de evaluacion (0.5/0.5/1/2/2/3/1 puntos) empezando en el
-     * caracter 7137, muy por encima de DOCUMENT_CHARS_FOR_MODEL (6000). Sin el
-     * detector de criterios, esa rubrica quedaria fuera de lo que ve el modelo
-     * por el simple recorte de longitud: es justo el caso que reprodujo el bug.
+     * Texto real de un guion de practica de agentes con JADE: 8445 caracteres.
+     * Sirve para comprobar que un documento largo y con caracteres acentuados
+     * llega entero al modelo y se interpreta bien, no solo con texto sintetico.
      */
     private static final String DOCUMENTO_JADE = """
             Práctica 2. Movimiento de una
@@ -758,46 +635,26 @@ class AiPlanServiceTest {
             """;
 
     @Test
-    @DisplayName("La rubrica de evaluacion del guion de JADE sobrevive al recorte del documento y no queda sin cubrir")
-    void jadeEvaluationCriteriaSurviveTruncationAndAreFullyCovered() {
+    @DisplayName("Un documento real, largo y con acentos llega entero al modelo y las tareas salen bien")
+    void aRealLongDocumentReachesTheModelWholeAndParsesFine() {
         assertThat(DOCUMENTO_JADE.length()).isGreaterThan(6_000);
         project.setBriefing(DOCUMENTO_JADE);
         modelReplies("""
-                {"resumen":{"duracion_semanas":4,"num_sprints":2,"criterios_detectados":[
-                  {"criterio":"Mundo sin obstaculos y con obstaculos basicos","peso_o_importancia":"0.5 puntos",
-                   "tareas_relacionadas":["Resolver mundo sin obstaculos y con obstaculos basicos"]},
-                  {"criterio":"Mundo con obstaculos concavos","peso_o_importancia":"0.5 puntos",
-                   "tareas_relacionadas":["Resolver mundo con obstaculos concavos"]},
-                  {"criterio":"Mundo con obstaculos convexos","peso_o_importancia":"1 punto",
-                   "tareas_relacionadas":["Resolver mundo con obstaculos convexos"]},
-                  {"criterio":"Mundos complejos","peso_o_importancia":"2 puntos",
-                   "tareas_relacionadas":["Resolver mundos complejos"]},
-                  {"criterio":"Mundo sorpresa","peso_o_importancia":"2 puntos",
-                   "tareas_relacionadas":["Resolver el mundo sorpresa"]},
-                  {"criterio":"Arquitectura de software","peso_o_importancia":"3 puntos",
-                   "tareas_relacionadas":["Disenar y justificar la arquitectura de software"]},
-                  {"criterio":"Presentacion","peso_o_importancia":"1 punto",
-                   "tareas_relacionadas":["Preparar y realizar la presentacion"]}
-                ]},
+                {"epicas":[{"id":"E1","titulo":"Movimiento","descripcion":"Resolver los mundos"}],
                  "tareas":[
-                  {"titulo":"Resolver mundo sin obstaculos y con obstaculos basicos","sprint":1,"asignado":"Ana Garcia","horas":4},
-                  {"titulo":"Resolver mundo con obstaculos concavos","sprint":1,"asignado":"Ana Garcia","horas":4},
-                  {"titulo":"Resolver mundo con obstaculos convexos","sprint":1,"asignado":"Luis Perez","horas":5},
-                  {"titulo":"Resolver mundos complejos","sprint":2,"asignado":"Luis Perez","horas":6},
-                  {"titulo":"Resolver el mundo sorpresa","sprint":2,"asignado":"Ana Garcia","horas":6},
-                  {"titulo":"Disenar y justificar la arquitectura de software","sprint":1,"asignado":"Luis Perez","horas":5},
-                  {"titulo":"Preparar y realizar la presentacion","sprint":2,"asignado":"Ana Garcia","horas":3}
+                  {"id":"T1","epica":"E1","titulo":"Resolver mundo sin obstaculos y con obstaculos basicos","sprint":1,"responsable":"Ana Garcia","horas":4},
+                  {"id":"T2","epica":"E1","titulo":"Resolver mundo con obstaculos concavos","sprint":1,"responsable":"Ana Garcia","horas":4},
+                  {"id":"T3","epica":"E1","titulo":"Resolver mundo con obstaculos convexos","sprint":1,"responsable":"Luis Perez","horas":5},
+                  {"id":"T4","epica":"E1","titulo":"Resolver mundos complejos","sprint":2,"responsable":"Luis Perez","horas":6},
+                  {"id":"T5","epica":"E1","titulo":"Resolver el mundo sorpresa","sprint":2,"responsable":"Ana Garcia","horas":6},
+                  {"id":"T6","epica":"E1","titulo":"Disenar y justificar la arquitectura de software","sprint":1,"responsable":"Luis Perez","horas":5},
+                  {"id":"T7","epica":"E1","titulo":"Preparar y realizar la presentacion","sprint":2,"responsable":"Ana Garcia","horas":3}
                  ]}""");
 
         var response = service.generate(7L, null);
 
-        // La rubrica empieza en el caracter 7137 del documento: por encima del
-        // recorte de 6000. Si el prompt la lleva de todas formas es porque el
-        // detector de criterios la ha sacado aparte, no porque haya sobrevivido
-        // al recorte por su cuenta.
         assertThat(promptDeUsuario())
-                .contains("CRITERIOS DE EVALUACION Y REQUISITOS DETECTADOS")
-                .contains("0.5 puntos")
+                .contains(DOCUMENTO_JADE)
                 .contains("Documentos a entregar");
 
         assertThat(response.tasks()).extracting(ProposedTask::title).contains(
@@ -808,8 +665,7 @@ class AiPlanServiceTest {
                 "Resolver el mundo sorpresa",
                 "Disenar y justificar la arquitectura de software",
                 "Preparar y realizar la presentacion");
-
-        assertThat(response.warnings()).noneMatch(aviso -> aviso.contains("no tiene ninguna tarea asociada"));
+        assertThat(response.tasks()).allSatisfy(task -> assertThat(task.epic()).isEqualTo("Movimiento"));
     }
 
     @Test
@@ -851,8 +707,8 @@ class AiPlanServiceTest {
         project.setDeadline(inicio.plusDays(13));
         modelReplies("""
                 {"tareas":[{"titulo":"Escribir la historia de la funcionalidad X","sprint":1,
-                  "asignado":"Ana Garcia","horas":4,
-                  "motivo":"PENDIENTE: falta una historia de usuario concreta en el documento"}]}""");
+                  "responsable":"Ana Garcia","horas":4,
+                  "justificacion":"PENDIENTE: falta una historia de usuario concreta en el documento"}]}""");
 
         var response = service.generate(7L, null);
 
@@ -881,94 +737,161 @@ class AiPlanServiceTest {
     }
 
     @Test
-    @DisplayName("Un documento muy largo se recorta antes de mandarlo al modelo, para no superar la cuota de Groq")
-    void longDocumentsAreTruncatedBeforeReachingTheModel() {
-        // Muy por debajo del tope de seguridad del extractor (80000): esto prueba
-        // el recorte propio del prompt, que existe por la cuota de Groq (8000
-        // tokens/minuto), no por el limite de contexto del modelo.
+    @DisplayName("Un documento largo se manda entero al modelo, sin recortar ni avisar de recorte")
+    void longDocumentsReachTheModelWhole() {
+        // Muy por debajo del tope de seguridad del extractor (80000).
         String documentoLargo = "Apartado del guion. ".repeat(1000);
         project.setBriefing(documentoLargo);
         modelReplies(PLAN_VALIDO);
 
         var response = service.generate(7L, null);
 
-        assertThat(promptDeUsuario())
-                .contains("[...documento recortado por longitud...]")
-                .doesNotContain(documentoLargo);
-        assertThat(response.warnings()).anySatisfy(aviso -> assertThat(aviso)
-                .contains("cuota de tokens por minuto de Groq"));
-    }
-
-    @Test
-    @DisplayName("Un documento corto no lleva ningun aviso de recorte")
-    void shortDocumentsAreNotTruncated() {
-        modelReplies(PLAN_VALIDO);
-
-        var response = service.generate(7L, null);
-
-        assertThat(promptDeUsuario()).doesNotContain("recortado");
-        assertThat(response.warnings()).noneMatch(aviso -> aviso.contains("cuota de tokens"));
+        assertThat(promptDeUsuario()).contains(documentoLargo);
+        assertThat(response.warnings()).noneMatch(aviso -> aviso.contains("recort"));
     }
 
     // -----------------------------------------------------------------
-    // JSON roto: reintentar y, si no hay manera, avisar de que no se pudo
+    // Interpretar la respuesta: formatos alternativos que puede usar el modelo
     // -----------------------------------------------------------------
 
     @Test
-    @DisplayName("Un JSON roto se reintenta antes de darlo por perdido")
-    void retriesOnceOnBrokenJson() {
-        modelReplies("esto no es json", PLAN_VALIDO);
+    @DisplayName("Se entienden sprint, horas y prioridad aunque vengan como texto o en otra forma")
+    void parseToleratesAlternativeFormats() {
+        var parsed = service.parse("""
+                {"tareas":[
+                  {"titulo":"Arreglar el login","sprint":"Sprint 2","horas":"3,5 h","prioridad":"Highest",
+                   "responsable":["Ana Garcia","Luis Perez"]},
+                  {"titulo":"Agrupar la entrega","sprint":1,"horas":"cuatro","prioridad":"High"},
+                  {"titulo":"Revisar incidencias","horas":150,"prioridad":"Low"},
+                  {"titulo":"   "},
+                  {"descripcion":"una tarea sin titulo no cuenta"}
+                ],
+                 "sprints":[{"nombre":"Sprint 1","objetivo":"Base"},
+                            {"nombre":2,"objetivo":"Cierre"}]}""");
+
+        assertThat(parsed.tasks()).extracting(ProposedTask::title)
+                .containsExactly("Arreglar el login", "Agrupar la entrega", "Revisar incidencias");
+
+        ProposedTask login = parsed.tasks().get(0);
+        assertThat(login.sprint()).isEqualTo(2);
+        assertThat(login.estimatedHours()).isEqualByComparingTo("3.5");
+        assertThat(login.priority()).isEqualTo(TaskPriority.CRITICA);
+        assertThat(login.assigneeNames()).containsExactly("Ana Garcia", "Luis Perez");
+
+        ProposedTask entrega = parsed.tasks().get(1);
+        assertThat(entrega.estimatedHours()).as("sin numero no hay horas").isNull();
+        assertThat(entrega.priority()).isEqualTo(TaskPriority.ALTA);
+
+        ProposedTask incidencias = parsed.tasks().get(2);
+        assertThat(incidencias.sprint()).isNull();
+        assertThat(incidencias.estimatedHours()).as("mas de 100 h no es una tarea razonable").isNull();
+        assertThat(incidencias.priority()).isEqualTo(TaskPriority.BAJA);
+
+        assertThat(parsed.goals().get(1).objetivo()).isEqualTo("Base");
+        assertThat(parsed.goals().get(2).objetivo()).isEqualTo("Cierre");
+        assertThat(parsed.numSprints()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Las etiquetas de una tarea llegan como lista de texto")
+    void parseReadsLabels() {
+        var parsed = service.parse("""
+                {"tareas":[{"titulo":"Montar el backend","sprint":1,"etiquetas":["backend","urgente"]}]}""");
+
+        assertThat(parsed.tasks().get(0).labels()).containsExactly("backend", "urgente");
+    }
+
+    @Test
+    @DisplayName("Sin etiquetas, la lista viene vacia y no null, para no tener que comprobarlo fuera")
+    void parseDefaultsLabelsToEmpty() {
+        var parsed = service.parse("""
+                {"tareas":[{"titulo":"Montar el backend","sprint":1}]}""");
+
+        assertThat(parsed.tasks().get(0).labelsOrEmpty()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Una lista de tareas suelta, sin objeto alrededor, tambien se acepta")
+    void parseAcceptsABareArrayOfTasks() {
+        var parsed = service.parse("[{\"titulo\":\"Escribir la memoria\",\"sprint\":1,\"assignee\":\"Ana\"}]");
+
+        assertThat(parsed.tasks()).extracting(ProposedTask::title).containsExactly("Escribir la memoria");
+        assertThat(parsed.tasks().get(0).assigneeNames()).containsExactly("Ana");
+        assertThat(parsed.numSprints()).isNull();
+        assertThat(parsed.goals()).isEmpty();
+        assertThat(parsed.modelWarnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Un JSON sin lista de tareas no es un plan")
+    void parseRejectsJsonWithoutTasks() {
+        assertThatThrownBy(() -> service.parse("{\"proyecto\":\"X\"}"))
+                .isInstanceOf(AiPlanService.InvalidPlanException.class);
+    }
+
+    // -----------------------------------------------------------------
+    // Un JSON roto se reintenta una vez, pidiendo la correccion con el error
+    // -----------------------------------------------------------------
+
+    @Test
+    @DisplayName("Un JSON roto se reintenta una vez, pasandole su respuesta y el error; si tampoco esa vez "
+            + "es legible, se avisa")
+    void brokenJsonIsRetriedOnceWithTheParseError() {
+        when(deepSeekClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString())).thenReturn("esto no es json");
+        when(deepSeekClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyList())).thenReturn("tampoco esto");
+
+        assertThatThrownBy(() -> service.generate(7L, null))
+                .isInstanceOf(AiUnavailableException.class)
+                .hasMessageContaining("ni siquiera tras pedirle que lo corrija");
+
+        verify(deepSeekClient, times(1)).chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString());
+        verify(deepSeekClient, times(1)).chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyList());
+    }
+
+    @Test
+    @DisplayName("Si la correccion si es un plan legible, se acepta sin fallar")
+    void correctionSucceedsOnSecondAttempt() {
+        when(deepSeekClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString())).thenReturn("esto no es json");
+        when(deepSeekClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyList())).thenReturn(PLAN_VALIDO);
 
         var response = service.generate(7L, null);
 
-        assertThat(response.attempts()).isEqualTo(2);
         assertThat(response.tasks()).hasSize(4);
     }
 
     @Test
-    @DisplayName("Si nunca llega un plan que se pueda leer, se avisa de que la IA no ha respondido bien")
-    void failsWhenNoAttemptIsReadable() {
-        modelReplies("nada", "tampoco");
+    @DisplayName("La correccion lleva el prompt original, la respuesta rota y el motivo por el que no vale")
+    void correctionMessageCarriesThePreviousAttempt() {
+        when(deepSeekClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString())).thenReturn("esto no es json");
+        when(deepSeekClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyList())).thenReturn(PLAN_VALIDO);
+
+        service.generate(7L, null);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<DeepSeekClient.Message>> captor = ArgumentCaptor.forClass(List.class);
+        verify(deepSeekClient).chatJson(eq(AiPlanService.SYSTEM_PROMPT), captor.capture());
+        List<DeepSeekClient.Message> mensajes = captor.getValue();
+
+        assertThat(mensajes).hasSize(3);
+        assertThat(mensajes.get(0).role()).isEqualTo("user");
+        assertThat(mensajes.get(1)).isEqualTo(new DeepSeekClient.Message("assistant", "esto no es json"));
+        assertThat(mensajes.get(2).role()).isEqualTo("user");
+        assertThat(mensajes.get(2).content())
+                .contains("no es un JSON valido")
+                .contains("Corrigelo");
+    }
+
+    @Test
+    @DisplayName("Un error de DeepSeek llega tal cual al usuario, sin taparlo con uno generico ni reintentar")
+    void deepSeekErrorsArePropagatedWithoutRetrying() {
+        when(deepSeekClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString()))
+                .thenThrow(new AiUnavailableException("DeepSeek esta recibiendo demasiadas peticiones"));
 
         assertThatThrownBy(() -> service.generate(7L, null))
                 .isInstanceOf(AiUnavailableException.class)
-                .hasMessageContaining("tras 2 intentos");
-    }
-
-    @Test
-    @DisplayName("Los reintentos se pueden configurar")
-    void retriesAreConfigurable() {
-        properties.setMaxRetries(0);
-        modelReplies("esto no es json");
-
-        assertThatThrownBy(() -> service.generate(7L, null))
-                .isInstanceOf(AiUnavailableException.class)
-                .hasMessageContaining("tras 1 intentos");
-    }
-
-    @Test
-    @DisplayName("Si Groq limita por cuota, se espera lo que dice y se reintenta, sin fallar a la primera")
-    void waitsAndRetriesOnRateLimit() {
-        when(groqClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString()))
-                .thenThrow(new GroqClient.RateLimitedException("Groq ha limitado la peticion", 0.01))
-                .thenReturn(PLAN_VALIDO);
-
-        var response = service.generate(7L, null);
-
-        assertThat(response.attempts()).isEqualTo(2);
-        assertThat(response.tasks()).hasSize(4);
-    }
-
-    @Test
-    @DisplayName("Si la cuota sigue llena en el ultimo intento, se propaga el aviso de Groq, no uno generico")
-    void propagatesRateLimitOnTheLastAttempt() {
-        properties.setMaxRetries(0);
-        when(groqClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString()))
-                .thenThrow(new GroqClient.RateLimitedException("Groq ha limitado la peticion por su cuota", 0.01));
-
-        assertThatThrownBy(() -> service.generate(7L, null))
-                .isInstanceOf(GroqClient.RateLimitedException.class)
-                .hasMessageContaining("cuota");
+                .hasMessageContaining("demasiadas peticiones");
+        verify(deepSeekClient, times(1)).chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString());
+        verify(deepSeekClient, never()).chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyList());
     }
 
     // -----------------------------------------------------------------
@@ -1058,7 +981,7 @@ class AiPlanServiceTest {
 
         assertThatThrownBy(() -> service.generate(7L, null))
                 .isInstanceOf(BusinessRuleException.class);
-        verifyNoInteractions(groqClient);
+        verifyNoInteractions(deepSeekClient);
     }
 
     @Test
@@ -1066,7 +989,7 @@ class AiPlanServiceTest {
     void requiresADescription() {
         assertThatThrownBy(() -> service.generateFromText(7L, "   ", null))
                 .isInstanceOf(BusinessRuleException.class);
-        verifyNoInteractions(groqClient);
+        verifyNoInteractions(deepSeekClient);
     }
 
     @Test
@@ -1077,7 +1000,7 @@ class AiPlanServiceTest {
         assertThatThrownBy(() -> service.generate(7L, null))
                 .isInstanceOf(AiUnavailableException.class)
                 .hasMessageContaining("desactivado");
-        verifyNoInteractions(groqClient);
+        verifyNoInteractions(deepSeekClient);
     }
 
     // -----------------------------------------------------------------
@@ -1099,7 +1022,7 @@ class AiPlanServiceTest {
         service.apply(7L, new ApplyPlanRequest(3L, List.of(
                 new ProposedTask("Montar la API", "Endpoints REST", "Lo pide el apartado 2", TaskType.HISTORIA,
                         "API", 1, TaskPriority.ALTA, BigDecimal.valueOf(6), fecha,
-                        List.of(2L), List.of("Luis Perez"), List.of()))));
+                        List.of(2L), List.of("Luis Perez"), List.of(), List.of("backend")))));
 
         ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
         verify(taskRepository).save(captor.capture());
@@ -1125,7 +1048,7 @@ class AiPlanServiceTest {
 
         service.apply(7L, new ApplyPlanRequest(3L, List.of(
                 new ProposedTask("Tarea", null, null, null, null, null, null, null, null,
-                        List.of(99L), List.of("Nadie"), null))));
+                        List.of(99L), List.of("Nadie"), null, null))));
 
         ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
         verify(taskRepository).save(captor.capture());
@@ -1145,7 +1068,7 @@ class AiPlanServiceTest {
 
         service.apply(7L, new ApplyPlanRequest(3L, List.of(
                 new ProposedTask("Tarea", null, null, null, null, null, null, null, null,
-                        List.of(2L, 99L), List.of("Luis Perez", "Nadie"), null))));
+                        List.of(2L, 99L), List.of("Luis Perez", "Nadie"), null, null))));
 
         ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
         verify(taskRepository).save(captor.capture());
@@ -1159,7 +1082,7 @@ class AiPlanServiceTest {
         when(boardService.getBoard(3L)).thenReturn(board);
 
         var request = new ApplyPlanRequest(3L, List.of(
-                new ProposedTask("Tarea", null, null, null, null, null, null, null, null, null, null, null)));
+                new ProposedTask("Tarea", null, null, null, null, null, null, null, null, null, null, null, null)));
 
         assertThatThrownBy(() -> service.apply(7L, request))
                 .isInstanceOf(BusinessRuleException.class)

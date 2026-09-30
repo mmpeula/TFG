@@ -22,7 +22,7 @@ import java.util.List;
  *                administrar ese workspace, invitar ni cambiar roles, y el
  *                equipo no puede arreglarlo por su cuenta.
  */
-@Schema(description = "Workspace visto desde administracion, con datos de diagnostico", example = """
+@Schema(description = "Espacio de trabajo visto desde administracion, con datos de diagnostico", example = """
         {"id":7,"name":"Practica de Bases de Datos","teamId":3,"ownerName":"Ana Garcia",
          "taskCount":12,"enabled":true,"blocked":false,"createdAt":"2026-09-01T10:00:00Z",
          "lastActivityAt":"2026-09-20T18:30:00Z",

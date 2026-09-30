@@ -117,7 +117,7 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
   return (
     <Modal
       open
-      title={editing ? 'Editar el workspace' : 'Nuevo workspace'}
+      title={editing ? 'Editar el espacio de trabajo' : 'Nuevo espacio de trabajo'}
       onClose={onClose}
       footer={
         <>
@@ -125,7 +125,7 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
             Cancelar
           </Button>
           <Button onClick={submit} disabled={!valido || isPending || guardandoFoto}>
-            {isPending || guardandoFoto ? 'Guardando…' : editing ? 'Guardar' : 'Crear workspace'}
+            {isPending || guardandoFoto ? 'Guardando…' : editing ? 'Guardar' : 'Crear espacio de trabajo'}
           </Button>
         </>
       }
@@ -136,7 +136,7 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
             ? <img className={styles.coverPreview} src={coverPreview} alt="Vista previa" />
             : (
               <WorkspaceBadge
-                workspace={{ id: workspace?.id ?? 0, name: name || 'Workspace', color, icon, coverUrl: coverActual }}
+                workspace={{ id: workspace?.id ?? 0, name: name || 'Espacio de trabajo', color, icon, coverUrl: coverActual }}
                 className={styles.coverBadge}
               />
             )}
@@ -181,36 +181,38 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
           />
         </label>
 
-        <div className={styles.row}>
-          <div className={styles.label}>
-            Color
-            <div className={styles.colors} role="radiogroup" aria-label="Color del workspace">
-              {WORKSPACE_COLORS.map((option) => (
-                <button
-                  key={option.id}
-                  role="radio"
-                  aria-checked={color === option.id}
-                  aria-label={option.label}
-                  title={option.label}
-                  className={[styles.color, color === option.id && styles.colorOn].filter(Boolean).join(' ')}
-                  style={{ background: option.value }}
-                  onClick={() => setColor(option.id)}
-                />
-              ))}
+        {!tieneFoto && (
+          <div className={styles.row}>
+            <div className={styles.label}>
+              Color
+              <div className={styles.colors} role="radiogroup" aria-label="Color del espacio de trabajo">
+                {WORKSPACE_COLORS.map((option) => (
+                  <button
+                    key={option.id}
+                    role="radio"
+                    aria-checked={color === option.id}
+                    aria-label={option.label}
+                    title={option.label}
+                    className={[styles.color, color === option.id && styles.colorOn].filter(Boolean).join(' ')}
+                    style={{ background: option.value }}
+                    onClick={() => setColor(option.id)}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
 
-          <label className={styles.label}>
-            Icono <span className={styles.optional}>opcional</span>
-            <input
-              className={[styles.input, styles.iconInput].join(' ')}
-              value={icon}
-              maxLength={4}
-              placeholder="BD"
-              onChange={(event) => setIcon(event.target.value)}
-            />
-          </label>
-        </div>
+            <label className={styles.label}>
+              Icono <span className={styles.optional}>opcional</span>
+              <input
+                className={[styles.input, styles.iconInput].join(' ')}
+                value={icon}
+                maxLength={4}
+                placeholder="BD"
+                onChange={(event) => setIcon(event.target.value)}
+              />
+            </label>
+          </div>
+        )}
 
         {!editing && (
           <p className={styles.createHint}>

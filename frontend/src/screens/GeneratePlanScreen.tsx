@@ -16,9 +16,6 @@ import { toErrorMessage } from '@/lib/api-client'
 import { canManage } from '@/lib/roles'
 import { ROUTES } from '@/app/routes'
 
-/** Lo que se asume si no se dice: una asignatura normal, no dedicacion completa. */
-const DEFAULT_HOURS_PER_WEEK = 10
-
 /**
  * Generar plan: crear tareas con IA a partir de un documento o una
  * descripcion, nada mas. Preguntarle algo puntual al modelo es otra cosa —el
@@ -74,7 +71,6 @@ export function GeneratePlanScreen() {
     .map((member) => draft.team?.find((person) => person.userId === member.user.id) ?? {
       userId: member.user.id,
       name: member.user.fullName,
-      hoursPerWeek: DEFAULT_HOURS_PER_WEEK,
       preferences: member.planNotes ?? '',
       included: true,
     })
@@ -91,7 +87,7 @@ export function GeneratePlanScreen() {
   const apply = useMutation({
     mutationFn: () => {
       const boardId = boards?.[0]?.id
-      if (!boardId) throw new Error('Este workspace no tiene tablero al que anadir las tareas')
+      if (!boardId) throw new Error('Este espacio de trabajo no tiene tablero al que anadir las tareas')
       const tasks = (plan?.tasks ?? []).filter((_, index) => selected.includes(index))
       return projectsApi.applyAiPlan(workspaceId, boardId, tasks)
     },
@@ -142,7 +138,7 @@ export function GeneratePlanScreen() {
 
     planJobs.start({
       workspaceId,
-      workspaceName: workspace?.name ?? 'el workspace',
+      workspaceName: workspace?.name ?? 'el espacio de trabajo',
       file,
       text: descripcion,
       options: {
@@ -152,8 +148,8 @@ export function GeneratePlanScreen() {
         // workspace, o dos semanas si tampoco la tiene.
         team: (team ?? [])
           .filter((person) => person.included)
-          .map(({ userId, hoursPerWeek, preferences }) => ({
-            userId, hoursPerWeek, preferences: preferences.trim(),
+          .map(({ userId, preferences }) => ({
+            userId, preferences: preferences.trim(),
           })),
       },
     })

@@ -47,7 +47,7 @@ export function RegisterScreen() {
         <div className={styles.card}>
           <h1 className={styles.title}>Crear cuenta</h1>
           <p className={styles.subtitle}>
-            Dentro de cada workspace tendras ademas el rol que te asigne su responsable.
+            Dentro de cada espacio de trabajo tendras ademas el rol que te asigne su responsable.
           </p>
 
           <form
@@ -71,8 +71,8 @@ export function RegisterScreen() {
               />
               <p className={styles.hint}>
                 {role === 'DOCENTE'
-                  ? 'Sigues los workspaces a los que te añadan, en modo lectura.'
-                  : 'Trabajas en los workspaces a los que te añadan.'}
+                  ? 'Sigues los espacios de trabajo a los que te añadan, en modo lectura.'
+                  : 'Trabajas en los espacios de trabajo a los que te añadan.'}
               </p>
             </div>
 

@@ -150,15 +150,15 @@ export function MembersScreen() {
                       {(manageable || isMe) && (
                         <ConfirmDialog
                           trigger={
-                            <Button variant="ghost" small aria-label={isMe ? 'Salir del workspace' : 'Quitar del workspace'}>
+                            <Button variant="ghost" small aria-label={isMe ? 'Salir del espacio de trabajo' : 'Quitar del espacio de trabajo'}>
                               <UserMinus size={14} strokeWidth={2.75} />
                             </Button>
                           }
-                          title={isMe ? 'Salir del workspace' : `Quitar a ${member.user.fullName}`}
+                          title={isMe ? 'Salir del espacio de trabajo' : `Quitar a ${member.user.fullName}`}
                           description={
                             isMe
-                              ? 'Dejaras de ver este workspace y sus tareas.'
-                              : 'Dejara de ver este workspace y sus tareas.'
+                              ? 'Dejaras de ver este espacio de trabajo y sus tareas.'
+                              : 'Dejara de ver este espacio de trabajo y sus tareas.'
                           }
                           confirmLabel={isMe ? 'Salir' : 'Quitar'}
                           onConfirm={async () => {
@@ -216,7 +216,7 @@ export function MembersScreen() {
           )}
 
           <p className={styles.help}>
-            <b>Responsable</b> administra el workspace y genera el plan con IA. <b>Alumno</b> crea y mueve
+            <b>Responsable</b> administra el espacio de trabajo y genera el plan con IA. <b>Alumno</b> crea y mueve
             tareas. <b>Docente</b> solo sigue el progreso. Quien recibe una invitacion no entra en el
             equipo hasta que la acepta.
           </p>
