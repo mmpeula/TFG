@@ -64,6 +64,13 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
   // campo que lo diga. Solo ahi tiene sentido preguntar cuanto ha costado de verdad.
   const done = columns.length > 0 && task.columnId === columns[columns.length - 1].id
 
+  // Diferencia entre lo real y lo estimado, igual que un diff: por debajo es
+  // verde, por encima es rojo. Sin las dos cifras no hay nada que comparar.
+  const delta = task.actualHours != null && task.estimatedHours != null
+    ? Math.round((task.actualHours - task.estimatedHours) * 10) / 10
+    : null
+  const deltaClass = delta == null ? undefined : delta <= 0 ? styles.deltaGood : styles.deltaOver
+
   function patch(values: Partial<Pick<TaskResponse, 'title' | 'description' | 'type' | 'priority' | 'columnId'>> & {
     assigneeIds?: number[]
     actualHours?: number | null
@@ -247,10 +254,10 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
             )}
 
             <span className={styles.propLabel}>Fecha</span>
-            <span className={styles.propValue}>{formatDate(task.dueDate)}</span>
+            <span className={[styles.propValue, styles.measured].join(' ')}>{formatDate(task.dueDate)}</span>
 
             <span className={styles.propLabel}>Estimacion</span>
-            <span className={styles.propValue}>
+            <span className={[styles.propValue, styles.measured].join(' ')}>
               {task.estimatedHours != null ? `${task.estimatedHours} h` : '—'}
             </span>
 
@@ -258,23 +265,37 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
               <>
                 <span className={styles.propLabel}>Horas reales</span>
                 {writable ? (
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    className={styles.propInput}
-                    defaultValue={task.actualHours ?? ''}
-                    placeholder="Cuanto ha costado de verdad"
-                    aria-label="Horas reales dedicadas a esta tarea"
-                    onBlur={(event) => {
-                      const raw = event.target.value.trim()
-                      const value = raw === '' ? null : Number(raw)
-                      if (value !== (task.actualHours ?? null)) patch({ actualHours: value })
-                    }}
-                  />
+                  <span className={styles.measuredInput}>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      className={[styles.propInput, styles.measured].join(' ')}
+                      defaultValue={task.actualHours ?? ''}
+                      placeholder="Cuanto ha costado de verdad"
+                      aria-label="Horas reales dedicadas a esta tarea"
+                      onBlur={(event) => {
+                        const raw = event.target.value.trim()
+                        const value = raw === '' ? null : Number(raw)
+                        if (value !== (task.actualHours ?? null)) patch({ actualHours: value })
+                      }}
+                    />
+                    {delta != null && (
+                      <span className={[styles.deltaNote, deltaClass].filter(Boolean).join(' ')}>
+                        {delta <= 0 ? '↓' : '↑'} {Math.abs(delta)} h vs. estimado
+                      </span>
+                    )}
+                  </span>
                 ) : (
-                  <span className={styles.propValue}>
+                  <span
+                    className={[styles.propValue, styles.measured, deltaClass].filter(Boolean).join(' ')}
+                  >
                     {task.actualHours != null ? `${task.actualHours} h` : '—'}
+                    {delta != null && (
+                      <span className={styles.deltaNote}>
+                        {delta <= 0 ? '↓' : '↑'} {Math.abs(delta)} h vs. estimado
+                      </span>
+                    )}
                   </span>
                 )}
               </>

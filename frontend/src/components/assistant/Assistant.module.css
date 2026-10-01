@@ -22,6 +22,7 @@
 /* El anillo del foco es redondo como el boton: con el radio pequeno que pone la
    regla global quedaba un cuadrado alrededor de un circulo. */
 .bubble:focus-visible { border-radius: 999px; }
+.bubbleIcon { width: 19px; height: 19px; }
 
 /* Mientras esta cerrado, avisa de que hay una conversacion empezada. En gris,
    que aqui el color no significa nada. */
@@ -53,6 +54,7 @@
   display: grid; place-items: center;
   background: var(--color-neutral-900); color: #ffffff;
 }
+.markIcon { width: 14px; height: 14px; }
 .titles { display: flex; flex-direction: column; gap: 1px; margin-right: auto; }
 .title { font-size: 13px; font-weight: 650; letter-spacing: -0.01em; }
 .hint { font-size: 11px; color: var(--color-neutral-600); }

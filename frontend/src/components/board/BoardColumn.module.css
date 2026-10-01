@@ -8,11 +8,12 @@
 .head { display: flex; align-items: center; gap: var(--space-2); }
 .name { font-family: var(--font-body); font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
 .count {
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--color-neutral-500);
   font-variant-numeric: tabular-nums;
 }
-.countOver { color: #b42318; }
+.countOver { color: var(--color-danger-600); }
 .add {
   margin-left: auto;
   display: grid; place-items: center;
@@ -26,7 +27,7 @@
 .add:hover { background: var(--color-neutral-200); color: var(--color-text); }
 .warning {
   font-size: 11px;
-  color: #b42318;
+  color: var(--color-danger-600);
 }
 .cards { display: flex; flex-direction: column; gap: var(--space-2); min-height: 40px; }
 .more {

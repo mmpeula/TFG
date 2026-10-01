@@ -19,7 +19,7 @@ export function ProgressBar({ value, height = 6, color = 'var(--color-accent-500
       aria-valuemax={100}
       aria-label={label}
     >
-      <div className={styles.fill} style={{ width: `${clamped}%`, background: color }} />
+      <div className={styles.fill} style={{ transform: `scaleX(${clamped / 100})`, background: color }} />
     </div>
   )
 }

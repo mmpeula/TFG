@@ -94,7 +94,7 @@ function diasEntre(desde: Date, hasta: Date): number {
  * no se ha empezado y la ultima lo terminado, se llamen como se llamen. Asi el
  * plan sigue siendo correcto si el grupo renombra o anade columnas.
  */
-export function stateOf(task: TaskResponse, columns: ColumnResponse[]): TaskState {
+function stateOf(task: TaskResponse, columns: ColumnResponse[]): TaskState {
   if (columns.length === 0) return 'en-curso'
   if (task.columnId === columns[0].id) return 'sin-empezar'
   if (task.columnId === columns[columns.length - 1].id) return 'terminada'

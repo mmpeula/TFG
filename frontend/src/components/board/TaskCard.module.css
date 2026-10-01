@@ -5,8 +5,9 @@
   text-align: left;
   background: var(--color-bg);
   border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-sm);
-  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) + var(--gutter-width) + 2px);
+  overflow: hidden;
   transition: var(--transition);
 }
 .card:hover { border-color: var(--color-neutral-500); }
@@ -22,9 +23,15 @@
   transition: box-shadow .2s ease;
 }
 
+/* La franja de prioridad como el gutter de un diff: color con trabajo, no decoracion. */
+.gutter { position: absolute; left: 0; top: 0; bottom: 0; width: var(--gutter-width); }
+
 .head { display: flex; align-items: center; gap: var(--space-2); }
-.code { font-size: 11px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
-.priority { width: 6px; height: 6px; border-radius: 999px; flex: none; }
+.code {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums;
+}
+.codeHours { color: var(--color-neutral-400); }
 .menu {
   margin-left: auto;
   display: grid; place-items: center;
@@ -50,14 +57,14 @@
   font-size: 11px;
   color: var(--color-neutral-600);
 }
-.stat { display: inline-flex; align-items: center; gap: 3px; }
-.due { margin-left: auto; }
-.dueSoon { color: var(--color-accent-700); font-weight: 700; }
+.stat { display: inline-flex; align-items: center; gap: 3px; font-variant-numeric: tabular-nums; }
+.due { margin-left: auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.dueSoon { color: var(--color-danger-600); font-weight: 700; }
 .grip {
   position: absolute;
   inset: 0;
   cursor: grab;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
 }
 .content { position: relative; pointer-events: none; }
 .content button, .content a { pointer-events: auto; }

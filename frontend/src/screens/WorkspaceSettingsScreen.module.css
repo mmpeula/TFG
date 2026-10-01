@@ -3,6 +3,7 @@
 .data { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-6); }
 .data dt { font-size: 11px; font-weight: 500; color: var(--color-neutral-600); }
 .data dd { font-size: 14px; margin-top: 2px; }
+.measured { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 .danger { padding-top: var(--space-2); border-top: 1px solid var(--color-divider); }
 

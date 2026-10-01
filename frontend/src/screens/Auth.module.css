@@ -9,15 +9,16 @@
 .brand { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); text-align: center; }
 .mark {
   display: grid; place-items: center;
-  width: 38px; height: 38px; border-radius: var(--radius-md);
-  background: var(--color-neutral-900); color: #ffffff;
+  width: 44px; height: 44px;
 }
+.mark img { width: 100%; height: 100%; object-fit: contain; }
 .name { font-size: 22px; font-weight: 600; letter-spacing: -0.025em; }
+.ia { color: var(--color-accent-600); }
 .claim { font-size: 13px; color: var(--color-neutral-600); }
 .card {
   background: var(--color-bg);
   border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: var(--space-6);
 }
 .title { font-size: 17px; font-weight: 600; }
@@ -35,13 +36,13 @@
   transition: var(--transition);
 }
 .control:focus { border-color: var(--color-neutral-900); }
-.control[aria-invalid="true"] { border-color: #c94f3f; }
+.control[aria-invalid="true"] { border-color: var(--color-danger-500); }
 .hint { font-size: 11px; color: var(--color-neutral-600); margin-top: 4px; }
-.fieldError { font-size: 11px; color: #922018; margin-top: 4px; }
+.fieldError { font-size: 11px; color: var(--color-danger-700); margin-top: 4px; }
 .error {
-  background: #fdf3f2;
-  border: 1px solid #f1cfcb;
-  color: #922018;
+  background: var(--color-danger-100);
+  border: 1px solid var(--color-danger-300);
+  color: var(--color-danger-700);
   border-radius: var(--radius-sm);
   padding: var(--space-3);
   font-size: 13px;

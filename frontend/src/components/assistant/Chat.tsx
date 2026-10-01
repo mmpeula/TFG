@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bot, RotateCcw, SendHorizontal } from 'lucide-react'
+import { RotateCcw, SendHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import styles from './Chat.module.css'
 import { renderMarkdown } from '@/lib/markdown'
 import type { ChatTurn } from '@/types/api'
+import assistantIcon from '@/assets/assistant-icon.png'
 
 /** Solo la usa este componente: el estado del chat flotante define la suya (ver state/context). */
 interface ChatMessage extends ChatTurn {
@@ -58,7 +59,7 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
         {messages.length === 0 && !pending && (
           <div className={styles.welcome}>
             <span className={styles.avatar} aria-hidden="true">
-              <Bot size={18} strokeWidth={2.75} />
+              <img src={assistantIcon} alt="" className={styles.avatarIcon} />
             </span>
             <div>
               <p className={styles.welcomeText}>
@@ -94,7 +95,7 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
           >
             {message.role === 'assistant' && (
               <span className={styles.avatar} aria-hidden="true">
-                <Bot size={16} strokeWidth={2.75} />
+                <img src={assistantIcon} alt="" className={styles.avatarIcon} />
               </span>
             )}
             <div className={styles.bubble}>
@@ -111,7 +112,7 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
         {pending && (
           <div className={[styles.message, styles.theirs].join(' ')}>
             <span className={styles.avatar} aria-hidden="true">
-              <Bot size={16} strokeWidth={2.75} />
+              <img src={assistantIcon} alt="" className={styles.avatarIcon} />
             </span>
             <div className={styles.bubble}>
               <span className={styles.typing} aria-label="Escribiendo">

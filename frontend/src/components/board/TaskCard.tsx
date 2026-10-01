@@ -70,13 +70,16 @@ export function TaskCard({
       )}
 
       <div className={styles.content}>
+        <span
+          className={styles.gutter}
+          style={{ background: PRIORITY_COLOR[task.priority] }}
+          title={`Prioridad ${PRIORITY_LABELS[task.priority].toLowerCase()}`}
+        />
+
         <header className={styles.head}>
-          <span className={styles.code}>#{task.id}</span>
-          <span
-            className={styles.priority}
-            style={{ background: PRIORITY_COLOR[task.priority] }}
-            title={`Prioridad ${PRIORITY_LABELS[task.priority].toLowerCase()}`}
-          />
+          <span className={styles.code}>
+            #{task.id}{task.estimatedHours != null && <span className={styles.codeHours}> · {task.estimatedHours}h</span>}
+          </span>
           {canWrite && (
             <Dropdown
               trigger={({ toggle }) => (

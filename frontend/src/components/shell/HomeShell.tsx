@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ListChecks, LogOut } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import { Tooltip } from '@/components/ui/Controls'
 import styles from './HomeShell.module.css'
+import logo from '@/assets/logo.png'
 import { homeForRole, ROUTES } from '@/app/routes'
 import { useAuth } from '@/state/context'
 
@@ -24,9 +25,9 @@ export function HomeShell({ children }: { children: ReactNode }) {
       <header className={styles.top}>
         <button className={styles.brand} onClick={() => navigate(homeForRole(user?.role ?? 'MIEMBRO'))}>
           <span className={styles.mark}>
-            <ListChecks size={15} strokeWidth={2.5} />
+            <img src={logo} alt="" />
           </span>
-          <span className={styles.brandName}>PlanifIA</span>
+          <span className={styles.brandName}>Planif<span className={styles.ia}>IA</span></span>
         </button>
 
         <div className={styles.actions}>

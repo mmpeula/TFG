@@ -63,12 +63,12 @@ export function BarChart({ series, title }: { series: Serie[]; title: string }) 
             <div className={styles.bars}>
               <span
                 className={styles.bar}
-                style={{ height: `${(item.done / max) * 100}%`, background: 'var(--color-accent-500)' }}
+                style={{ transform: `scaleY(${item.done / max})`, background: 'var(--color-accent-500)' }}
                 title={`${item.done} completadas en ${item.week}`}
               />
               <span
                 className={styles.bar}
-                style={{ height: `${(item.created / max) * 100}%`, background: 'var(--color-accent-2-400)' }}
+                style={{ transform: `scaleY(${item.created / max})`, background: 'var(--color-accent-2-400)' }}
                 title={`${item.created} creadas en ${item.week}`}
               />
             </div>

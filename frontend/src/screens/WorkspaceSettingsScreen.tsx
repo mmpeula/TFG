@@ -64,19 +64,19 @@ export function WorkspaceSettingsScreen() {
               </div>
               <div>
                 <dt>Empieza</dt>
-                <dd>{workspace.startDate ? formatDate(workspace.startDate) : 'Sin fecha'}</dd>
+                <dd className={styles.measured}>{workspace.startDate ? formatDate(workspace.startDate) : 'Sin fecha'}</dd>
               </div>
               <div>
                 <dt>Se entrega</dt>
-                <dd>{workspace.deadline ? formatDate(workspace.deadline) : 'Sin fecha'}</dd>
+                <dd className={styles.measured}>{workspace.deadline ? formatDate(workspace.deadline) : 'Sin fecha'}</dd>
               </div>
               <div>
                 <dt>Duracion del sprint</dt>
-                <dd>{(workspace.sprintDays ?? DEFAULT_SPRINT_DAYS) / 7} semanas</dd>
+                <dd className={styles.measured}>{(workspace.sprintDays ?? DEFAULT_SPRINT_DAYS) / 7} semanas</dd>
               </div>
               <div>
                 <dt>Tareas</dt>
-                <dd>
+                <dd className={styles.measured}>
                   {workspace.doneTasks} de {workspace.totalTasks} hechas
                 </dd>
               </div>

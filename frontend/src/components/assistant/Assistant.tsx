@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
-import { Bot, MessageCircleQuestion, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { Chat } from './Chat'
 import styles from './Assistant.module.css'
+import assistantIcon from '@/assets/assistant-icon.png'
 import { workspaces as workspacesApi } from '@/api/endpoints'
 import { toErrorMessage } from '@/lib/api-client'
 import { useAssistant } from '@/state/context'
@@ -65,7 +66,7 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
         <div className={styles.panel} role="dialog" aria-label="Chat de ayuda">
           <header className={styles.head}>
             <span className={styles.mark} aria-hidden="true">
-              <Bot size={14} strokeWidth={2.75} />
+              <img src={assistantIcon} alt="" className={styles.markIcon} />
             </span>
             <span className={styles.titles}>
               <span className={styles.title}>Asistente</span>
@@ -96,7 +97,7 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
         aria-haspopup="dialog"
         aria-label={open ? 'Cerrar el chat de ayuda' : 'Abrir el chat de ayuda'}
       >
-        {open ? <X size={19} strokeWidth={2.5} /> : <MessageCircleQuestion size={19} strokeWidth={2.5} />}
+        {open ? <X size={19} strokeWidth={2.5} /> : <img src={assistantIcon} alt="" className={styles.bubbleIcon} />}
         {!open && messages.length > 0 && <span className={styles.pip} aria-hidden="true" />}
       </button>
     </div>

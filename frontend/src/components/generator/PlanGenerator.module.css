@@ -94,7 +94,7 @@
   border: 2px solid var(--color-neutral-400);
   display: grid; place-items: center; color: transparent;
 }
-.checkOn { background: var(--color-accent-2-500); border-color: var(--color-accent-2-500); color: #fff8ef; }
+.checkOn { background: var(--color-accent-2-500); border-color: var(--color-accent-2-500); color: #ffffff; }
 .rowTitle { display: block; font-size: 14px; font-weight: 600; line-height: 1.4; }
 .rowType { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--color-neutral-600); margin-top: 3px; }
 .rowTypeDot { width: 7px; height: 7px; border-radius: 999px; background: var(--tipo, var(--color-neutral-400)); flex: none; }
@@ -273,8 +273,8 @@
 
 /* Error del modulo de IA -------------------------------------------------- */
 .error {
-  border: 1px solid var(--color-accent-300);
-  background: var(--color-accent-100);
+  border: 1px solid var(--color-danger-300);
+  background: var(--color-danger-100);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   display: flex;
@@ -284,9 +284,9 @@
 }
 .errorHead {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; font-weight: 700; color: var(--color-accent-800);
+  font-size: 13px; font-weight: 700; color: var(--color-danger-800);
 }
-.errorBody { font-size: 13px; line-height: 1.5; color: var(--color-accent-700); }
+.errorBody { font-size: 13px; line-height: 1.5; color: var(--color-danger-700); }
 
 /* Confirmacion de que ya esta en el tablero -------------------------------- */
 .applied {

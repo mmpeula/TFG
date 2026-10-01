@@ -33,7 +33,7 @@
   transition: var(--transition);
 }
 .control:focus { outline: none; border-color: var(--color-neutral-900); }
-.error { font-size: 11px; color: #b42318; }
+.error { font-size: 11px; color: var(--color-danger-600); }
 
 @media (max-width: 640px) {
   .data { grid-template-columns: 1fr; }

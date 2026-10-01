@@ -1,13 +1,17 @@
 /*
  * Sistema de diseno de PlanifIA.
  *
- * Una sola escala de grises, un unico acento y nada mas. La regla es que el
- * color signifique algo: si un elemento no comunica estado, va en gris. Por eso
- * la accion principal es casi negra y el azul queda reservado a lo que el
- * usuario tiene que mirar (foco, seleccion, la IA).
+ * El tablero se lee como un log de git: lo que se mide (horas, fechas, ids) va
+ * en monoespacio, lo que se escribe (titulos, descripciones) en la tipografia
+ * de siempre. El color ya no es un acento decorativo suelto: los cuatro colores
+ * del logo tienen cada uno un trabajo fijo, igual que un diff — verde es "por
+ * debajo de lo estimado", rojo es "por encima o critico", ambar es "pendiente
+ * de revisar", y el azul manda en la accion principal y en lo que hay que
+ * mirar (foco, seleccion, la IA). Ningun color se usa sin que signifique eso.
  *
  * Los nombres de los tokens se conservan de la version anterior para que ningun
- * componente tenga que cambiar de vocabulario; lo que cambia son los valores.
+ * componente tenga que cambiar de vocabulario; lo que cambia son los valores y
+ * las dos familias nuevas (danger, warning).
  */
 :root {
   --color-bg: #ffffff;
@@ -23,8 +27,9 @@
   --color-neutral-900: #18181b;
 
   /*
-   * Acento. El 600 es el azul de trabajo; el 900 se usa como accion principal
-   * porque un boton negro pesa menos en la pagina que uno de color.
+   * Acento azul: identidad, accion principal y lo que hay que mirar. El 600 es
+   * el azul de trabajo; el 900 se usa como accion principal porque un boton
+   * negro pesa menos en la pagina que uno de color.
    */
   --color-accent: #18181b;
   --color-accent-100: #f4f7fe; --color-accent-200: #e6edfc;
@@ -33,27 +38,48 @@
   --color-accent-700: #2a52a8; --color-accent-800: #223f80;
   --color-accent-900: #18181b;
 
-  /* Verde discreto: solo para lo terminado y lo que va bien. */
+  /* Verde: por debajo de lo estimado, al dia, terminado. La mitad "buena" del diff. */
   --color-accent-2-100: #f3f8f4; --color-accent-2-200: #e2efe6;
   --color-accent-2-300: #c3dfcc; --color-accent-2-400: #92c2a2;
   --color-accent-2-500: #5f9e74; --color-accent-2-600: #467e59;
   --color-accent-2-700: #366245; --color-accent-2-800: #2a4c36;
   --color-accent-2-900: #1d3325;
 
+  /* Rojo: por encima de lo estimado, atrasado, critico. La mitad "mala" del diff. */
+  --color-danger-100: #fbf1f0; --color-danger-200: #f5dedb;
+  --color-danger-300: #e8bbb3; --color-danger-400: #d68d7d;
+  --color-danger-500: #c06148; --color-danger-600: #a14a35;
+  --color-danger-700: #813a29; --color-danger-800: #642d20;
+  --color-danger-900: #431e16;
+
+  /* Ambar: pendiente de revisar, a punto de vencer. Nunca "mal", solo "atencion". */
+  --color-warning-100: #fbf3e7; --color-warning-200: #f3e0c0;
+  --color-warning-300: #e6c489; --color-warning-400: #d3a04f;
+  --color-warning-500: #b8822f; --color-warning-600: #966821;
+  --color-warning-700: #78531b; --color-warning-800: #5c4015;
+  --color-warning-900: #3d2b0e;
+
   /*
-   * Una sola familia. Se usa la del sistema: carga instantanea, se ve nativa en
-   * cada equipo y quita una dependencia externa. La jerarquia la dan el peso y
-   * el interletrado, no una segunda tipografia.
+   * Dos familias. La del sistema para todo lo que se escribe y se lee: carga
+   * instantanea, se ve nativa en cada equipo y quita una dependencia externa.
+   * La monoespaciada del sistema para todo lo que se mide: horas, fechas, ids
+   * de tarea, timestamps — igual que un terminal o un diff, nunca como
+   * decoracion de "esto es tecnico".
    */
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
                Arial, "Noto Sans", sans-serif;
   --font-heading: var(--font-body);
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas,
+               "Liberation Mono", monospace;
 
   /* Escala de 4 en 4: predecible y facil de tener en la cabeza. */
   --space-1: 4px; --space-2: 8px; --space-3: 12px;
   --space-4: 16px; --space-6: 24px; --space-8: 32px;
 
   --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px;
+
+  /* El ancho de la franja de delta/prioridad en el borde izquierdo de una tarjeta, como el gutter de un diff. */
+  --gutter-width: 3px;
 
   /*
    * Casi todo se separa con una linea de 1 px, no con sombra. Las sombras

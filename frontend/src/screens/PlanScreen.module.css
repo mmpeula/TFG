@@ -4,8 +4,8 @@
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--color-divider);
 }
-.window { font-size: 13px; color: var(--color-neutral-700); }
-.dim { color: var(--color-neutral-500); font-weight: 400; }
+.window { font-size: 13px; color: var(--color-neutral-700); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.dim { color: var(--color-neutral-500); font-weight: 400; font-family: var(--font-body); }
 .note { font-size: 12px; color: var(--color-neutral-500); margin-top: 3px; }
 .link { font-size: 12px; color: var(--color-text); text-decoration: underline; text-underline-offset: 2px; }
 .headActions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
@@ -30,7 +30,7 @@
   flex: 0 0 300px;
   width: 300px;
   border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: var(--space-3);
 }
 /* El sprint en curso se marca oscureciendo su borde: sin fondo ni color de mas. */
@@ -46,8 +46,8 @@
   background: var(--color-neutral-900); color: #ffffff;
   border-radius: 4px; padding: 1px 5px;
 }
-.range { font-size: 12px; color: var(--color-neutral-500); }
-.count { font-size: 11px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+.range { font-size: 12px; color: var(--color-neutral-500); font-family: var(--font-mono); }
+.count { font-size: 11px; color: var(--color-neutral-500); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 .sprintEmpty { font-size: 12px; color: var(--color-neutral-400); margin-top: var(--space-2); }
 

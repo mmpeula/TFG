@@ -1,4 +1,4 @@
-.scrim { position: fixed; inset: 0; background: color-mix(in srgb, #201e1d 45%, transparent); z-index: 65; }
+.scrim { position: fixed; inset: 0; background: color-mix(in srgb, var(--color-neutral-900) 45%, transparent); z-index: 65; }
 .panel {
   position: fixed;
   top: 0; right: 0; bottom: 0;
@@ -18,7 +18,7 @@
   display: flex; align-items: flex-start; gap: var(--space-3);
   padding: var(--space-6) var(--space-6) var(--space-3);
 }
-.code { font-size: 11px; font-weight: 700; color: var(--color-neutral-600); letter-spacing: .02em; }
+.code { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--color-neutral-600); letter-spacing: .02em; }
 .title {
   font-family: var(--font-heading);
   font-size: 21px;
@@ -77,6 +77,18 @@
 }
 .propInput:focus { border-color: var(--color-accent-2-500); }
 
+/* Lo que se mide (fechas, horas) va en monoespacio, como en el resto de la app. */
+.measured { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.measuredInput { display: flex; align-items: center; gap: var(--space-2); }
+.measuredInput .propInput { flex: 1; }
+.deltaGood { color: var(--color-accent-2-700); }
+.deltaOver { color: var(--color-danger-600); }
+.deltaNote {
+  flex: none;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  white-space: nowrap;
+}
+
 .sectionTitle { font-family: var(--font-body); font-size: 15px; font-weight: 700; }
 
 .comment { display: flex; gap: var(--space-3); }
@@ -104,8 +116,9 @@
 .dropActive { border-color: var(--color-accent-400); background: var(--color-accent-100); color: var(--color-accent-700); font-weight: 700; }
 .file { display: flex; align-items: center; gap: var(--space-2); font-size: 12px; margin-top: var(--space-2); }
 
-.ai { background: var(--color-accent-2-100); border-radius: var(--radius-md); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
-.aiKicker { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--color-accent-2-700); }
+/* Azul, como el resto de lo que es la IA en la app (ver la etiqueta "IA" de las tarjetas). */
+.ai { background: var(--color-accent-100); border-radius: var(--radius-md); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.aiKicker { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--color-accent-700); }
 .aiActions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 .history { display: flex; flex-direction: column; gap: var(--space-2); font-size: 12px; color: var(--color-neutral-600); }

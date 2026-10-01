@@ -14,7 +14,7 @@ import type { TaskState } from './sprints'
  * de atencion es tambien el orden en que conviene mirarlo.
  */
 export const STATE_COLORS: Record<TaskState, { label: string; color: string }> = {
-  'sin-empezar': { label: 'Por hacer', color: '#b42318' },
-  'en-curso': { label: 'En curso', color: '#b7791f' },
-  terminada: { label: 'Terminadas', color: '#2f7d4f' },
+  'sin-empezar': { label: 'Por hacer', color: 'var(--color-danger-600)' },
+  'en-curso': { label: 'En curso', color: 'var(--color-warning-600)' },
+  terminada: { label: 'Terminadas', color: 'var(--color-accent-2-600)' },
 }

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { Loader2, Waves } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Segmented } from '@/components/ui/Controls'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import styles from './Auth.module.css'
+import logo from '@/assets/logo.png'
 import { auth } from '@/api/endpoints'
 import { toErrorMessage } from '@/lib/api-client'
 import { useAuth } from '@/state/context'
@@ -40,8 +41,8 @@ export function RegisterScreen() {
     <div className={styles.page}>
       <div className={styles.wrap}>
         <div className={styles.brand}>
-          <span className={styles.mark}><Waves size={22} strokeWidth={2.75} /></span>
-          <span className={styles.name}>PlanifIA</span>
+          <span className={styles.mark}><img src={logo} alt="" /></span>
+          <span className={styles.name}>Planif<span className={styles.ia}>IA</span></span>
         </div>
 
         <div className={styles.card}>

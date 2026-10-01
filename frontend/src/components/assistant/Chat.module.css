@@ -36,8 +36,9 @@
 .avatar {
   width: 26px; height: 26px; border-radius: var(--radius-sm); flex: none;
   display: grid; place-items: center;
-  background: var(--color-neutral-200); color: var(--color-neutral-700);
+  background: var(--color-neutral-900); color: #ffffff;
 }
+.avatarIcon { width: 15px; height: 15px; }
 
 .bubble {
   max-width: min(62ch, 80%);
@@ -46,7 +47,7 @@
 }
 .theirs .bubble { background: var(--color-neutral-100); }
 .mine .bubble { background: var(--color-neutral-900); color: #ffffff; }
-.failed .bubble { background: #fdf3f2; border: 1px solid #f1cfcb; color: #922018; }
+.failed .bubble { background: var(--color-danger-100); border: 1px solid var(--color-danger-300); color: var(--color-danger-700); }
 
 .text { font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
 
@@ -58,7 +59,7 @@
 .markdown li { margin-bottom: 2px; }
 .markdown strong { font-weight: 700; }
 .markdown code {
-  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12.5px;
   background: var(--color-neutral-200);
   padding: 1px 5px;

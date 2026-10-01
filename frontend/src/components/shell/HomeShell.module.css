@@ -9,11 +9,12 @@
 
 .brand { display: flex; align-items: center; gap: var(--space-2); }
 .mark {
-  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  width: 26px; height: 26px;
   display: grid; place-items: center;
-  background: var(--color-neutral-900); color: #ffffff;
 }
+.mark img { width: 100%; height: 100%; object-fit: contain; }
 .brandName { font-size: 15px; font-weight: 600; letter-spacing: -0.015em; }
+.ia { color: var(--color-accent-600); }
 
 .actions { display: flex; align-items: center; gap: var(--space-2); }
 

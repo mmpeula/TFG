@@ -94,7 +94,7 @@ export function BoardColumn({
       <ProgressBar
         value={pressure}
         height={2}
-        color={overLimit ? '#b42318' : 'var(--color-neutral-300)'}
+        color={overLimit ? 'var(--color-danger-500)' : 'var(--color-neutral-300)'}
         label={`Presion de ${column.name}`}
       />
 

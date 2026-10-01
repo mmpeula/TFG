@@ -40,24 +40,18 @@ export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrador',
 }
 
-export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  RESPONSABLE: 'Control total del equipo y sus proyectos',
-  MIEMBRO: 'Crea y mueve tareas, comenta y adjunta ficheros',
-  DOCENTE: 'Sigue los equipos asignados en modo lectura',
-  ADMIN: 'Gestiona las cuentas de toda la plataforma',
-}
-
 export const PRIORITY_LABELS = {
   BAJA: 'Baja', MEDIA: 'Media', ALTA: 'Alta', CRITICA: 'Critica',
 } as const
 
 /*
- * Aqui el color si dice algo, y por eso es el unico sitio del tablero donde se
- * usa rojo: solo destaca lo que urge, lo demas se queda en gris.
+ * El color de cada prioridad es el mismo lenguaje que el resto del diff: rojo
+ * es lo critico (la mitad "mala"), ambar lo que pide atencion, gris lo que
+ * puede esperar. Ningun color se usa sin que signifique esto.
  */
 export const PRIORITY_COLOR = {
-  CRITICA: '#b42318',
-  ALTA: '#c26a12',
+  CRITICA: 'var(--color-danger-500)',
+  ALTA: 'var(--color-warning-500)',
   MEDIA: 'var(--color-neutral-400)',
   BAJA: 'var(--color-neutral-300)',
 } as const
