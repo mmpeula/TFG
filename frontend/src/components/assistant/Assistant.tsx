@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
-import { X } from 'lucide-react'
+import { Minus, X } from 'lucide-react'
 import { Chat } from './Chat'
 import styles from './Assistant.module.css'
 import assistantIcon from '@/assets/assistant-icon.png'
@@ -69,12 +69,21 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
               <img src={assistantIcon} alt="" className={styles.markIcon} />
             </span>
             <span className={styles.titles}>
-              <span className={styles.title}>Asistente</span>
+              <span className={styles.titleRow}>
+                <span className={styles.title}>PlanifIA</span>
+                <span className={styles.aiBadge}>IA</span>
+              </span>
               <span className={styles.hint}>
-                {activeTask ? `Sobre «${activeTask.title}»` : 'Responde sobre este espacio de trabajo'}
+                {activeTask ? `Sobre «${activeTask.title}»` : 'Asistente de proyectos con IA'}
               </span>
             </span>
-            <button className={styles.close} onClick={close} aria-label="Cerrar el chat">
+            {/* Minimizar y cerrar hacen lo mismo hoy —no hay un estado "a medias"
+                en el provider—, pero se ensenan por separado porque es lo que
+                se espera de una ventana de chat. */}
+            <button className={styles.headButton} onClick={close} aria-label="Minimizar el chat">
+              <Minus size={15} strokeWidth={2.75} />
+            </button>
+            <button className={styles.headButton} onClick={close} aria-label="Cerrar el chat">
               <X size={15} strokeWidth={2.75} />
             </button>
           </header>

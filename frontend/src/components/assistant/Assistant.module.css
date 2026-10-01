@@ -9,28 +9,29 @@
 
 .bubble {
   position: relative;
-  width: 46px; height: 46px; border-radius: 999px;
+  width: 52px; height: 52px; border-radius: 999px; flex: none;
   display: grid; place-items: center;
-  background: var(--color-neutral-900); color: #ffffff;
+  background: var(--color-assistant);
+  color: #ffffff;
   /* Lo unico que flota en toda la aplicacion, asi que si lleva sombra: es lo que
      lo despega del contenido. Pero no se levanta al pasar por encima, como
      tampoco lo hacen las tarjetas; solo aclara un poco. */
   box-shadow: var(--shadow-md);
   transition: var(--transition);
 }
-.bubble:hover { background: var(--color-neutral-800); }
+.bubble:hover { filter: brightness(1.08); }
 /* El anillo del foco es redondo como el boton: con el radio pequeno que pone la
    regla global quedaba un cuadrado alrededor de un circulo. */
 .bubble:focus-visible { border-radius: 999px; }
-.bubbleIcon { width: 19px; height: 19px; }
+.bubbleIcon { width: 22px; height: 22px; }
 
 /* Mientras esta cerrado, avisa de que hay una conversacion empezada. En gris,
    que aqui el color no significa nada. */
 .pip {
   position: absolute; top: 2px; right: 2px;
   width: 9px; height: 9px; border-radius: 999px;
-  background: var(--color-neutral-400);
-  border: 2px solid var(--color-neutral-900);
+  background: #ffffff;
+  border: 2px solid var(--color-assistant);
 }
 
 .panel {
@@ -44,27 +45,36 @@
 }
 
 .head {
-  display: flex; align-items: center; gap: var(--space-2);
+  display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-divider);
-  background: var(--color-neutral-100);
+  background: var(--color-assistant-strong);
 }
 .mark {
-  width: 24px; height: 24px; border-radius: var(--radius-sm); flex: none;
+  width: 40px; height: 40px; border-radius: var(--radius-md); flex: none;
   display: grid; place-items: center;
-  background: var(--color-neutral-900); color: #ffffff;
+  background: var(--color-assistant);
+  color: #ffffff;
+  border: 1px solid rgb(255 255 255 / .22);
 }
-.markIcon { width: 14px; height: 14px; }
+.markIcon { width: 21px; height: 21px; }
 .titles { display: flex; flex-direction: column; gap: 1px; margin-right: auto; }
-.title { font-size: 13px; font-weight: 650; letter-spacing: -0.01em; }
-.hint { font-size: 11px; color: var(--color-neutral-600); }
+.titleRow { display: flex; align-items: center; gap: var(--space-2); }
+.title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: #ffffff; }
+/* La etiqueta que dice que quien responde es una IA. En monoespacio, como el
+   resto de etiquetas de la app. */
+.aiBadge {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  padding: 1px 5px; border-radius: 4px;
+  color: var(--color-assistant-strong); background: var(--color-accent-200);
+}
+.hint { font-size: 11.5px; color: rgb(255 255 255 / .62); }
 
-.close {
+.headButton {
   width: 26px; height: 26px; border-radius: var(--radius-sm); flex: none;
-  display: grid; place-items: center; color: var(--color-neutral-500);
+  display: grid; place-items: center; color: rgb(255 255 255 / .7);
   transition: var(--transition);
 }
-.close:hover { background: var(--color-neutral-200); color: var(--color-text); }
+.headButton:hover { background: rgb(255 255 255 / .12); color: #ffffff; }
 
 /* El chat trae su propio borde y esquinas, que aqui sobran: ya los pone el panel. */
 .body > * { border: none; border-radius: 0; }

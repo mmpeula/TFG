@@ -93,4 +93,14 @@
                 opacity .12s ease, transform .12s ease;
 
   --sidebar-width: 236px;
+
+  /*
+   * El asistente usa el azul de acento, que en este sistema es "la IA": no
+   * tiene paleta propia. Lo que lo distingue de una superficie normal es la
+   * etiqueta "IA" y el borde azul de sus mensajes, no un color ajeno.
+   */
+  --color-assistant: var(--color-accent-600);
+  --color-assistant-strong: var(--color-accent-800);
+  --color-assistant-tint: var(--color-accent-100);
+  --color-assistant-line: var(--color-accent-300);
 }

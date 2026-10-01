@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { RotateCcw, SendHorizontal } from 'lucide-react'
+import { Calendar, Clock, Flag, Lightbulb, ListChecks, RotateCcw, SendHorizontal, Users } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import styles from './Chat.module.css'
 import { renderMarkdown } from '@/lib/markdown'
+import { formatTime } from '@/lib/format'
 import type { ChatTurn } from '@/types/api'
 import assistantIcon from '@/assets/assistant-icon.png'
 
@@ -11,15 +12,17 @@ interface ChatMessage extends ChatTurn {
   /** Lo que el modelo tenia delante al responder; se muestra en pequeno. */
   context?: string
   error?: boolean
+  createdAt: number
 }
 
-/** Preguntas de ejemplo: quien no sabe que pedirle, empieza por aqui. */
-const SUGGESTIONS = [
-  '¿Que deberia hacer primero?',
-  'Resume las tareas pendientes',
-  '¿Que tareas llevamos atrasadas?',
-  '¿Quien tiene mas trabajo encima?',
-  'Divide la tarea mas grande en pasos',
+/** Lo que el asistente sabe hacer, para quien abre el chat por primera vez. */
+const CAPABILITIES = [
+  { icon: ListChecks, label: 'Generar y organizar tareas' },
+  { icon: Flag, label: 'Priorizar el trabajo' },
+  { icon: Clock, label: 'Estimar tiempos' },
+  { icon: Lightbulb, label: 'Resolver dudas' },
+  { icon: Calendar, label: 'Crear planes y sprints' },
+  { icon: Users, label: 'Analizar el progreso' },
 ]
 
 interface Props {
@@ -40,11 +43,24 @@ interface Props {
 export function Chat({ messages, pending, disabled, placeholder, onSend, onReset }: Props) {
   const [value, setValue] = useState('')
   const endRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  // Fija a cuando se monta el chat: calcular la hora en cada render seria una
+  // llamada impura dentro del render, y ademas cambiaria sola cada vez.
+  const [welcomeTime] = useState(() => formatTime(Date.now()))
 
   // Cada mensaje nuevo deja la conversacion abajo, como en cualquier chat.
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages.length, pending])
+
+  // Crece con lo escrito, hasta el tope que marca el CSS: nunca recorta una
+  // linea, ni la del texto ni la del placeholder largo.
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
 
   function send() {
     const text = value.trim()
@@ -57,27 +73,26 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
     <div className={styles.chat}>
       <div className={styles.thread}>
         {messages.length === 0 && !pending && (
-          <div className={styles.welcome}>
+          <div className={[styles.message, styles.theirs].join(' ')}>
             <span className={styles.avatar} aria-hidden="true">
               <img src={assistantIcon} alt="" className={styles.avatarIcon} />
             </span>
-            <div>
-              <p className={styles.welcomeText}>
-                Puedo mirar este espacio de trabajo y responderte sobre el: que llevais hecho, que urge y como
-                repartirlo. Pruebame:
-              </p>
-              <div className={styles.suggestions}>
-                {SUGGESTIONS.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    className={styles.suggestion}
-                    disabled={disabled}
-                    onClick={() => onSend(suggestion)}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
+            <div className={styles.column}>
+              <div className={styles.bubble}>
+                <p className={styles.welcomeGreeting}>¡Hola! 👋</p>
+                <p className={styles.text}>Soy PlanifIA, tu asistente de proyectos.</p>
+                <p className={styles.text}>Puedo ayudarte a:</p>
+                <ul className={styles.capabilities}>
+                  {CAPABILITIES.map(({ icon: Icon, label }) => (
+                    <li key={label} className={styles.capability}>
+                      <Icon size={14} strokeWidth={2.5} className={styles.capabilityIcon} />
+                      {label}
+                    </li>
+                  ))}
+                </ul>
+                <p className={styles.text}>¿En que puedo ayudarte hoy?</p>
               </div>
+              <span className={styles.timestamp}>{welcomeTime}</span>
             </div>
           </div>
         )}
@@ -98,13 +113,16 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
                 <img src={assistantIcon} alt="" className={styles.avatarIcon} />
               </span>
             )}
-            <div className={styles.bubble}>
-              {message.role === 'assistant' ? (
-                <div className={styles.markdown}>{renderMarkdown(message.content)}</div>
-              ) : (
-                <p className={styles.text}>{message.content}</p>
-              )}
-              {message.context && <span className={styles.context}>ha mirado: {message.context}</span>}
+            <div className={styles.column}>
+              <div className={styles.bubble}>
+                {message.role === 'assistant' ? (
+                  <div className={styles.markdown}>{renderMarkdown(message.content)}</div>
+                ) : (
+                  <p className={styles.text}>{message.content}</p>
+                )}
+                {message.context && <span className={styles.context}>ha mirado: {message.context}</span>}
+              </div>
+              <span className={styles.timestamp}>{formatTime(message.createdAt)}</span>
             </div>
           </div>
         ))}
@@ -129,8 +147,9 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
 
       <div className={styles.composer}>
         <textarea
+          ref={inputRef}
           className={styles.input}
-          rows={1}
+          rows={2}
           value={value}
           disabled={disabled}
           placeholder={placeholder ?? 'Preguntale algo sobre este espacio de trabajo…'}
@@ -147,10 +166,16 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
             <RotateCcw size={15} strokeWidth={2.75} />
           </Button>
         )}
-        <Button onClick={send} disabled={!value.trim() || pending || disabled} aria-label="Enviar">
+        <Button
+          className={styles.sendButton}
+          onClick={send}
+          disabled={!value.trim() || pending || disabled}
+          aria-label="Enviar"
+        >
           <SendHorizontal size={15} strokeWidth={2.75} />
         </Button>
       </div>
+      <p className={styles.disclaimer}>Respuestas generadas por IA · pueden contener errores</p>
     </div>
   )
 }

@@ -21,10 +21,10 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     [conversations],
   )
 
-  const append = useCallback((workspaceId: number, message: AssistantMessage) => {
+  const append = useCallback((workspaceId: number, message: Omit<AssistantMessage, 'createdAt'>) => {
     setConversations((current) => ({
       ...current,
-      [workspaceId]: [...(current[workspaceId] ?? []), message],
+      [workspaceId]: [...(current[workspaceId] ?? []), { ...message, createdAt: Date.now() }],
     }))
   }, [])
 

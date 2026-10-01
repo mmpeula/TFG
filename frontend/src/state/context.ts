@@ -75,6 +75,8 @@ export interface AssistantMessage {
   /** Lo que el modelo tenia delante al responder; se muestra en pequeno. */
   context?: string
   error?: boolean
+  /** La pone `append`, no quien llama: hora a la que el mensaje entro en la conversacion. */
+  createdAt: number
 }
 
 /**
@@ -143,7 +145,8 @@ export interface AssistantValue {
   close: () => void
   /** Conversacion de este workspace, vacia si todavia no se ha preguntado nada. */
   messagesOf: (workspaceId: number) => AssistantMessage[]
-  append: (workspaceId: number, message: AssistantMessage) => void
+  /** La hora la pone el provider: quien llama no decide cuando "entro" el mensaje. */
+  append: (workspaceId: number, message: Omit<AssistantMessage, 'createdAt'>) => void
   reset: (workspaceId: number) => void
   /**
    * La tarea que se tiene abierta en el panel, si la hay. La pone la pantalla del

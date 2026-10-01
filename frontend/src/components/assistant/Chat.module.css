@@ -15,39 +15,45 @@
   max-height: 56vh;
 }
 
-.welcome { display: flex; gap: var(--space-3); }
-.welcomeText { font-size: 14px; line-height: 1.55; color: var(--color-neutral-700); max-width: 56ch; }
-.suggestions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
-.suggestion {
-  font-size: 12.5px; color: var(--color-neutral-600);
-  background: var(--color-bg);
-  border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-sm);
-  padding: 6px 11px;
-  transition: var(--transition);
-}
-.suggestion:hover { border-color: var(--color-neutral-500); color: var(--color-text); }
-.suggestion:disabled { opacity: .5; cursor: not-allowed; }
+.welcomeGreeting { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+
+.capabilities { list-style: none; margin: 6px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.capability { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--color-neutral-800); }
+.capabilityIcon { flex: none; color: var(--color-assistant); }
 
 .message { display: flex; gap: var(--space-2); align-items: flex-start; }
 .mine { justify-content: flex-end; }
 .theirs { justify-content: flex-start; }
 
+/* La columna junta la burbuja y su hora, alineadas al mismo lado que el mensaje. */
+.column { display: flex; flex-direction: column; gap: 4px; max-width: min(62ch, 80%); }
+.mine .column { align-items: flex-end; }
+.theirs .column { align-items: flex-start; }
+
 .avatar {
-  width: 26px; height: 26px; border-radius: var(--radius-sm); flex: none;
+  width: 28px; height: 28px; border-radius: 999px; flex: none;
   display: grid; place-items: center;
-  background: var(--color-neutral-900); color: #ffffff;
+  background: var(--color-assistant);
+  color: #ffffff;
 }
 .avatarIcon { width: 15px; height: 15px; }
 
 .bubble {
-  max-width: min(62ch, 80%);
+  max-width: 100%;
   border-radius: var(--radius-md);
   padding: var(--space-3);
 }
-.theirs .bubble { background: var(--color-neutral-100); }
+/* Los mensajes de la IA llevan el borde azul a la izquierda, el mismo gutter que
+   las tarjetas de tarea: se distinguen de los tuyos sin leer el nombre. */
+.theirs .bubble {
+  background: var(--color-assistant-tint);
+  border-left: var(--gutter-width) solid var(--color-assistant);
+  border-top-left-radius: var(--radius-sm); border-bottom-left-radius: var(--radius-sm);
+}
 .mine .bubble { background: var(--color-neutral-900); color: #ffffff; }
-.failed .bubble { background: var(--color-danger-100); border: 1px solid var(--color-danger-300); color: var(--color-danger-700); }
+.failed .bubble { background: var(--color-danger-100); border: 1px solid var(--color-danger-300); border-left: var(--gutter-width) solid var(--color-danger-500); color: var(--color-danger-700); }
+
+.timestamp { font-size: 10.5px; color: var(--color-neutral-500); padding: 0 2px; }
 
 .text { font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
 
@@ -58,15 +64,41 @@
 .markdown ul:last-child, .markdown ol:last-child { margin-bottom: 0; }
 .markdown li { margin-bottom: 2px; }
 .markdown strong { font-weight: 700; }
+
+/* Las listas numeradas llevan su numero en un circulo de color, como una
+   prioridad destacada, en vez del "1." plano de una lista corriente. */
+.markdown ol {
+  list-style: none;
+  counter-reset: paso;
+  padding-left: 0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.markdown ol li {
+  counter-increment: paso;
+  display: flex; align-items: flex-start; gap: 9px;
+  margin-bottom: 0;
+}
+.markdown ol li > span { flex: 1; min-width: 0; }
+.markdown ol li::before {
+  content: counter(paso);
+  flex: none;
+  width: 20px; height: 20px; border-radius: 999px;
+  display: grid; place-items: center;
+  font-size: 11px; font-weight: 700; color: #ffffff;
+}
+/* Se repite de 3 en 3: no dice prioridad real (eso ya lo dice el texto), solo separa los pasos a simple vista. */
+.markdown ol li:nth-child(3n+1)::before { background: var(--color-danger-500); }
+.markdown ol li:nth-child(3n+2)::before { background: var(--color-warning-500); }
+.markdown ol li:nth-child(3n)::before { background: var(--color-assistant); }
 .markdown code {
   font-family: var(--font-mono);
   font-size: 12.5px;
-  background: var(--color-neutral-200);
+  background: var(--color-accent-200);
   padding: 1px 5px;
   border-radius: 4px;
 }
 .markdown pre {
-  background: var(--color-neutral-200);
+  background: var(--color-accent-200);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
   overflow-x: auto;
@@ -75,7 +107,7 @@
 .markdown pre:last-child { margin-bottom: 0; }
 .markdown pre code { background: none; padding: 0; font-size: 12.5px; }
 
-.context { display: block; font-size: 11px; color: var(--color-neutral-500); margin-top: var(--space-2); }
+.context { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--color-neutral-500); margin-top: var(--space-2); }
 
 .typing { display: inline-flex; gap: 4px; padding: 3px 0; }
 .typing i {
@@ -102,7 +134,20 @@
 }
 .input:focus { outline: none; }
 
+/* Aviso fijo bajo el cuadro de texto: recuerda que habla una IA y que puede fallar. */
+.disclaimer {
+  margin: 0; padding: 6px var(--space-3);
+  font-size: 11px; color: var(--color-neutral-600); text-align: center;
+  border-top: 1px solid var(--color-neutral-300); background: var(--color-bg);
+}
+
+/* El boton de enviar es redondo, no el rectangulo de siempre: aqui es la
+   accion principal del cuadro, no un boton mas en una fila. */
+.sendButton.sendButton {
+  width: 32px; height: 32px; padding: 0; border-radius: 999px;
+}
+
 @media (max-width: 767px) {
   .thread { max-height: none; padding: var(--space-3); }
-  .bubble { max-width: 88%; }
+  .column { max-width: 88%; }
 }

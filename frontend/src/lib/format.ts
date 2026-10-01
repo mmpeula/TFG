@@ -7,6 +7,10 @@ export function formatDate(value?: string | null): string {
     : date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+export function formatTime(value: number): string {
+  return new Date(value).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+}
+
 export function formatDateTime(value?: string | null): string {
   if (!value) return '—'
   const date = new Date(value)

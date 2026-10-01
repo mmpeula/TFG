@@ -40,7 +40,11 @@ export function renderMarkdown(text: string): ReactNode {
       const listKey = key++
       blocks.push(
         <ol key={listKey}>
-          {items.map((item, index) => <li key={index}>{renderInline(item, `${listKey}-${index}`)}</li>)}
+          {items.map((item, index) => (
+            <li key={index}>
+              <span>{renderInline(item, `${listKey}-${index}`)}</span>
+            </li>
+          ))}
         </ol>,
       )
       continue
