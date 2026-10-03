@@ -12,7 +12,7 @@ import styles from './WorkspaceShell.module.css'
 import { ROUTES } from '@/app/routes'
 import { useAuth } from '@/state/context'
 import { useWorkspaces } from '@/hooks/useData'
-import { canManage } from '@/lib/roles'
+import { canManage, isTeacher } from '@/lib/roles'
 import type { WorkspaceResponse } from '@/types/api'
 
 const ICON = { size: 15, strokeWidth: 2.75 } as const
@@ -39,7 +39,9 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
   const { pathname } = useLocation()
   const { user, signOut } = useAuth()
   const [helpOpen, setHelpOpen] = useState(false)
-  const isTeacher = user?.role === 'DOCENTE'
+  // Lo que se ve lo decide el rol en ESTE espacio, no el de la cuenta: un mismo docente es
+  // responsable de los que crea y solo observa los que le anaden como docente.
+  const soloObserva = isTeacher(workspace?.myRole)
   // Generar el plan con IA es cosa de quien administra el equipo;
   // preguntarle algo (ver Assistant) sigue abierto a cualquiera que no sea
   // el docente, que solo observa.
@@ -77,9 +79,9 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
     <div className={styles.shell}>
       <header className={styles.top}>
         <div className={styles.identity}>
-          <button className={styles.back} onClick={() => navigate(isTeacher ? ROUTES.docente : ROUTES.workspaces)}>
+          <button className={styles.back} onClick={() => navigate(soloObserva ? ROUTES.docente : ROUTES.workspaces)}>
             <ArrowLeft size={15} strokeWidth={2.75} />
-            {isTeacher ? 'Panel docente' : 'Mis espacios de trabajo'}
+            {soloObserva ? 'Panel docente' : 'Mis espacios de trabajo'}
           </button>
           <h1 className={styles.name}>
             {workspace && <WorkspaceBadge workspace={workspace} className={styles.badge} />}
@@ -142,7 +144,7 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
       {/* Flotante sobre cualquier seccion del workspace: preguntar «que hago
           primero?» se hace mirando el tablero, no yendose a otra pantalla. El
           docente no lo ve: observa el trabajo, no lo hace. */}
-      {!isTeacher && <Assistant workspaceId={workspaceId} />}
+      {workspace && !soloObserva && <Assistant workspaceId={workspaceId} />}
 
       <ShortcutsDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>

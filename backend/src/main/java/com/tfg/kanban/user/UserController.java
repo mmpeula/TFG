@@ -55,8 +55,10 @@ public class UserController {
     }
 
     @Operation(summary = "Cambiar el rol global de un usuario",
-            description = "Reservado al administrador de la plataforma. Es un rol independiente de los "
-                    + "equipos; el rol dentro de cada equipo se gestiona en /api/teams.")
+            description = "Reservado al administrador de la plataforma. Los cambios son siempre hacia arriba: "
+                    + "alumno a docente o a administrador, y docente a administrador. Un docente no vuelve a "
+                    + "ser alumno ni un administrador se degrada. Es un rol independiente de los equipos; "
+                    + "el rol dentro de cada equipo se gestiona en /api/teams.")
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/role")
     public UserResponse updateRole(@PathVariable Long id, @Valid @RequestBody UpdateGlobalRoleRequest request) {
@@ -64,7 +66,8 @@ public class UserController {
     }
 
     @Operation(summary = "Deshabilitar una cuenta",
-            description = "Baja logica: la cuenta deja de poder acceder pero se conserva su historial.")
+            description = "Baja logica: la cuenta deja de poder acceder pero se conserva su historial. "
+                    + "No se puede dar de baja al unico administrador habilitado.")
     @ApiResponses(@ApiResponse(responseCode = "204", description = "Cuenta deshabilitada"))
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")

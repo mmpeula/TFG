@@ -73,6 +73,38 @@ class DeepSeekClientTest {
     }
 
     @Test
+    @DisplayName("Con imagenes, el turno de usuario lleva partes text e image_url con su nivel de detalle")
+    void sendsImagesAsContentParts() throws Exception {
+        AtomicReference<String> peticion = new AtomicReference<>();
+        DeepSeekClient client = clientRespondiendo(200, contenidoRespuesta("=== PÁGINA 1 ===\nTexto"), peticion);
+
+        String answer = client.chatVision("Transcribe", "Transcribe 1 pagina",
+                java.util.List.of(new DeepSeekClient.ImagePart("data:image/jpeg;base64,AAAA", "high")), 8000);
+
+        assertThat(answer).contains("Texto");
+        var body = new ObjectMapper().readTree(peticion.get());
+        var user = body.path("messages").get(1);
+        assertThat(user.path("role").asText()).isEqualTo("user");
+        assertThat(user.path("content").get(0).path("type").asText()).isEqualTo("text");
+        assertThat(user.path("content").get(1).path("type").asText()).isEqualTo("image_url");
+        assertThat(user.path("content").get(1).path("image_url").path("url").asText()).isEqualTo("data:image/jpeg;base64,AAAA");
+        assertThat(user.path("content").get(1).path("image_url").path("detail").asText()).isEqualTo("high");
+        assertThat(body.path("max_tokens").asInt()).isEqualTo(8000);
+        assertThat(body.has("response_format")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Sin API key no se intenta leer imagenes: se dice que falta la clave")
+    void visionRequiresApiKey() {
+        AiProperties props = properties("http://127.0.0.1:1");
+        props.setApiKey("");
+        DeepSeekClient client = new DeepSeekClient(props, new ObjectMapper());
+
+        assertThatThrownBy(() -> client.chatVision("s", "u", java.util.List.of(), 100))
+                .isInstanceOf(AiUnavailableException.class).hasMessageContaining("DEEPSEEK_API_KEY");
+    }
+
+    @Test
     @DisplayName("Devuelve el contenido del mensaje, sin streaming, con la API key en la cabecera")
     void returnsMessageContent() throws Exception {
         AtomicReference<String> peticion = new AtomicReference<>();
@@ -159,6 +191,18 @@ class DeepSeekClientTest {
                 .isInstanceOf(AiUnavailableException.class)
                 .hasMessageContaining("se ha cortado")
                 .hasMessageContaining("AI_MAX_OUTPUT_TOKENS");
+    }
+
+    @Test
+    @DisplayName("Si se corta la lectura de imagenes, el aviso nombra el tope de la vision, no el del chat")
+    void namesTheVisionLimitWhenTheVisionAnswerIsCut() throws Exception {
+        DeepSeekClient client = clientRespondiendo(200,
+                "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"=== PAGINA 1 ===\"},"
+                        + "\"finish_reason\":\"length\"}]}");
+
+        assertThatThrownBy(() -> client.chatVision("s", "u", java.util.List.of(), 100))
+                .isInstanceOf(AiUnavailableException.class)
+                .hasMessageContaining("AI_VISION_MAX_OUTPUT_TOKENS");
     }
 
     @Test

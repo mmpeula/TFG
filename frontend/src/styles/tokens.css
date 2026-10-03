@@ -8,14 +8,9 @@
  * debajo de lo estimado", rojo es "por encima o critico", ambar es "pendiente
  * de revisar", y el azul manda en la accion principal y en lo que hay que
  * mirar (foco, seleccion, la IA). Ningun color se usa sin que signifique eso.
- *
- * Los nombres de los tokens se conservan de la version anterior para que ningun
- * componente tenga que cambiar de vocabulario; lo que cambia son los valores y
- * las dos familias nuevas (danger, warning).
  */
 :root {
   --color-bg: #ffffff;
-  --color-surface: #fafafa;
   --color-text: #18181b;
   --color-divider: #e8e8ea;
 
@@ -85,14 +80,11 @@
    * Casi todo se separa con una linea de 1 px, no con sombra. Las sombras
    * quedan para lo que de verdad flota por encima de la pagina.
    */
-  --shadow-sm: 0 1px 2px rgb(24 24 27 / .05);
   --shadow-md: 0 4px 12px rgb(24 24 27 / .07);
   --shadow-lg: 0 16px 40px rgb(24 24 27 / .12);
 
   --transition: background .12s ease, color .12s ease, border-color .12s ease,
                 opacity .12s ease, transform .12s ease;
-
-  --sidebar-width: 236px;
 
   /*
    * El asistente usa el azul de acento, que en este sistema es "la IA": no
@@ -100,7 +92,5 @@
    * etiqueta "IA" y el borde azul de sus mensajes, no un color ajeno.
    */
   --color-assistant: var(--color-accent-600);
-  --color-assistant-strong: var(--color-accent-800);
   --color-assistant-tint: var(--color-accent-100);
-  --color-assistant-line: var(--color-accent-300);
 }

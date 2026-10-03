@@ -155,14 +155,15 @@ function WorkspaceDetail({
   /**
    * Los roles que se le pueden dar a esta persona.
    *
-   * Un docente sigue el equipo pero no trabaja en el, y al reves: el servidor
-   * rechaza cruzar esas dos cosas, asi que aqui tampoco se ofrecen. Y al ultimo
-   * responsable no se le deja bajar, porque el equipo se quedaria sin nadie que
+   * Quien esta como docente es una cuenta docente, y esa puede seguir el equipo o
+   * trabajar en el (alumno o responsable); a quien ya trabaja no se le ofrece docente,
+   * porque aqui no se sabe si su cuenta lo es y el servidor lo rechazaria si no. Y al
+   * ultimo responsable no se le deja bajar, porque el equipo se quedaria sin nadie que
    * pueda administrarlo (eso tambien lo rechaza el servidor; esto solo evita
    * ofrecer algo que va a fallar).
    */
   function rolesPara(member: AdminWorkspaceResponse['members'][number]): Role[] {
-    if (member.role === 'DOCENTE') return ['DOCENTE']
+    if (member.role === 'DOCENTE') return ['DOCENTE', 'MIEMBRO', 'RESPONSABLE']
     const esUltimoResponsable = member.role === 'RESPONSABLE' && responsablesActivos.length === 1
     return esUltimoResponsable ? ['RESPONSABLE'] : ['RESPONSABLE', 'MIEMBRO']
   }

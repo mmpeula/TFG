@@ -8,6 +8,8 @@ import com.tfg.kanban.ai.dto.ApplyPlanRequest;
 import com.tfg.kanban.ai.dto.MemberWorkload;
 import com.tfg.kanban.ai.dto.PlanOptions;
 import com.tfg.kanban.ai.dto.PlannedSprint;
+import com.tfg.kanban.ai.document.DocumentIngestionService;
+import com.tfg.kanban.ai.document.ProcessedDocument;
 import com.tfg.kanban.ai.dto.ProposedTask;
 import com.tfg.kanban.board.BoardService;
 import com.tfg.kanban.common.BusinessRuleException;
@@ -16,7 +18,6 @@ import com.tfg.kanban.domain.repository.TaskRepository;
 import com.tfg.kanban.domain.repository.UserRepository;
 import com.tfg.kanban.project.ProjectService;
 import com.tfg.kanban.security.SecurityUtils;
-import com.tfg.kanban.storage.FileStorageService;
 import com.tfg.kanban.task.TaskMapper;
 import com.tfg.kanban.task.dto.TaskResponse;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -42,8 +44,8 @@ import java.util.stream.Collectors;
  * acepta las tareas que quiere ({@link #apply}). Es la regla de producto del modulo
  * de IA y la razon de separar generar y aplicar en dos endpoints.</p>
  *
- * <p>Una sola llamada a DeepSeek con el documento entero (el propio
- * {@link DocumentTextExtractor} lo capa a 80000 caracteres como red de
+ * <p>Una sola llamada a DeepSeek con el documento entero (el procesamiento de
+ * {@link DocumentIngestionService} lo acota por secciones, como red de
  * seguridad), y de ella sale el reparto completo de todos los sprints de una
  * vez. Lo que si es medible —el reparto de horas, las dependencias entre
  * tareas— se comprueba en Java sobre el resultado, no se le pide al modelo que
@@ -96,7 +98,8 @@ public class AiPlanService {
     private final UserRepository userRepository;
     private final ActivityService activityService;
     private final TaskMapper taskMapper;
-    private final DocumentTextExtractor documentTextExtractor;
+    private final DocumentIngestionService documentIngestion;
+    private final PlanProgressTracker progressTracker;
     private final AiTaskScheduler aiTaskScheduler;
 
     /** Genera el plan a partir del guion ya guardado en el proyecto. */
@@ -108,7 +111,7 @@ public class AiPlanService {
             throw new BusinessRuleException(
                     "El proyecto no tiene guion de la practica: subelo como documento o escribelo en el proyecto");
         }
-        return plan(project, project.getBriefing(), "guion del proyecto", options);
+        return tracked(projectId, () -> plan(project, project.getBriefing(), "guion del proyecto", options, List.of()));
     }
 
     /**
@@ -118,12 +121,26 @@ public class AiPlanService {
     @Transactional
     public AiPlanResponse generateFromDocument(Long projectId, MultipartFile file, PlanOptions options) {
         Project project = projectService.getProject(projectId);
-        String text = documentTextExtractor.extract(file);
+        return tracked(projectId, () -> {
+            ProcessedDocument document = documentIngestion.ingest(file, stage -> progressTracker.advance(projectId, stage));
+            String context = document.context();
+            project.setBriefing(context);
 
-        project.setBriefing(text);
+            return plan(project, context, "documento: " + document.filename(), options, document.warnings());
+        });
+    }
 
-        return plan(project, text, "documento: " + FileStorageService.cleanFilename(file.getOriginalFilename()),
-                options);
+    /**
+     * Mientras dura la generacion, la interfaz puede preguntar por que fase va
+     * ({@link PlanProgressTracker}); al terminar, bien o mal, se olvida.
+     */
+    private <T> T tracked(Long projectId, Supplier<T> generation) {
+        progressTracker.advance(projectId, ProcessingStage.RECEIVED);
+        try {
+            return generation.get();
+        } finally {
+            progressTracker.clear(projectId);
+        }
     }
 
     /**
@@ -133,7 +150,7 @@ public class AiPlanService {
      */
     @Transactional(readOnly = true)
     public Optional<LocalDate> detectStartDate(MultipartFile file) {
-        return DocumentDateDetector.detect(documentTextExtractor.extract(file));
+        return DocumentDateDetector.detect(documentIngestion.localContext(file));
     }
 
     /**
@@ -147,13 +164,15 @@ public class AiPlanService {
         if (text == null || text.isBlank()) {
             throw new BusinessRuleException("Escribe de que va el trabajo para que pueda proponerte tareas");
         }
-        return plan(project, text.trim(), "descripcion escrita", options);
+        return tracked(projectId, () -> plan(project, text.trim(), "descripcion escrita", options, List.of()));
     }
 
-    private AiPlanResponse plan(Project project, String text, String source, PlanOptions requested) {
+    private AiPlanResponse plan(Project project, String text, String source, PlanOptions requested,
+                                List<String> documentWarnings) {
         if (!properties.isEnabled()) {
             throw new AiUnavailableException("El modulo de IA esta desactivado en la configuracion del servidor");
         }
+        progressTracker.advance(project.getId(), ProcessingStage.PLANNING);
         PlanOptions options = requested == null ? PlanOptions.defaults() : requested;
 
         PlanTeam team = PlanTeam.resolve(project.getTeam().getMembers(), options.team());
@@ -187,7 +206,9 @@ public class AiPlanService {
                 .map(IterationDeliveryDetector.Delivery::describe).toList();
 
         AiPlanResponse response = toResponse(project, source, team, start, ventanas, parsed, deliveryWarnings);
-        return balanced.warnings().isEmpty() ? response : withExtraWarnings(response, balanced.warnings());
+        List<String> extra = new ArrayList<>(documentWarnings);
+        extra.addAll(balanced.warnings());
+        return extra.isEmpty() ? response : withExtraWarnings(response, extra);
     }
 
     /** La misma respuesta con avisos de mas al final: los que anade el ajuste de reparto, fuera de {@code toResponse}. */

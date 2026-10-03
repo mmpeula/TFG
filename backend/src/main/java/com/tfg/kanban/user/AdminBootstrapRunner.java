@@ -17,7 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
  * exista un administrador antes: sin este arranque, nadie podria llegar nunca
  * al primero.
  *
- * <p>Si ya hay algun ADMIN no hace nada. Si el correo configurado en
+ * <p>Si ya hay algun ADMIN que pueda entrar no hace nada: uno dado de baja no
+ * cuenta, porque la plataforma se quedaria sin nadie que la administre. Si el correo configurado en
  * {@link AdminProperties} pertenece a una cuenta existente, esa cuenta se
  * asciende (y se reactiva si estaba deshabilitada) en vez de duplicarla.</p>
  */
@@ -33,7 +34,7 @@ public class AdminBootstrapRunner implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (userRepository.existsByRole(Role.ADMIN)) {
+        if (userRepository.existsByRoleAndEnabledTrue(Role.ADMIN)) {
             return;
         }
 

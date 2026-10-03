@@ -1,5 +1,7 @@
 package com.tfg.kanban.security;
 
+import com.tfg.kanban.domain.model.User;
+import com.tfg.kanban.domain.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -17,10 +19,12 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Optional;
 
 /**
- * Lee el token del cabecera {@code Authorization: Bearer <token>} y, si es valido,
- * deja la autenticacion en el {@link SecurityContextHolder}.
+ * Lee el token del cabecera {@code Authorization: Bearer <token>} y, si es valido y la
+ * cuenta sigue habilitada, deja la autenticacion en el {@link SecurityContextHolder} con
+ * el rol que la cuenta tiene <b>ahora</b>, no con el que tenia al emitirse el token.
  *
  * No corta la cadena si no hay token: de eso se encarga la configuracion de
  * autorizacion de {@link SecurityConfig}.
@@ -33,6 +37,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -59,8 +64,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        AppUserDetails principal =
-                new AppUserDetails(userId.longValue(), claims.getSubject(), "ROLE_" + role);
+        // El token dice quien es; lo que puede hacer ahora lo dice la base de datos. Si no,
+        // una cuenta dada de baja seguiria entrando hasta que caducara su token (horas), y un
+        // cambio de rol no valdria hasta volver a iniciar sesion. Es una lectura por clave
+        // primaria por peticion: barata a esta escala.
+        Optional<User> user = userRepository.findById(userId.longValue());
+        if (user.isEmpty() || !user.get().isEnabled()) {
+            log.debug("Token JWT de una cuenta inexistente o deshabilitada: se ignora");
+            return;
+        }
+        AppUserDetails principal = new AppUserDetails(user.get());
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Tests unitarios de las reglas de cuentas. El conteo global de administradores
- * ({@code countByRole}) se prueba aqui con un repositorio simulado, no con el
+ * ({@code countByRoleAndEnabledTrue}) se prueba aqui con un repositorio simulado, no con el
  * Oracle real de los tests de integracion: ese Oracle es compartido entre todas
  * las clases de test (vease {@code AbstractOracleContainerTest}) y siempre tiene
  * al menos el administrador que crea {@link AdminBootstrapRunner} al arrancar,
@@ -51,56 +51,111 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Degradar al ultimo ADMIN de la plataforma no esta permitido")
-    void cannotDemoteLastAdmin() {
+    @DisplayName("Un alumno puede pasar a docente o a administrador, y un docente a administrador")
+    void rolesOnlyGoUp() {
         TestSecurity.authenticateAs(9L, "ADMIN");
-        User admin = User.builder().id(1L).email("admin@planifia.local").role(Role.ADMIN).build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
-        when(userRepository.countByRole(Role.ADMIN)).thenReturn(1L);
+        User student = User.builder().id(2L).email("luis@uni.es").role(Role.MIEMBRO).build();
+        User otherStudent = User.builder().id(4L).email("eva@uni.es").role(Role.MIEMBRO).build();
+        User teacher = User.builder().id(3L).email("marta@uni.es").role(Role.DOCENTE).build();
+        when(userRepository.findById(2L)).thenReturn(Optional.of(student));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(teacher));
+        when(userRepository.findById(4L)).thenReturn(Optional.of(otherStudent));
 
+        assertThat(userService.updateGlobalRole(2L, new UpdateGlobalRoleRequest(Role.DOCENTE)).role()).isEqualTo(Role.DOCENTE);
+        assertThat(userService.updateGlobalRole(2L, new UpdateGlobalRoleRequest(Role.ADMIN)).role()).isEqualTo(Role.ADMIN);
+        assertThat(userService.updateGlobalRole(3L, new UpdateGlobalRoleRequest(Role.ADMIN)).role()).isEqualTo(Role.ADMIN);
+        assertThat(userService.updateGlobalRole(4L, new UpdateGlobalRoleRequest(Role.ADMIN)).role()).isEqualTo(Role.ADMIN);
+    }
+
+    @Test
+    @DisplayName("Pedir el rol que la cuenta ya tiene no cambia nada")
+    void sameRoleIsANoOp() {
+        TestSecurity.authenticateAs(9L, "ADMIN");
+        User student = User.builder().id(2L).email("luis@uni.es").role(Role.MIEMBRO).build();
+        User teacher = User.builder().id(3L).email("marta@uni.es").role(Role.DOCENTE).build();
+        User admin = User.builder().id(1L).email("admin@planifia.local").role(Role.ADMIN).build();
+        when(userRepository.findById(2L)).thenReturn(Optional.of(student));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(teacher));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+        assertThat(userService.updateGlobalRole(2L, new UpdateGlobalRoleRequest(Role.MIEMBRO)).role()).isEqualTo(Role.MIEMBRO);
+        assertThat(userService.updateGlobalRole(3L, new UpdateGlobalRoleRequest(Role.DOCENTE)).role()).isEqualTo(Role.DOCENTE);
+        assertThat(userService.updateGlobalRole(1L, new UpdateGlobalRoleRequest(Role.ADMIN)).role()).isEqualTo(Role.ADMIN);
+    }
+
+    @Test
+    @DisplayName("Un docente no vuelve a ser alumno, y un ADMIN no se degrada, haya uno o varios")
+    void rolesNeverGoDown() {
+        TestSecurity.authenticateAs(9L, "ADMIN");
+        User teacher = User.builder().id(3L).email("marta@uni.es").role(Role.DOCENTE).build();
+        User admin = User.builder().id(1L).email("admin@planifia.local").role(Role.ADMIN).build();
+        when(userRepository.findById(3L)).thenReturn(Optional.of(teacher));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.countByRoleAndEnabledTrue(Role.ADMIN)).thenReturn(3L);
+
+        assertThatThrownBy(() -> userService.updateGlobalRole(3L, new UpdateGlobalRoleRequest(Role.MIEMBRO)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("no puede volver a ser alumno");
         assertThatThrownBy(() -> userService.updateGlobalRole(1L, new UpdateGlobalRoleRequest(Role.MIEMBRO)))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("al menos un administrador");
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("no se puede degradar");
+        assertThatThrownBy(() -> userService.updateGlobalRole(1L, new UpdateGlobalRoleRequest(Role.DOCENTE)))
+                .isInstanceOf(BusinessRuleException.class);
+
+        assertThat(teacher.getRole()).isEqualTo(Role.DOCENTE);
+        assertThat(admin.getRole()).isEqualTo(Role.ADMIN);
     }
 
     @Test
-    @DisplayName("Con mas de un ADMIN, degradar a uno de ellos si esta permitido")
-    void canDemoteAdminIfNotTheLastOne() {
+    @DisplayName("RESPONSABLE es un rol de equipo: no se puede dar como rol de cuenta")
+    void responsableIsNotAnAccountRole() {
         TestSecurity.authenticateAs(9L, "ADMIN");
-        User admin = User.builder().id(1L).email("admin@planifia.local").role(Role.ADMIN).build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
-        when(userRepository.countByRole(Role.ADMIN)).thenReturn(2L);
+        User student = User.builder().id(2L).email("luis@uni.es").role(Role.MIEMBRO).build();
+        when(userRepository.findById(2L)).thenReturn(Optional.of(student));
 
-        var response = userService.updateGlobalRole(1L, new UpdateGlobalRoleRequest(Role.MIEMBRO));
-
-        assertThat(response.role()).isEqualTo(Role.MIEMBRO);
+        assertThatThrownBy(() -> userService.updateGlobalRole(2L, new UpdateGlobalRoleRequest(Role.RESPONSABLE)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("rol de equipo");
+        assertThat(student.getRole()).isEqualTo(Role.MIEMBRO);
     }
 
     @Test
-    @DisplayName("Ascender a alguien a ADMIN no comprueba el ultimo administrador")
-    void promotingToAdminDoesNotCheckTheGuard() {
-        TestSecurity.authenticateAs(9L, "ADMIN");
-        User member = User.builder().id(2L).email("luis@uni.es").role(Role.MIEMBRO).build();
-        when(userRepository.findById(2L)).thenReturn(Optional.of(member));
-
-        var response = userService.updateGlobalRole(2L, new UpdateGlobalRoleRequest(Role.ADMIN));
-
-        assertThat(response.role()).isEqualTo(Role.ADMIN);
-    }
-
-    @Test
-    @DisplayName("Deshabilitar al ultimo ADMIN de la plataforma no esta permitido")
+    @DisplayName("Deshabilitar al ultimo ADMIN habilitado no esta permitido")
     void cannotDisableLastAdmin() {
         // Quien deshabilita no es el propio admin, para llegar a la comprobacion
         // del ultimo administrador y no a la de "no puedes darte de baja a ti mismo".
         TestSecurity.authenticateAs(9L, "ADMIN");
         User admin = User.builder().id(1L).email("admin@planifia.local").role(Role.ADMIN).build();
         when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
-        when(userRepository.countByRole(Role.ADMIN)).thenReturn(1L);
+        when(userRepository.countByRoleAndEnabledTrue(Role.ADMIN)).thenReturn(1L);
 
         assertThatThrownBy(() -> userService.disable(1L))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("al menos un administrador");
+        assertThat(admin.isEnabled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Con otro ADMIN habilitado, dar de baja a uno si esta permitido")
+    void canDisableAdminIfAnotherRemains() {
+        TestSecurity.authenticateAs(9L, "ADMIN");
+        User admin = User.builder().id(1L).email("ana@uni.es").role(Role.ADMIN).build();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.countByRoleAndEnabledTrue(Role.ADMIN)).thenReturn(2L);
+
+        userService.disable(1L);
+
+        assertThat(admin.isEnabled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Un ADMIN ya deshabilitado no cuenta: darlo de baja otra vez no se bloquea por ser el ultimo")
+    void disablingAnAlreadyDisabledAdminIsNotBlocked() {
+        TestSecurity.authenticateAs(9L, "ADMIN");
+        User admin = User.builder().id(1L).email("vieja@uni.es").role(Role.ADMIN).enabled(false).build();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.countByRoleAndEnabledTrue(Role.ADMIN)).thenReturn(1L);
+
+        userService.disable(1L);
+
+        assertThat(admin.isEnabled()).isFalse();
     }
 
     @Test

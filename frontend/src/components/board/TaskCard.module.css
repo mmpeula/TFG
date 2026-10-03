@@ -7,7 +7,12 @@
   border: 1px solid var(--color-neutral-300);
   border-radius: var(--radius-lg);
   padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) + var(--gutter-width) + 2px);
-  overflow: hidden;
+  /* La franja de prioridad como el gutter de un diff: color con trabajo, no decoracion. Es
+     una sombra interior y no un elemento aparte porque asi sigue siempre la curva de las
+     esquinas, sin necesitar overflow:hidden, que recortaria el aviso (SignalBadge) que sale
+     por encima del borde. */
+  --franja: inset var(--gutter-width) 0 0 var(--prioridad, var(--color-neutral-300));
+  box-shadow: var(--franja);
   transition: var(--transition);
 }
 .card:hover { border-color: var(--color-neutral-500); }
@@ -17,14 +22,12 @@
 .done .title { color: var(--color-neutral-500); }
 .dragging { opacity: .4; }
 /* Solo la tarjeta que se arrastra flota, porque de verdad esta por encima. */
-.overlay { box-shadow: var(--shadow-lg); cursor: grabbing; }
+.overlay { box-shadow: var(--franja), var(--shadow-lg); cursor: grabbing; }
 .highlight {
-  box-shadow: 0 0 0 2px var(--color-accent-500);
+  box-shadow: var(--franja), 0 0 0 2px var(--color-accent-500);
   transition: box-shadow .2s ease;
 }
 
-/* La franja de prioridad como el gutter de un diff: color con trabajo, no decoracion. */
-.gutter { position: absolute; left: 0; top: 0; bottom: 0; width: var(--gutter-width); }
 
 .head { display: flex; align-items: center; gap: var(--space-2); }
 .code {
@@ -32,6 +35,13 @@
   font-size: 11px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums;
 }
 .codeHours { color: var(--color-neutral-400); }
+/* El estado, solo en el plan: a la derecha de la cabecera, con su color y su texto. */
+.status {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; color: var(--estado);
+}
+.statusDot { width: 6px; height: 6px; border-radius: 999px; background: var(--estado); flex: none; }
 .menu {
   margin-left: auto;
   display: grid; place-items: center;

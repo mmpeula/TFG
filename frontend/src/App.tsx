@@ -16,13 +16,10 @@ import { TeacherScreen } from './screens/TeacherScreen'
 import { InvitationScreen } from './screens/InvitationScreen'
 import { useAuth } from './state/context'
 
-/**
- * Redireccion de una ruta antigua a su equivalente nueva, conservando el id.
- * Existe para que los enlaces guardados de la version anterior sigan valiendo.
- */
-function LegacyRedirect({ to }: { to: (id: string) => string }) {
+/** Entrar en un workspace es ver su plan: /workspaces/:id lleva a su seccion Plan. */
+function WorkspaceHomeRedirect() {
   const { workspaceId } = useParams()
-  return <Navigate to={workspaceId ? to(workspaceId) : ROUTES.workspaces} replace />
+  return <Navigate to={workspaceId ? ROUTES.planById(workspaceId) : ROUTES.workspaces} replace />
 }
 
 /** Evita que una cuenta entre en un panel que no corresponde a su rol global. */
@@ -50,7 +47,7 @@ export function App() {
           <Route path={ROUTES.workspaces} element={<WorkspacesScreen />} />
 
           {/* Entrar en un workspace es ver su plan; el tablero es el dia a dia. */}
-          <Route path={ROUTES.workspace} element={<LegacyRedirect to={ROUTES.planById} />} />
+          <Route path={ROUTES.workspace} element={<WorkspaceHomeRedirect />} />
           <Route path={ROUTES.plan} element={<PlanScreen />} />
           <Route path={ROUTES.tablero} element={<BoardScreen />} />
           <Route path={ROUTES.generarPlan} element={<GeneratePlanScreen />} />
@@ -61,16 +58,6 @@ export function App() {
           {/* Solo la ve quien tiene rol global ADMIN. */}
           <Route path={ROUTES.administracion} element={<AdminScreen />} />
           <Route path={ROUTES.docente} element={<TeacherScreen />} />
-
-          {/* Rutas de la version anterior. */}
-          <Route path={ROUTES.legacyEquipos} element={<Navigate to={ROUTES.workspaces} replace />} />
-          <Route path={ROUTES.legacyEquipo} element={<Navigate to={ROUTES.workspaces} replace />} />
-          <Route path={ROUTES.legacyProyectos} element={<Navigate to={ROUTES.workspaces} replace />} />
-          <Route path={ROUTES.legacyProyecto} element={<LegacyRedirect to={ROUTES.planById} />} />
-          <Route path={ROUTES.legacyTablero} element={<LegacyRedirect to={ROUTES.tableroById} />} />
-          <Route path={ROUTES.legacyCopiloto} element={<LegacyRedirect to={ROUTES.generarPlanById} />} />
-          <Route path={ROUTES.legacyCopilotoWorkspace} element={<LegacyRedirect to={ROUTES.generarPlanById} />} />
-          <Route path={ROUTES.legacyPulso} element={<LegacyRedirect to={ROUTES.pulsoById} />} />
         </Route>
 
         <Route path={ROUTES.configuracion} element={<SettingsScreen />} />

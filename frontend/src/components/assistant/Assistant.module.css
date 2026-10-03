@@ -47,14 +47,13 @@
 .head {
   display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-  background: var(--color-assistant-strong);
+  background: var(--color-assistant);
 }
 .mark {
   width: 40px; height: 40px; border-radius: var(--radius-md); flex: none;
   display: grid; place-items: center;
-  background: var(--color-assistant);
+  background: rgb(255 255 255 / .16);
   color: #ffffff;
-  border: 1px solid rgb(255 255 255 / .22);
 }
 .markIcon { width: 21px; height: 21px; }
 .titles { display: flex; flex-direction: column; gap: 1px; margin-right: auto; }
@@ -65,13 +64,13 @@
 .aiBadge {
   font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .04em;
   padding: 1px 5px; border-radius: 4px;
-  color: var(--color-assistant-strong); background: var(--color-accent-200);
+  color: var(--color-assistant); background: #ffffff;
 }
-.hint { font-size: 11.5px; color: rgb(255 255 255 / .62); }
+.hint { font-size: 11.5px; color: rgb(255 255 255 / .85); }
 
 .headButton {
   width: 26px; height: 26px; border-radius: var(--radius-sm); flex: none;
-  display: grid; place-items: center; color: rgb(255 255 255 / .7);
+  display: grid; place-items: center; color: rgb(255 255 255 / .85);
   transition: var(--transition);
 }
 .headButton:hover { background: rgb(255 255 255 / .12); color: #ffffff; }

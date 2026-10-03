@@ -18,9 +18,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
             String fullName, String email, Pageable pageable);
 
-    /** Para el arranque: si ya hay un administrador no hace falta crear otro. */
-    boolean existsByRole(Role role);
+    /**
+     * Para el arranque: si ya hay un administrador que pueda entrar no hace falta
+     * crear otro. Cuentan solo las habilitadas: un ADMIN dado de baja no administra nada.
+     */
+    boolean existsByRoleAndEnabledTrue(Role role);
 
-    /** Para no dejar la plataforma sin nadie que la administre. */
-    long countByRole(Role role);
+    /** Para no dejar la plataforma sin nadie que la administre: solo cuentan las cuentas que pueden entrar. */
+    long countByRoleAndEnabledTrue(Role role);
 }

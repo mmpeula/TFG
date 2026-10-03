@@ -3,6 +3,10 @@ package com.tfg.kanban.ai;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tfg.kanban.TestSecurity;
 import com.tfg.kanban.activity.ActivityService;
+import com.tfg.kanban.ai.document.DocumentFormat;
+import com.tfg.kanban.ai.document.DocumentIngestionService;
+import com.tfg.kanban.ai.document.ProcessedDocument;
+import com.tfg.kanban.ai.document.ProgressListener;
 import com.tfg.kanban.ai.dto.ApplyPlanRequest;
 import com.tfg.kanban.ai.dto.PlanOptions;
 import com.tfg.kanban.ai.dto.ProposedTask;
@@ -24,7 +28,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
@@ -59,8 +66,10 @@ class AiPlanServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private ActivityService activityService;
     @Mock private TaskMapper taskMapper;
+    @Mock private DocumentIngestionService documentIngestion;
 
     private AiProperties properties;
+    private final PlanProgressTracker progressTracker = new PlanProgressTracker();
     private AiPlanService service;
     private Project project;
     /** Un lunes: asi las fechas de fin de sprint caen en dias de la semana conocidos. */
@@ -68,14 +77,20 @@ class AiPlanServiceTest {
 
     @BeforeEach
     void setUp() {
-        TestSecurity.authenticateAs(1L, "RESPONSABLE");
+        TestSecurity.authenticateAs(1L, "MIEMBRO");
 
         properties = new AiProperties();
         properties.setModel("deepseek-flash");
 
         service = new AiPlanService(properties, deepSeekClient, new ObjectMapper(), projectService,
                 boardService, taskRepository, userRepository, activityService, taskMapper,
-                new DocumentTextExtractor(), new AiTaskScheduler());
+                documentIngestion, progressTracker, new AiTaskScheduler());
+
+        // El procesamiento real del documento se prueba en DocumentIngestionServiceTest: aqui
+        // basta con que un fichero de texto llegue como el texto que contiene.
+        when(documentIngestion.ingest(any(), any())).thenAnswer(invocation -> processed(invocation.getArgument(0)));
+        when(documentIngestion.localContext(any())).thenAnswer(invocation ->
+                processed(invocation.getArgument(0)).context());
 
         inicio = LocalDate.now().plusWeeks(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
 
@@ -910,6 +925,15 @@ class AiPlanServiceTest {
         assertThat(response.sprints().get(0).start()).isEqualTo(LocalDate.now());
     }
 
+    private static ProcessedDocument processed(MultipartFile file) {
+        try {
+            return new ProcessedDocument(file.getOriginalFilename(), DocumentFormat.TEXT, file.getSize(), 0, null,
+                    new String(file.getBytes(), StandardCharsets.UTF_8), List.of(), List.of(), 0, 0, List.of());
+        } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
+    }
+
     @Test
     @DisplayName("Sin fecha en el workspace, se usa la marcada en el documento")
     void startDateComesFromTheDocument() {
@@ -969,9 +993,49 @@ class AiPlanServiceTest {
 
         var response = service.generateFromDocument(7L, file, null);
 
-        assertThat(project.getBriefing()).isEqualTo("Practica de gestion de una biblioteca");
+        assertThat(project.getBriefing()).startsWith("# ENUNCIADO").contains("Practica de gestion de una biblioteca");
         assertThat(response.source()).isEqualTo("documento: guion.txt");
         assertThat(promptDeUsuario()).contains("Practica de gestion de una biblioteca");
+    }
+
+    @Test
+    @DisplayName("Los avisos del procesamiento del documento llegan al usuario junto a los del plan")
+    void documentWarningsReachTheResponse() {
+        modelReplies(PLAN_VALIDO);
+        doReturn(new ProcessedDocument("guion.pdf", DocumentFormat.PDF, 100, 3, null, "Practica de redes",
+                List.of(), List.of(), 0, 0, List.of("La tabla 2 se ha omitido")))
+                .when(documentIngestion).ingest(any(), any());
+        var file = new MockMultipartFile("file", "guion.pdf", "application/pdf", new byte[] {1});
+
+        var response = service.generateFromDocument(7L, file, null);
+
+        assertThat(response.warnings()).contains("La tabla 2 se ha omitido");
+    }
+
+    @Test
+    @DisplayName("El progreso pasa por recibido y generando, y se olvida al terminar, bien o mal")
+    void progressIsTrackedAndCleared() {
+        List<ProcessingStage> seen = new java.util.ArrayList<>();
+        doAnswer(invocation -> {
+            progressTracker.current(7L).ifPresent(seen::add);
+            ((ProgressListener) invocation.getArgument(1)).stage(ProcessingStage.EXTRACTING);
+            progressTracker.current(7L).ifPresent(seen::add);
+            return processed(invocation.getArgument(0));
+        }).when(documentIngestion).ingest(any(), any());
+        when(deepSeekClient.chatJson(anyString(), anyString())).thenAnswer(invocation -> {
+            progressTracker.current(7L).ifPresent(seen::add);
+            return PLAN_VALIDO;
+        });
+        var file = new MockMultipartFile("file", "guion.txt", "text/plain", "Practica".getBytes(StandardCharsets.UTF_8));
+
+        service.generateFromDocument(7L, file, null);
+
+        assertThat(seen).containsExactly(ProcessingStage.RECEIVED, ProcessingStage.EXTRACTING, ProcessingStage.PLANNING);
+        assertThat(progressTracker.current(7L)).isEmpty();
+
+        doThrow(new BusinessRuleException("roto")).when(documentIngestion).ingest(any(), any());
+        assertThatThrownBy(() -> service.generateFromDocument(7L, file, null)).isInstanceOf(BusinessRuleException.class);
+        assertThat(progressTracker.current(7L)).isEmpty();
     }
 
     @Test

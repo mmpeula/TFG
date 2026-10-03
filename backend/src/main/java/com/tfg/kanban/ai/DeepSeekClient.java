@@ -32,6 +32,9 @@ public class DeepSeekClient {
     /** En el chat interesa algo mas de soltura que al generar JSON, pero sin inventar. */
     private static final double CHAT_TEMPERATURE = 0.4;
 
+    /** Leer una imagen es transcribir lo que se ve: nada de soltura. */
+    private static final double VISION_TEMPERATURE = 0.1;
+
     /** Lo que se espera a que el servidor de DeepSeek coja el telefono, no a que conteste. */
     private static final int CONNECT_TIMEOUT_MILLIS = 10_000;
 
@@ -79,13 +82,44 @@ public class DeepSeekClient {
     public record Message(String role, String content) {
     }
 
+    /** Una imagen ya codificada como data URL ({@code data:image/jpeg;base64,...}). */
+    public record ImagePart(String dataUrl, String detail) {
+    }
+
+    /**
+     * Una peticion con imagenes: el texto de la tarea y las imagenes en un solo
+     * turno de usuario, con las partes {@code text} e {@code image_url} del formato
+     * compatible con OpenAI. Temperatura casi nula: se transcribe, no se interpreta.
+     */
+    public String chatVision(String systemPrompt, String userText, List<ImagePart> images, int maxTokens) {
+        if (properties.getApiKey() == null || properties.getApiKey().isBlank()) {
+            throw new AiUnavailableException(
+                    "Falta la API key de DeepSeek (DEEPSEEK_API_KEY): sin ella no se pueden leer las imagenes del documento");
+        }
+        List<Map<String, Object>> parts = new ArrayList<>();
+        parts.add(Map.of("type", "text", "text", userText));
+        for (ImagePart image : images) {
+            parts.add(Map.of("type", "image_url",
+                    "image_url", Map.of("url", image.dataUrl(), "detail", image.detail())));
+        }
+        List<Map<String, Object>> turns = List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", parts));
+        return send(turns, false, VISION_TEMPERATURE, maxTokens, "AI_VISION_MAX_OUTPUT_TOKENS");
+    }
+
     private String chat(String systemPrompt, List<Message> messages, boolean json, double temperature, int maxTokens) {
         List<Map<String, Object>> turns = new ArrayList<>();
         turns.add(Map.of("role", "system", "content", systemPrompt));
         for (Message message : messages) {
             turns.add(Map.of("role", message.role(), "content", message.content()));
         }
+        return send(turns, json, temperature, maxTokens, json ? "AI_MAX_OUTPUT_TOKENS" : "AI_CHAT_MAX_OUTPUT_TOKENS");
+    }
 
+    /** {@code maxTokensSetting} es la variable de entorno que sube ese tope, para decirla si se queda corto. */
+    private String send(List<Map<String, Object>> turns, boolean json, double temperature, int maxTokens,
+                        String maxTokensSetting) {
         Map<String, Object> body = new LinkedHashMap<>(Map.of(
                 "model", properties.getModel(),
                 "stream", false,
@@ -121,7 +155,7 @@ public class DeepSeekClient {
                 log.warn("DeepSeek ha cortado la respuesta al llegar a max_tokens ({})", maxTokens);
                 throw new AiUnavailableException(("La respuesta del modelo se ha cortado al llegar al tope de %,d "
                         + "tokens. Sube %s o prueba con un documento mas corto.")
-                        .formatted(maxTokens, json ? "AI_MAX_OUTPUT_TOKENS" : "AI_CHAT_MAX_OUTPUT_TOKENS"));
+                        .formatted(maxTokens, maxTokensSetting));
             }
             return choice.path("message").path("content").asText();
 

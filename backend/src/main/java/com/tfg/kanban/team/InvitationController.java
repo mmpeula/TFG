@@ -2,6 +2,7 @@ package com.tfg.kanban.team;
 
 import com.tfg.kanban.common.ApiError;
 import com.tfg.kanban.team.dto.InvitationResponse;
+import com.tfg.kanban.team.dto.InviteCandidateResponse;
 import com.tfg.kanban.team.dto.InviteRequest;
 import com.tfg.kanban.team.dto.MyInvitationResponse;
 import com.tfg.kanban.team.dto.TeamMemberResponse;
@@ -51,6 +52,20 @@ public class InvitationController {
     public ResponseEntity<InvitationResponse> invite(@PathVariable Long teamId,
                                                      @Valid @RequestBody InviteRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(invitationService.invite(teamId, request));
+    }
+
+    @Operation(summary = "Con que roles se puede invitar a un correo",
+            description = """
+                    Solo el RESPONSABLE. Dice si la cuenta de ese correo se puede invitar como docente,
+                    como alumno o con cualquiera de los dos (una cuenta docente admite las dos), para
+                    ofrecer la eleccion solo cuando existe. No crea nada.
+                    """)
+    @ApiResponses(@ApiResponse(responseCode = "404", description = "No hay ninguna cuenta con ese email",
+            content = @Content(schema = @Schema(implementation = ApiError.class))))
+    @PreAuthorize("@access.canManageTeam(#teamId)")
+    @GetMapping("/api/teams/{teamId}/invitations/candidate")
+    public InviteCandidateResponse candidate(@PathVariable Long teamId, @RequestParam String email) {
+        return invitationService.candidate(email);
     }
 
     @Operation(summary = "Invitaciones pendientes del equipo",

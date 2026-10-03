@@ -69,12 +69,18 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
       SERVER_PORT: 8080
       UPLOAD_DIR: /app/uploads
-      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10MB}
       # Modulo de IA: modelo alojado en DeepSeek, no local. Hace falta DEEPSEEK_API_KEY en .env.
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
       AI_ENABLED: ${AI_ENABLED:-true}
       AI_TIMEOUT: ${AI_TIMEOUT:-5m}
+      # Topes de tokens de cada respuesta: los mensajes de error los nombran cuando se quedan
+      # cortos, asi que tienen que poder subirse desde .env.
+      AI_MAX_OUTPUT_TOKENS: ${AI_MAX_OUTPUT_TOKENS:-32000}
+      AI_CHAT_MAX_OUTPUT_TOKENS: ${AI_CHAT_MAX_OUTPUT_TOKENS:-1500}
+      AI_VISION_MAX_OUTPUT_TOKENS: ${AI_VISION_MAX_OUTPUT_TOKENS:-8000}
+      # Leer con DeepSeek las paginas escaneadas y las imagenes de los documentos.
+      AI_VISION_ENABLED: ${AI_VISION_ENABLED:-true}
       # Correo de las invitaciones. En desarrollo va a Mailpit, que no lo reenvia
       # a ninguna parte; para mandarlo de verdad, apunta MAIL_HOST a un SMTP real.
       MAIL_HOST: ${MAIL_HOST:-mailpit}

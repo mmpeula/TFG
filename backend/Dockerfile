@@ -16,7 +16,8 @@ FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
 
 # curl lo usa el healthcheck de docker-compose
-RUN apk add --no-cache curl \
+# fontconfig y una fuente: PDFBox las necesita para dibujar una pagina y leerla visualmente
+RUN apk add --no-cache curl fontconfig ttf-dejavu \
  && addgroup -S kanban && adduser -S kanban -G kanban
 
 COPY --from=build /build/target/*.jar app.jar

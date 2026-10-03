@@ -63,3 +63,13 @@
   color: var(--color-neutral-500);
 }
 .pending .member { background: var(--color-neutral-100); }
+
+/* La eleccion de rol aparece bajo el correo solo si la cuenta es de docente: es un ajuste de esta invitacion. */
+.inviteChoice { border: 0; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.inviteChoiceLegend { font-size: 12px; font-weight: 600; color: var(--color-neutral-700); padding: 0; margin-bottom: 4px; }
+.inviteOption {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  font-size: 12px; color: var(--color-neutral-600);
+  cursor: pointer;
+}
+.inviteOption input { margin-top: 2px; }

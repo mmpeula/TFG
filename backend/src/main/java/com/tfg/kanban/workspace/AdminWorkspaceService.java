@@ -44,6 +44,7 @@ public class AdminWorkspaceService {
 
     private final ProjectRepository projectRepository;
     private final TeamRepository teamRepository;
+    private final InvitationRepository invitationRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final BoardColumnRepository columnRepository;
     private final TaskRepository taskRepository;
@@ -180,6 +181,8 @@ public class AdminWorkspaceService {
         projectRepository.flush();
 
         if (projectRepository.findByTeam_Id(team.getId()).isEmpty()) {
+            // Las invitaciones, aunque ya esten respondidas, apuntan al equipo y bloquearian el borrado.
+            invitationRepository.deleteByTeam_Id(team.getId());
             teamRepository.delete(team);
         }
         log.info("Soporte: borrado el workspace {} ('{}')", workspaceId, nombre);

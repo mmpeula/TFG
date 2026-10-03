@@ -1,14 +1,16 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { AlertTriangle, GraduationCap } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, GraduationCap, Plus } from 'lucide-react'
 import { HomeShell } from '@/components/shell/HomeShell'
 import { WorkspaceCard } from '@/components/workspace/WorkspaceCard'
 import { InvitationsBanner } from '@/components/workspace/InvitationsBanner'
+import { WorkspaceFormModal } from '@/components/workspace/WorkspaceFormModal'
+import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Tag'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import styles from './WorkspacesScreen.module.css'
-import { useBoard, useWorkspaces } from '@/hooks/useData'
+import { useBoard, useWorkspaceMutations, useWorkspaces } from '@/hooks/useData'
 import { deriveSignals } from '@/lib/signals'
 import { isTeacher } from '@/lib/roles'
 import { ROUTES } from '@/app/routes'
@@ -20,11 +22,16 @@ import type { WorkspaceResponse } from '@/types/api'
  * pero solo los que sigues como DOCENTE y con una alerta si el tablero
  * tiene algun cuello de botella (ver lib/signals.ts). Sin tablero por medio:
  * la alerta ya dice si hace falta entrar o no.
+ *
+ * No es la pantalla de inicio del docente —esa es la misma que la del alumno—, asi que
+ * lleva la vuelta a ella y la opcion de crear un espacio propio, donde es responsable.
  */
 export function TeacherScreen() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { data: workspaces, isPending } = useWorkspaces()
+  const { create } = useWorkspaceMutations()
+  const [formOpen, setFormOpen] = useState(false)
 
   const observed = useMemo(
     () => (workspaces ?? []).filter((workspace) => isTeacher(workspace.myRole)),
@@ -41,12 +48,20 @@ export function TeacherScreen() {
     <HomeShell>
       <header className={styles.head}>
         <div>
+          <button className={styles.backLink} onClick={() => navigate(ROUTES.workspaces)}>
+            <ArrowLeft size={15} strokeWidth={2.75} />
+            Mis espacios de trabajo
+          </button>
           <h1 className={styles.title}>Panel docente</h1>
           <p className={styles.subtitle}>Los equipos que sigues como docente, de un vistazo.</p>
         </div>
+        <Button onClick={() => setFormOpen(true)}>
+          <Plus size={15} strokeWidth={2.75} />
+          Nuevo espacio de trabajo
+        </Button>
       </header>
 
-      {/* Al docente tambien se le invita, y su panel es el unico sitio donde entra. */}
+      {/* Las invitaciones tambien se ven aqui: es donde el docente mira lo que sigue. */}
       <InvitationsBanner />
 
       {isPending ? (
@@ -64,6 +79,17 @@ export function TeacherScreen() {
           ))}
         </div>
       )}
+      <WorkspaceFormModal
+        open={formOpen}
+        isPending={create.isPending}
+        onClose={() => setFormOpen(false)}
+        onSubmit={async (payload) => {
+          const workspace = await create.mutateAsync(payload)
+          // Como en el inicio: se entra directamente en el espacio recien creado.
+          navigate(ROUTES.planById(workspace.id))
+          return workspace
+        }}
+      />
     </HomeShell>
   )
 }

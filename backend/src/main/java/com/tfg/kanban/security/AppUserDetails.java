@@ -27,14 +27,6 @@ public class AppUserDetails implements UserDetails {
         this.authorities = List.of(new SimpleGrantedAuthority(user.getRole().authority()));
     }
 
-    public AppUserDetails(Long id, String username, String authority) {
-        this.id = id;
-        this.username = username;
-        this.password = "";
-        this.enabled = true;
-        this.authorities = List.of(new SimpleGrantedAuthority(authority));
-    }
-
     @Override
     public boolean isAccountNonExpired() {
         return true;

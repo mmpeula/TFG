@@ -14,20 +14,30 @@ import type { ColumnResponse, TaskResponse } from '@/types/api'
 
 interface Props {
   task: TaskResponse
-  columns: ColumnResponse[]
+  /** Columnas a las que se puede mover desde el menu; sin ellas, el menu solo abre y borra. */
+  columns?: ColumnResponse[]
   badge?: string
   done?: boolean
   highlighted?: boolean
   canWrite?: boolean
+  /**
+   * Estado de la tarea con su color (por hacer / en curso / terminada). En el tablero no hace
+   * falta, lo dice la columna; en el plan las tareas van por sprint y no por columna.
+   */
+  status?: { label: string; color: string }
   onOpen: (task: TaskResponse) => void
-  onMove: (task: TaskResponse, columnId: number) => void
+  onMove?: (task: TaskResponse, columnId: number) => void
   onDelete: (task: TaskResponse) => void | Promise<unknown>
   draggable?: boolean
   overlay?: boolean
 }
 
+/**
+ * La tarjeta de una tarea: la misma en el tablero y en el plan, para que una tarea se vea
+ * igual este donde este. En el plan no se arrastra (draggable={false}) y lleva su estado.
+ */
 export function TaskCard({
-  task, columns, badge, done, highlighted, canWrite = true,
+  task, columns = [], badge, done, highlighted, canWrite = true, status,
   onOpen, onMove, onDelete, draggable = true, overlay,
 }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -51,11 +61,10 @@ export function TaskCard({
     <article
       ref={overlay ? undefined : sortable.setNodeRef}
       className={className}
-      style={
-        overlay
-          ? undefined
-          : { transform: CSS.Translate.toString(sortable.transform), transition: sortable.transition }
-      }
+      style={{
+        '--prioridad': PRIORITY_COLOR[task.priority],
+        ...(overlay ? {} : { transform: CSS.Translate.toString(sortable.transform), transition: sortable.transition }),
+      } as React.CSSProperties}
     >
       {badge && <SignalBadge text={badge} />}
 
@@ -70,14 +79,8 @@ export function TaskCard({
       )}
 
       <div className={styles.content}>
-        <span
-          className={styles.gutter}
-          style={{ background: PRIORITY_COLOR[task.priority] }}
-          title={`Prioridad ${PRIORITY_LABELS[task.priority].toLowerCase()}`}
-        />
-
         <header className={styles.head}>
-          <span className={styles.code}>
+          <span className={styles.code} title={`Prioridad ${PRIORITY_LABELS[task.priority].toLowerCase()}`}>
             #{task.id}{task.estimatedHours != null && <span className={styles.codeHours}> · {task.estimatedHours}h</span>}
           </span>
           {canWrite && (
@@ -91,7 +94,7 @@ export function TaskCard({
               {(close) => (
                 <>
                   <DropdownItem onClick={() => { close(); onOpen(task) }}>Abrir la tarea</DropdownItem>
-                  {columns
+                  {onMove && columns
                     .filter((column) => column.id !== task.columnId)
                     .map((column) => (
                       <DropdownItem key={column.id} onClick={() => { close(); onMove(task, column.id) }}>
@@ -104,6 +107,13 @@ export function TaskCard({
                 </>
               )}
             </Dropdown>
+          )}
+          {/* Lo ultimo de la cabecera, pegado al borde: el boton de acciones queda a su izquierda. */}
+          {status && (
+            <span className={styles.status} style={{ '--estado': status.color } as React.CSSProperties}>
+              <span className={styles.statusDot} aria-hidden="true" />
+              {status.label}
+            </span>
           )}
         </header>
 

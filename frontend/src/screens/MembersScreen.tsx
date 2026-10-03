@@ -11,23 +11,24 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import styles from './MembersScreen.module.css'
 import {
-  useInvitationMutations, useMemberMutations, useTeamInvitations, useTeamMembers, useWorkspace,
+  useInvitationMutations, useInviteCandidate, useMemberMutations, useTeamInvitations, useTeamMembers, useWorkspace,
 } from '@/hooks/useData'
 import { useAuth } from '@/state/context'
 import { canManage, ROLE_LABELS } from '@/lib/roles'
 import { relativeTime } from '@/lib/format'
 import { ROUTES } from '@/app/routes'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import type { Role } from '@/types/api'
 
 /**
- * A que puede cambiarse el rol de alguien ya en el equipo: nunca a DOCENTE ni
- * desde DOCENTE, porque eso depende del tipo de cuenta (Alumno/Docente elegido
- * al registrarse), no de una eleccion dentro del equipo. Una cuenta Docente no
- * tiene nada que elegir aqui; una cuenta Alumno puede pasar de alumno a
- * responsable y viceversa.
+ * A que puede cambiarse el rol de alguien ya en el equipo. Quien esta como docente
+ * es por fuerza una cuenta docente, y una cuenta docente puede trabajar en el equipo
+ * (alumno) o dirigirlo (responsable) igual que un alumno; por eso se le ofrecen los
+ * tres. A quien ya trabaja no se le ofrece docente: la pantalla no sabe si su cuenta
+ * lo es, y el servidor lo rechazaria si no.
  */
 function rolesDisponiblesPara(actual: Role): Role[] {
-  return actual === 'DOCENTE' ? ['DOCENTE'] : ['MIEMBRO', 'RESPONSABLE']
+  return actual === 'DOCENTE' ? ['DOCENTE', 'MIEMBRO', 'RESPONSABLE'] : ['MIEMBRO', 'RESPONSABLE']
 }
 
 /**
@@ -49,6 +50,15 @@ export function MembersScreen() {
   const invitaciones = useInvitationMutations(workspace?.teamId)
 
   const [email, setEmail] = useState('')
+  // Solo se pregunta por la cuenta cuando el correo esta completo y se ha dejado de teclear.
+  const correo = useDebouncedValue(email.trim().toLowerCase(), 400)
+  const correoValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo) && correo === email.trim().toLowerCase()
+  const { data: candidato } = useInviteCandidate(workspace?.teamId, correoValido ? correo : undefined)
+  // La eleccion (docente o alumno) solo existe si la cuenta admite las dos, es decir, si es de docente.
+  const puedeElegir = correoValido && (candidato?.allowedRoles.length ?? 0) > 1
+  const [eleccion, setEleccion] = useState<{ correo: string; rol: Role } | null>(null)
+  // Cada correo parte de su rol por defecto: una eleccion hecha para otro correo no se arrastra.
+  const rolElegido = eleccion?.correo === correo ? eleccion.rol : candidato?.defaultRole ?? undefined
 
   const manageable = canManage(workspace?.myRole)
 
@@ -63,11 +73,15 @@ export function MembersScreen() {
               className={styles.invite}
               onSubmit={async (event) => {
                 event.preventDefault()
-                // Invitar, no anadir: no entra en el equipo hasta que acepte. El rol no se
-                // elige aqui: entra como alumno o como docente segun su tipo de cuenta, y
-                // a responsable se le puede pasar despues desde esta misma pantalla.
-                await invitaciones.invite.mutateAsync({ email: email.trim() })
+                // Invitar, no anadir: no entra en el equipo hasta que acepte. Entra como alumno o
+                // como docente segun su tipo de cuenta, salvo que se pida que una cuenta docente
+                // trabaje aqui como alumno; a responsable se le pasa despues, desde esta pantalla.
+                await invitaciones.invite.mutateAsync({
+                  email: email.trim(),
+                  role: puedeElegir && (rolElegido === 'MIEMBRO' || rolElegido === 'DOCENTE') ? rolElegido : undefined,
+                })
                 setEmail('')
+                setEleccion(null)
               }}
             >
               <div className={styles.inviteField}>
@@ -83,6 +97,27 @@ export function MembersScreen() {
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="companero@uni.es"
                 />
+                {puedeElegir && (
+                  <fieldset className={styles.inviteChoice}>
+                    <legend className={styles.inviteChoiceLegend}>
+                      Esta cuenta es de docente. ¿Cómo entra en este espacio?
+                    </legend>
+                    {candidato?.allowedRoles.map((rol) => (
+                      <label key={rol} className={styles.inviteOption}>
+                        <input
+                          type="radio"
+                          name="invite-role"
+                          checked={rolElegido === rol}
+                          onChange={() => setEleccion({ correo, rol })}
+                        />
+                        <span>
+                          <strong>{ROLE_LABELS[rol]}</strong>
+                          {rol === 'DOCENTE' ? ' · solo sigue el progreso' : ' · trabaja aquí, y luego puedes hacerle responsable'}
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                )}
               </div>
 
               <Button type="submit" disabled={invitaciones.invite.isPending || !email.trim()}>
@@ -114,7 +149,7 @@ export function MembersScreen() {
                         <div className={styles.mail}>{member.user.email}</div>
                       </div>
 
-                      {manageable && member.role !== 'DOCENTE' ? (
+                      {manageable ? (
                         <Dropdown
                           trigger={({ toggle }) => (
                             <button className={styles.roleButton} onClick={toggle}>

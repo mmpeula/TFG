@@ -24,7 +24,10 @@ export function PlanJobsProvider({ children }: { children: ReactNode }) {
     (request: PlanGenerateRequest) => {
       const { workspaceId, workspaceName, file, text, options } = request
       const sourceLabel = sourceLabelOf(file, text)
-      setJobs((current) => ({ ...current, [workspaceId]: { status: 'pending', sourceLabel } }))
+      setJobs((current) => ({
+        ...current,
+        [workspaceId]: { status: 'pending', sourceLabel, withDocument: file !== null, options },
+      }))
 
       const call = file
         ? projectsApi.aiPlanFromDocument(workspaceId, file, options)
@@ -36,7 +39,7 @@ export function PlanJobsProvider({ children }: { children: ReactNode }) {
 
       call.then(
         (plan) => {
-          setJobs((current) => ({ ...current, [workspaceId]: { status: 'done', sourceLabel, plan } }))
+          setJobs((current) => ({ ...current, [workspaceId]: { status: 'done', sourceLabel, plan, options } }))
           // Subir un documento actualiza el guion guardado del proyecto; lo demas no lo toca.
           if (file) queryClient.invalidateQueries({ queryKey: keys.project(workspaceId) })
           pushToast(`Propuesta de planificacion lista para «${workspaceName}»`, verElPlan)

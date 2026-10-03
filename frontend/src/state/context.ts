@@ -41,6 +41,14 @@ export interface PlanJob {
   status: PlanJobStatus
   /** De donde esta leyendo, para el mensaje de "generando…" aunque se remonte la pantalla. */
   sourceLabel: string
+  /** Si lee un documento subido: solo entonces hay fases de procesamiento que ensenar. */
+  withDocument?: boolean
+  /**
+   * Con que calendario se genero. Las fechas no se guardan en el espacio al generar, sino
+   * al confirmar el plan, y tienen que ser estas: las del formulario pueden haber cambiado
+   * despues, y la propuesta se hizo con estas.
+   */
+  options?: PlanOptions
   plan?: AiPlanResponse
   error?: string
 }
@@ -55,7 +63,7 @@ export interface PlanGenerateRequest {
   options: PlanOptions
 }
 
-export interface PlanJobsValue {
+interface PlanJobsValue {
   /** Una entrada por workspace con una generacion en curso o ya resuelta. */
   jobs: Record<number, PlanJob>
   start: (request: PlanGenerateRequest) => void
@@ -118,7 +126,7 @@ export interface PlanTeamDraft {
   included: boolean
 }
 
-export interface PlanDraftsValue {
+interface PlanDraftsValue {
   draftOf: (workspaceId: number) => PlanDraft
   patch: (workspaceId: number, cambios: Partial<PlanDraft>) => void
 }
@@ -139,7 +147,7 @@ export interface AssistantActiveTask {
   title: string
 }
 
-export interface AssistantValue {
+interface AssistantValue {
   open: boolean
   toggle: () => void
   close: () => void

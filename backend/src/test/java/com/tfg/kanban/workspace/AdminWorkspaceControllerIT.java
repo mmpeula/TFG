@@ -109,6 +109,19 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
     }
 
     @Test
+    @DisplayName("Soporte puede borrar un workspace al que se ha invitado a gente")
+    void supportCanDeleteAWorkspaceWithInvitations() throws Exception {
+        TestUser duena = registerUser(Role.MIEMBRO);
+        TestUser invitada = registerUser(Role.MIEMBRO);
+        Workspace workspace = createWorkspace(duena, "Equipo con invitaciones");
+        addMember(duena, workspace.teamId(), invitada, Role.MIEMBRO);
+        TestUser admin = registerUser(Role.ADMIN);
+
+        mockMvc.perform(authorized(delete("/api/admin/workspaces/{id}", workspace.id()), admin))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     @DisplayName("Soporte puede borrar un workspace ajeno")
     void supportCanDeleteAWorkspace() throws Exception {
         TestUser duena = registerUser(Role.MIEMBRO);

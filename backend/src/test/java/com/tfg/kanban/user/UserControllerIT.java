@@ -13,6 +13,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class UserControllerIT extends AbstractApiIT {
 
+    /** La firma de un PNG: lo que mira el servidor para aceptar una foto, no la cabecera que manda el navegador. */
+    private static final byte[] PNG = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13};
+
+
     @Test
     @DisplayName("La busqueda de usuarios encuentra por email y nunca devuelve el hash de la contrasena")
     void searchFindsUserAndHidesPassword() throws Exception {
@@ -154,9 +158,46 @@ class UserControllerIT extends AbstractApiIT {
 
         mockMvc.perform(authorized(patch("/api/users/{id}/role", member.id()), admin)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"role\":\"DOCENTE\"}"))
+                        .content("{\"role\":\"ADMIN\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+    }
+
+    @Test
+    @DisplayName("Los roles solo suben: alumno a docente o admin, docente a admin; nunca hacia abajo")
+    void rolesOnlyGoUp() throws Exception {
+        TestUser admin = registerUser(Role.ADMIN);
+        TestUser student = registerUser(Role.MIEMBRO);
+        TestUser teacher = registerUser(Role.DOCENTE);
+        TestUser otherAdmin = registerUser(Role.ADMIN);
+
+        mockMvc.perform(authorized(patch("/api/users/{id}/role", student.id()), admin)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"DOCENTE\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.role").value("DOCENTE"));
+
+        // Un docente (el de antes, o el que acaba de ascender) no vuelve a ser alumno
+        mockMvc.perform(authorized(patch("/api/users/{id}/role", teacher.id()), admin)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"MIEMBRO\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+        mockMvc.perform(authorized(patch("/api/users/{id}/role", student.id()), admin)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"MIEMBRO\"}"))
+                .andExpect(status().isConflict());
+        // ni un administrador se degrada
+        mockMvc.perform(authorized(patch("/api/users/{id}/role", otherAdmin.id()), admin)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"DOCENTE\"}"))
+                .andExpect(status().isConflict());
+        // y RESPONSABLE es de equipo, no de cuenta
+        mockMvc.perform(authorized(patch("/api/users/{id}/role", teacher.id()), admin)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"RESPONSABLE\"}"))
+                .andExpect(status().isConflict());
+
+        // un docente si puede pasar a administrador
+        mockMvc.perform(authorized(patch("/api/users/{id}/role", teacher.id()), admin)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"ADMIN\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("ADMIN"));
     }
 
     @Test
@@ -212,6 +253,10 @@ class UserControllerIT extends AbstractApiIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].enabled").value(false));
 
+        // Su sesion abierta se corta en el acto: el token que ya tenia deja de valer
+        mockMvc.perform(authorized(get("/api/auth/me"), victim))
+                .andExpect(status().isUnauthorized());
+
         // Una cuenta deshabilitada ya no puede iniciar sesion
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -245,11 +290,27 @@ class UserControllerIT extends AbstractApiIT {
     // que "queda un unico ADMIN en toda la base de datos" no es reproducible aqui.
 
     @Test
+    @DisplayName("Como foto de perfil solo vale una imagen de verdad: ni un SVG ni un texto que diga ser PNG")
+    void avatarMustReallyBeAnImage() throws Exception {
+        TestUser user = registerUser(Role.MIEMBRO);
+        var svg = new MockMultipartFile("file", "foto.svg", "image/svg+xml",
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>".getBytes());
+        var disfrazado = new MockMultipartFile("file", "foto.png", "image/png", "no soy una imagen".getBytes());
+
+        for (var file : new MockMultipartFile[] {svg, disfrazado}) {
+            mockMvc.perform(multipart("/api/users/{id}/avatar", user.id())
+                            .file(file).header(HttpHeaders.AUTHORIZATION, user.bearer()))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("PNG, JPEG, GIF o WebP")));
+        }
+    }
+
+    @Test
     @DisplayName("Subir, descargar y quitar la foto de perfil")
     void avatarLifecycle() throws Exception {
         TestUser user = registerUser(Role.MIEMBRO);
         MockMultipartFile foto = new MockMultipartFile("file", "foto.png", "image/png",
-                new byte[] {1, 2, 3, 4});
+                PNG);
 
         mockMvc.perform(authorized(get("/api/auth/me"), user))
                 .andExpect(jsonPath("$.avatarUrl").doesNotExist());
@@ -263,7 +324,7 @@ class UserControllerIT extends AbstractApiIT {
         mockMvc.perform(authorized(get("/api/users/{id}/avatar", user.id()), user))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/png"))
-                .andExpect(content().bytes(new byte[] {1, 2, 3, 4}));
+                .andExpect(content().bytes(PNG));
 
         mockMvc.perform(authorized(delete("/api/users/{id}/avatar", user.id()), user))
                 .andExpect(status().isNoContent());
@@ -279,7 +340,7 @@ class UserControllerIT extends AbstractApiIT {
         TestUser user = registerUser(Role.MIEMBRO);
         TestUser other = registerUser(Role.MIEMBRO);
         MockMultipartFile foto = new MockMultipartFile("file", "foto.png", "image/png",
-                new byte[] {1, 2, 3, 4});
+                PNG);
 
         mockMvc.perform(multipart("/api/users/{id}/avatar", user.id())
                         .file(foto)
@@ -302,7 +363,7 @@ class UserControllerIT extends AbstractApiIT {
         addMember(owner, workspace.teamId(), teammate, Role.MIEMBRO);
 
         MockMultipartFile foto = new MockMultipartFile("file", "foto.png", "image/png",
-                new byte[] {1, 2, 3, 4});
+                PNG);
         mockMvc.perform(multipart("/api/users/{id}/avatar", owner.id())
                         .file(foto)
                         .header(HttpHeaders.AUTHORIZATION, owner.bearer()))

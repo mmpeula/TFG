@@ -61,4 +61,61 @@ public class AiProperties {
      * generando un plan entero.
      */
     private int chatMaxOutputTokens = 1_500;
+
+    /** Como se procesa el documento antes de llegar al modelo (ver {@code ai.document}). */
+    private final Document document = new Document();
+
+    /**
+     * Limites del procesamiento de documentos. Todo lo que se puede decidir en
+     * local se decide aqui, con estos numeros: DeepSeek solo se usa para lo que
+     * no se puede leer sin ver (paginas escaneadas, imagenes con informacion).
+     */
+    @Getter
+    @Setter
+    public static class Document {
+
+        /** Si es false, un documento que necesite leerse visualmente se rechaza explicando por que. */
+        private boolean visionEnabled = true;
+
+        /** Paginas de un PDF que se leen como mucho; el resto se descarta avisando. */
+        private int maxPages = 300;
+
+        /** Tope del enunciado en texto, como red de seguridad ante un fichero descomunal. */
+        private int maxTextChars = 80_000;
+
+        /** Tope de todas las tablas juntas. Una tabla que no cabe se omite entera, no a medias. */
+        private int maxTablesChars = 30_000;
+
+        /** Tope de lo que devuelve el analisis visual. */
+        private int maxVisualChars = 20_000;
+
+        /** Una pagina con menos caracteres utiles que esto se considera sin texto (portada, escaneo...). */
+        private int minPageChars = 40;
+
+        /** Paginas que se mandan a leer visualmente como mucho, entre escaneadas y con tablas dudosas. */
+        private int maxVisualPages = 20;
+
+        /** Imagenes incrustadas que se mandan a analizar como mucho, las mas grandes primero. */
+        private int maxImages = 6;
+
+        /** Una imagen mas pequena que esto (px, por lado) es un icono o un adorno. */
+        private int minImageSide = 120;
+
+        /** Lado mayor al que se reduce cualquier imagen antes de enviarla. */
+        private int maxImageSide = 1_568;
+
+        /** Resolucion a la que se dibuja una pagina para leerla visualmente. */
+        private int renderDpi = 150;
+
+        /** Imagenes por peticion: menos llamadas, a costa de respuestas mas largas. */
+        private int imagesPerRequest = 4;
+
+        /** Tope de tokens de una respuesta del analisis visual. */
+        private int visionMaxOutputTokens = 8_000;
+
+        /** Documentos ya procesados que se recuerdan, para no pagar dos veces la vision al reintentar. */
+        private int cacheEntries = 8;
+
+        private Duration cacheTtl = Duration.ofHours(1);
+    }
 }

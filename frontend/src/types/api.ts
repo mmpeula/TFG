@@ -94,6 +94,13 @@ export interface InvitationResponse {
   createdAt: string
 }
 
+/** Con que roles se puede invitar a una cuenta: la eleccion solo existe si hay mas de uno. */
+export interface InviteCandidateResponse {
+  accountRole: Role
+  defaultRole?: Role | null
+  allowedRoles: Role[]
+}
+
 /** Una invitacion vista por quien la recibe. */
 export interface MyInvitationResponse {
   token: string
@@ -247,6 +254,14 @@ export interface PlanOptions {
   deadline?: string | null
   sprintDays?: number | null
   team?: PlanTeamSlot[]
+}
+
+/** Fase de la generacion en curso, tal como la informa el servidor mientras la peticion sigue abierta. */
+export type PlanStage = 'RECEIVED' | 'ANALYZING' | 'EXTRACTING' | 'VISUAL' | 'PLANNING'
+
+export interface PlanProgressResponse {
+  /** Ausente si no hay ninguna generacion en curso. */
+  stage?: PlanStage
 }
 
 /** Lo que se ha encontrado en el documento, sin generar nada todavia. */

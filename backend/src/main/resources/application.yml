@@ -45,9 +45,12 @@ spring:
           time_zone: UTC
 
   servlet:
+    # Techo de la subida: un fichero de 10 MB (app.storage.max-file-size) mas el resto del
+    # formulario. Van fijos y no por variable de entorno porque tienen que moverse a la vez
+    # que app.storage.max-file-size y que client_max_body_size en frontend/nginx.conf.
     multipart:
-      max-file-size: ${MAX_FILE_SIZE:10MB}
-      max-request-size: ${MAX_REQUEST_SIZE:12MB}
+      max-file-size: 10MB
+      max-request-size: 12MB
 
   jackson:
     default-property-inclusion: non_null
@@ -94,11 +97,20 @@ app:
     temperature: ${AI_TEMPERATURE:0.2}
     max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:32000}
     chat-max-output-tokens: ${AI_CHAT_MAX_OUTPUT_TOKENS:1500}
+    document:
+      # Procesamiento de documentos: todo lo que puede leerse en local se lee en local, y
+      # DeepSeek solo ve las paginas sin texto (escaneadas) y las imagenes con informacion.
+      vision-enabled: ${AI_VISION_ENABLED:true}
+      max-pages: ${AI_DOC_MAX_PAGES:300}
+      max-visual-pages: ${AI_DOC_MAX_VISUAL_PAGES:20}
+      max-images: ${AI_DOC_MAX_IMAGES:6}
+      images-per-request: ${AI_DOC_IMAGES_PER_REQUEST:4}
+      vision-max-output-tokens: ${AI_VISION_MAX_OUTPUT_TOKENS:8000}
   storage:
     # Directorio de los ficheros adjuntos (volumen de Docker en despliegue).
     upload-dir: ${UPLOAD_DIR:./uploads}
-    # Tamano maximo por fichero en bytes (10 MB).
-    max-file-size: ${MAX_FILE_SIZE_BYTES:10485760}
+    # Tamano maximo por fichero en bytes (10 MB): es el que se comprueba con un mensaje claro.
+    max-file-size: 10485760
 
 springdoc:
   api-docs:

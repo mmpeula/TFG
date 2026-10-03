@@ -38,7 +38,7 @@ export interface Sprint {
   progress: number
 }
 
-export interface Plan {
+interface Plan {
   sprints: Sprint[]
   /** Tareas sin fecha limite: no caen en ningun sprint. */
   sinFecha: SprintTask[]

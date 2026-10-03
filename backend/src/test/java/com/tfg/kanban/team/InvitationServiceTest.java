@@ -82,7 +82,7 @@ class InvitationServiceTest {
     @Test
     @DisplayName("Invitar deja la invitacion pendiente y manda el correo, pero no mete a nadie en el equipo")
     void invitingDoesNotAddAnyoneYet() {
-        var response = service.invite(5L, new InviteRequest("luis@uni.es"));
+        var response = service.invite(5L, new InviteRequest("luis@uni.es", null));
 
         assertThat(response.status()).isEqualTo(InvitationStatus.PENDIENTE);
         assertThat(response.invited().email()).isEqualTo("luis@uni.es");
@@ -94,7 +94,7 @@ class InvitationServiceTest {
     @Test
     @DisplayName("El correo lleva el enlace con el token para responder")
     void theMailCarriesTheLink() {
-        service.invite(5L, new InviteRequest("luis@uni.es"));
+        service.invite(5L, new InviteRequest("luis@uni.es", null));
 
         ArgumentCaptor<String> cuerpo = ArgumentCaptor.forClass(String.class);
         verify(mailService).send(anyString(), anyString(), cuerpo.capture());
@@ -107,7 +107,7 @@ class InvitationServiceTest {
     void unknownEmailIsReported() {
         when(userRepository.findByEmailIgnoreCase("nadie@uni.es")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("nadie@uni.es")))
+        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("nadie@uni.es", null)))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("No hay ninguna cuenta")
                 .hasMessageContaining("nadie@uni.es");
@@ -118,7 +118,7 @@ class InvitationServiceTest {
     void cannotInviteSomeoneAlreadyIn() {
         when(teamMemberRepository.existsByTeam_IdAndUser_Id(5L, 2L)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es")))
+        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es", null)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("ya esta en el equipo");
     }
@@ -129,27 +129,84 @@ class InvitationServiceTest {
         when(invitationRepository.existsByTeam_IdAndInvited_IdAndStatus(5L, 2L, InvitationStatus.PENDIENTE))
                 .thenReturn(true);
 
-        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es")))
+        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es", null)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("invitacion pendiente");
     }
 
     @Test
-    @DisplayName("El rol no lo elige quien invita: una cuenta MIEMBRO entra siempre como alumno")
+    @DisplayName("Sin elegir rol, una cuenta de alumno entra como alumno")
     void memberAccountsAreInvitedAsMiembro() {
-        var response = service.invite(5L, new InviteRequest("luis@uni.es"));
+        var response = service.invite(5L, new InviteRequest("luis@uni.es", null));
 
         assertThat(response.role()).isEqualTo(Role.MIEMBRO);
     }
 
     @Test
-    @DisplayName("A una cuenta DOCENTE se le invita como docente, nunca como alumno")
-    void docenteAccountsAreInvitedAsDocente() {
+    @DisplayName("Sin elegir rol, a una cuenta DOCENTE se le invita como docente")
+    void docenteAccountsAreInvitedAsDocenteByDefault() {
         invitada.setRole(Role.DOCENTE);
 
-        var response = service.invite(5L, new InviteRequest("luis@uni.es"));
+        var response = service.invite(5L, new InviteRequest("luis@uni.es", null));
 
         assertThat(response.role()).isEqualTo(Role.DOCENTE);
+    }
+
+    @Test
+    @DisplayName("A una cuenta DOCENTE se la puede invitar como alumno, para que trabaje en el equipo")
+    void docenteAccountsCanBeInvitedAsStudent() {
+        invitada.setRole(Role.DOCENTE);
+
+        var response = service.invite(5L, new InviteRequest("luis@uni.es", Role.MIEMBRO));
+
+        assertThat(response.role()).isEqualTo(Role.MIEMBRO);
+    }
+
+    @Test
+    @DisplayName("Una cuenta de alumno no se puede invitar como docente")
+    void studentAccountsCannotBeInvitedAsDocente() {
+        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es", Role.DOCENTE)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("DOCENTE");
+        verify(invitationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("No se invita directamente como RESPONSABLE ni como ADMIN: eso es un paso posterior, ya dentro")
+    void cannotBeInvitedAsResponsableOrAdmin() {
+        invitada.setRole(Role.DOCENTE);
+
+        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es", Role.RESPONSABLE)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("paso posterior");
+        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es", Role.ADMIN)))
+                .isInstanceOf(BusinessRuleException.class);
+        verify(invitationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Consultar un correo dice con que roles se puede invitar, el de su cuenta primero")
+    void candidateListsTheAllowedRoles() {
+        var student = service.candidate(" Luis@uni.es ");
+        assertThat(student.allowedRoles()).containsExactly(Role.MIEMBRO);
+        assertThat(student.defaultRole()).isEqualTo(Role.MIEMBRO);
+
+        invitada.setRole(Role.DOCENTE);
+        var teacher = service.candidate("luis@uni.es");
+        assertThat(teacher.accountRole()).isEqualTo(Role.DOCENTE);
+        assertThat(teacher.allowedRoles()).containsExactly(Role.DOCENTE, Role.MIEMBRO);
+        assertThat(teacher.defaultRole()).isEqualTo(Role.DOCENTE);
+
+        invitada.setRole(Role.ADMIN);
+        var admin = service.candidate("luis@uni.es");
+        assertThat(admin.allowedRoles()).isEmpty();
+        assertThat(admin.defaultRole()).isNull();
+    }
+
+    @Test
+    @DisplayName("Consultar un correo sin cuenta dice que no existe, como al invitarle")
+    void candidateOfUnknownEmail() {
+        assertThatThrownBy(() -> service.candidate("nadie@uni.es"))
+                .isInstanceOf(com.tfg.kanban.common.ResourceNotFoundException.class)
+                .hasMessageContaining("nadie@uni.es");
     }
 
     @Test
@@ -157,7 +214,7 @@ class InvitationServiceTest {
     void theInvitationSurvivesAFailingMailServer() {
         when(mailService.send(anyString(), anyString(), anyString())).thenReturn(false);
 
-        var response = service.invite(5L, new InviteRequest("luis@uni.es"));
+        var response = service.invite(5L, new InviteRequest("luis@uni.es", null));
 
         assertThat(response.emailSent()).isFalse();
         assertThat(response.status()).isEqualTo(InvitationStatus.PENDIENTE);
@@ -207,16 +264,27 @@ class InvitationServiceTest {
     }
 
     @Test
-    @DisplayName("Si entre medias le cambian el tipo de cuenta, el rol prometido ya no vale")
+    @DisplayName("Si entre medias la hacen administradora, el rol prometido ya no vale: un administrador no entra en equipos")
     void theRoleIsCheckedAgainOnAccept() {
-        TestSecurity.authenticateAs(2L, "DOCENTE");
-        invitada.setRole(Role.DOCENTE);
+        TestSecurity.authenticateAs(2L, "ADMIN");
+        invitada.setRole(Role.ADMIN);
         when(invitationRepository.findByToken("tok")).thenReturn(Optional.of(pendiente(Role.MIEMBRO)));
 
         assertThatThrownBy(() -> service.accept("tok"))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("cuenta MIEMBRO");
+                .hasMessageContaining("alumno o de docente");
         verify(teamMemberRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Si entre medias la hacen docente, la invitacion como alumno sigue valiendo: un docente tambien trabaja en equipos")
+    void promotedToTeacherCanStillAcceptAStudentInvitation() {
+        TestSecurity.authenticateAs(2L, "DOCENTE");
+        invitada.setRole(Role.DOCENTE);
+        when(invitationRepository.findByToken("tok")).thenReturn(Optional.of(pendiente(Role.MIEMBRO)));
+        when(teamMemberRepository.save(any(TeamMember.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(service.accept("tok").role()).isEqualTo(Role.MIEMBRO);
     }
 
     @Test

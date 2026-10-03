@@ -18,4 +18,7 @@ public interface InvitationRepository extends JpaRepository<Invitation, Long> {
     List<Invitation> findByInvited_IdAndStatusOrderByCreatedAtDesc(Long userId, InvitationStatus status);
 
     boolean existsByTeam_IdAndInvited_IdAndStatus(Long teamId, Long userId, InvitationStatus status);
+
+    /** Al borrar un equipo: sus invitaciones (de cualquier estado) apuntan a el y bloquearian el borrado. */
+    void deleteByTeam_Id(Long teamId);
 }

@@ -4,6 +4,7 @@ import com.tfg.kanban.ai.dto.AiPlanResponse;
 import com.tfg.kanban.ai.dto.ApplyPlanRequest;
 import com.tfg.kanban.ai.dto.DetectedDateResponse;
 import com.tfg.kanban.ai.dto.PlanOptions;
+import com.tfg.kanban.ai.dto.PlanProgressResponse;
 import com.tfg.kanban.common.ApiError;
 import com.tfg.kanban.task.dto.TaskResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,6 +39,7 @@ import java.util.List;
 public class AiPlanController {
 
     private final AiPlanService aiPlanService;
+    private final PlanProgressTracker progressTracker;
 
     @Operation(summary = "Generar una propuesta de planificacion",
             description = """
@@ -68,7 +70,8 @@ public class AiPlanController {
     @Operation(summary = "Generar la planificacion a partir de un documento",
             description = """
                     Sube el documento de la actividad (PDF, Word .docx o texto plano), extrae su
-                    contenido, lo guarda como guion del proyecto y devuelve las tareas propuestas
+                    contenido (texto y tablas en local; paginas escaneadas e imagenes con
+                    informacion, con la vision de DeepSeek), lo guarda como guion del proyecto y devuelve las tareas propuestas
                     ya repartidas entre las personas del equipo. Tampoco crea nada en el tablero.
                     """)
     // Anotacion de Swagger, escrita con el paquete completo a proposito: importarla
@@ -97,6 +100,19 @@ public class AiPlanController {
             @RequestPart("file") MultipartFile file,
             @Valid @RequestPart(value = "options", required = false) PlanOptions options) {
         return aiPlanService.generateFromDocument(projectId, file, options);
+    }
+
+    @Operation(summary = "En que fase va la generacion en curso",
+            description = """
+                    Para que la interfaz pueda ensenar el avance mientras POST /document sigue
+                    respondiendo: recibido, analizando, extrayendo, leyendo contenido visual
+                    (solo si el documento lo necesita) y generando el plan. Sin generacion en
+                    curso devuelve un objeto sin fase.
+                    """)
+    @PreAuthorize("@access.canManageProject(#projectId)")
+    @GetMapping("/progress")
+    public PlanProgressResponse progress(@PathVariable Long projectId) {
+        return new PlanProgressResponse(progressTracker.current(projectId).map(Enum::name).orElse(null));
     }
 
     @Operation(summary = "Detectar la fecha de inicio en un documento",

@@ -24,7 +24,7 @@ interface Insight {
   actions: { label: string; primary: boolean }[]
 }
 
-export interface Pulse {
+interface Pulse {
   kpis: Kpi[]
   weekly: { week: string; done: number; created: number; current?: boolean }[]
   byStatus: { label: string; value: number; max: number }[]

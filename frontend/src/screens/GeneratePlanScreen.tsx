@@ -4,12 +4,13 @@ import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
 import {
   AiErrorCard, AiWorkbench, AppliedTasksSummary, PlanWarnings, PrivacyNote, ProposalPanel, WorkloadSummary,
 } from '@/components/generator/PlanGenerator'
+import { ProcessingSteps } from '@/components/generator/ProcessingSteps'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tag } from '@/components/ui/Tag'
 import styles from './GeneratePlanScreen.module.css'
-import { projects as projectsApi } from '@/api/endpoints'
+import { projects as projectsApi, workspaces as workspacesApi } from '@/api/endpoints'
 import {
-  keys, useMemberMutations, useProject, useProjectBoards, useTeamMembers, useWorkspace, useWorkspaceMutations,
+  keys, useMemberMutations, useProject, useProjectBoards, useTeamMembers, useWorkspace,
 } from '@/hooks/useData'
 import { usePlanDrafts, usePlanJob, usePlanJobs, useUi, type PlanTeamDraft } from '@/state/context'
 import { toErrorMessage } from '@/lib/api-client'
@@ -39,7 +40,6 @@ export function GeneratePlanScreen() {
   const { data: members } = useTeamMembers(workspace?.teamId)
   const { pushToast } = useUi()
   const queryClient = useQueryClient()
-  const workspaceMutations = useWorkspaceMutations(workspaceId)
   const memberMutations = useMemberMutations(workspace?.teamId)
   const planJobs = usePlanJobs()
   const job = usePlanJob(workspaceId)
@@ -85,9 +85,10 @@ export function GeneratePlanScreen() {
   const fechasResueltas = Boolean(effectiveStartDate && effectiveDeadline)
 
   const apply = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const boardId = boards?.[0]?.id
       if (!boardId) throw new Error('Este espacio de trabajo no tiene tablero al que anadir las tareas')
+      await saveCalendarOfThePlan()
       const tasks = (plan?.tasks ?? []).filter((_, index) => selected.includes(index))
       return projectsApi.applyAiPlan(workspaceId, boardId, tasks)
     },
@@ -103,6 +104,8 @@ export function GeneratePlanScreen() {
       if (boardId) queryClient.invalidateQueries({ queryKey: keys.board(boardId) })
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: keys.workspaces })
+      queryClient.invalidateQueries({ queryKey: keys.workspace(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: keys.project(workspaceId) })
       queryClient.invalidateQueries({ queryKey: keys.activity(workspaceId) })
       pushToast(`${created.length} ${created.length === 1 ? 'tarea anadida' : 'tareas anadidas'} al tablero`)
     },
@@ -110,31 +113,38 @@ export function GeneratePlanScreen() {
   })
 
   /**
+   * Al confirmar el plan, el espacio se queda con el calendario con el que se genero, si aun
+   * no lo tenia: asi la pestana Plan cuadra con las tareas que se acaban de crear y la proxima
+   * generacion no vuelve a pedir las fechas. Antes de confirmar no se guarda nada: generar y
+   * descartar la propuesta no debe cambiar el espacio. Las fechas que ya tenia no se tocan
+   * (esas solo se cambian en Ajustes).
+   */
+  async function saveCalendarOfThePlan() {
+    const usadas = job?.options
+    if (!workspace || !usadas) return
+    const startDate = workspace.startDate ?? usadas.startDate ?? null
+    const deadline = workspace.deadline ?? usadas.deadline ?? null
+    if (startDate === (workspace.startDate ?? null) && deadline === (workspace.deadline ?? null)) return
+    await workspacesApi.update(workspaceId, {
+      name: workspace.name,
+      description: workspace.description,
+      color: workspace.color,
+      icon: workspace.icon,
+      startDate,
+      deadline,
+      sprintDays: workspace.sprintDays,
+    })
+  }
+
+  /**
    * Documento si lo hay, si no la descripcion, si tampoco el guion ya guardado
    * del proyecto. Las fechas ya estan resueltas para cuando esto se puede
-   * llamar (ver `sinFechas` en `AiWorkbench`): si alguna no estaba guardada en
-   * el workspace, se guarda aqui mismo, para no tener que volver a pedirla en
-   * la proxima generacion ni dejar la pestana Plan con otro calendario.
+   * llamar (ver `sinFechas` en `AiWorkbench`); si no estaban en el espacio, la
+   * propuesta se genera con las del formulario y solo se guardan al confirmarla.
    */
   function runGenerate() {
     if (!fechasResueltas) return
     set({ appliedTitles: null, selected: null })
-
-    if (workspace && (effectiveStartDate !== (workspace.startDate ?? '')
-        || effectiveDeadline !== (workspace.deadline ?? ''))) {
-      workspaceMutations.update.mutate(
-        {
-          name: workspace.name,
-          description: workspace.description,
-          color: workspace.color,
-          icon: workspace.icon,
-          startDate: effectiveStartDate,
-          deadline: effectiveDeadline,
-          sprintDays: workspace.sprintDays,
-        },
-        { onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.project(workspaceId) }) },
-      )
-    }
 
     planJobs.start({
       workspaceId,
@@ -205,7 +215,11 @@ export function GeneratePlanScreen() {
           <AppliedTasksSummary titles={appliedTitles} />
         )}
 
-        {proponiendo && (
+        {proponiendo && job?.withDocument && (
+          <ProcessingSteps workspaceId={workspaceId} sourceLabel={job.sourceLabel} />
+        )}
+
+        {proponiendo && !job?.withDocument && (
           <Skeleton label={`Leyendo ${job?.sourceLabel ?? 'el enunciado'} y repartiendo el trabajo…`} />
         )}
 

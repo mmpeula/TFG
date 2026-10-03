@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CalendarRange, Plus, Users } from 'lucide-react'
 import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
-import { PlanTaskCard } from '@/components/plan/PlanTaskCard'
+import { TaskCard } from '@/components/board/TaskCard'
 import { TaskPanel } from '@/components/task/TaskPanel'
 import { Button } from '@/components/ui/Button'
 import { Segmented } from '@/components/ui/Controls'
@@ -13,7 +13,7 @@ import styles from './PlanScreen.module.css'
 import { useBoard, useProjectBoards, useTaskMutations, useTeamMembers, useWorkspace } from '@/hooks/useData'
 import { buildPlan, DEFAULT_SPRINT_DAYS, isoDate, sprintRange, type Sprint } from '@/lib/sprints'
 import { STATE_COLORS } from '@/lib/planStatus'
-import { canWrite } from '@/lib/roles'
+import { canWrite, isTeacher } from '@/lib/roles'
 import { formatDate } from '@/lib/format'
 import { useAuth } from '@/state/context'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -72,9 +72,13 @@ export function PlanScreen() {
   const taskMutations = useTaskMutations(boards?.[0]?.id, workspaceId)
 
   // El alcance elegido se recuerda: nadie quiere volver a fijarlo cada vez.
-  const [scope, setScope] = useState<'mine' | 'team'>(
+  const [chosenScope, setScope] = useState<'mine' | 'team'>(
     () => (leerGuardado(GUARDADO_ALCANCE, 'mine') as 'mine' | 'team') ?? 'mine',
   )
+  // Un docente que solo observa este espacio no tiene tareas suyas: siempre ve las de todo el equipo,
+  // y ni se le ofrece elegir. Lo decide su rol en ESTE espacio, no el de su cuenta.
+  const soloObserva = isTeacher(workspace?.myRole)
+  const scope = soloObserva ? 'team' : chosenScope
   const [mobileSprint, setMobileSprint] = useState<number | null>(null)
   const [openTask, setOpenTask] = useState<TaskResponse | null>(null)
 
@@ -161,7 +165,9 @@ export function PlanScreen() {
               )}
             </div>
             <div className={styles.headActions}>
-              <Segmented options={ALCANCES} value={scope} onChange={elegirAlcance} ariaLabel="Que tareas ver" />
+              {!soloObserva && (
+                <Segmented options={ALCANCES} value={scope} onChange={elegirAlcance} ariaLabel="Que tareas ver" />
+              )}
             </div>
           </header>
 
@@ -211,11 +217,12 @@ export function PlanScreen() {
               </p>
               <div className={styles.looseCards}>
                 {plan.sinFecha.map((item) => (
-                  <PlanTaskCard
+                  <TaskCard
                     key={item.task.id}
                     task={item.task}
+                    draggable={false}
                     done={item.state === 'terminada'}
-                    state={STATE_COLORS[item.state]}
+                    status={STATE_COLORS[item.state]}
                     canWrite={writable}
                     onOpen={setOpenTask}
                     onDelete={(task) => taskMutations.remove.mutate(task.id)}
@@ -288,11 +295,12 @@ function SprintColumn({
       ) : (
         <div className={styles.cards}>
           {sprint.tasks.map((item) => (
-            <PlanTaskCard
+            <TaskCard
               key={item.task.id}
               task={item.task}
+              draggable={false}
               done={item.state === 'terminada'}
-              state={STATE_COLORS[item.state]}
+              status={STATE_COLORS[item.state]}
               canWrite={canWrite}
               onOpen={onOpen}
               onDelete={onDelete}

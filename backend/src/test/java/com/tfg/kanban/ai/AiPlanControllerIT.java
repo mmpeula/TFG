@@ -10,6 +10,7 @@ import org.springframework.mock.web.MockMultipartFile;
 
 import java.nio.charset.StandardCharsets;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -82,6 +83,19 @@ class AiPlanControllerIT extends AbstractApiIT {
                         .file(new MockMultipartFile("file", "guion.txt", "text/plain",
                                 "contenido".getBytes(StandardCharsets.UTF_8)))
                         .header(HttpHeaders.AUTHORIZATION, ctx.miembro().bearer()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("El progreso solo lo ve el responsable y, sin generacion en curso, no trae ninguna fase")
+    void progressIsPrivateAndEmptyWhenIdle() throws Exception {
+        Contexto ctx = contexto();
+
+        mockMvc.perform(authorized(get("/api/projects/{id}/ai-plan/progress", ctx.projectId()), ctx.responsable()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stage").doesNotExist());
+
+        mockMvc.perform(authorized(get("/api/projects/{id}/ai-plan/progress", ctx.projectId()), ctx.miembro()))
                 .andExpect(status().isForbidden());
     }
 

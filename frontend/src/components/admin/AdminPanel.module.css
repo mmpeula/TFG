@@ -44,7 +44,17 @@
   background: var(--color-bg);
   border: 1px solid var(--color-neutral-300);
   border-radius: var(--radius-md);
-  overflow: hidden;
+  /* Sin overflow:hidden a proposito: recortaria el desplegable de rol de cada
+     fila, que se abre por encima de la lista. Las esquinas redondeadas se las
+     da a la primera y la ultima fila lo de justo debajo. */
+}
+.rows > :first-child, .rows > :first-child .rowButton {
+  border-top-left-radius: calc(var(--radius-md) - 1px);
+  border-top-right-radius: calc(var(--radius-md) - 1px);
+}
+.rows > :last-child, .rows > :last-child .rowButton {
+  border-bottom-left-radius: calc(var(--radius-md) - 1px);
+  border-bottom-right-radius: calc(var(--radius-md) - 1px);
 }
 
 .row {
@@ -106,6 +116,8 @@
   transition: var(--transition);
 }
 .roleButton:hover { border-color: var(--color-neutral-500); }
+/* El rol de un administrador no se cambia: se ve como dato, no como boton. */
+.roleStatic { font-size: 12.5px; font-weight: 600; padding: 5px 9px; }
 
 .help { font-size: 12px; color: var(--color-neutral-600); line-height: 1.5; }
 

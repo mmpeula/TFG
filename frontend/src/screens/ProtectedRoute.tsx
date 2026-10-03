@@ -24,21 +24,22 @@ export function ProtectedRoute() {
 }
 
 /**
- * Separa los tres espacios principales de la aplicacion. No basta con ocultar
+ * Separa las areas principales de la aplicacion. No basta con ocultar
  * enlaces: una URL pegada tampoco puede abrir el panel de otro tipo de cuenta.
  */
 export function RoleAreaRoute() {
   const { user } = useAuth()
   const location = useLocation()
   const path = location.pathname
-  const isWorkspaceArea = path.startsWith('/workspaces')
-    || path.startsWith('/equipos') || path.startsWith('/proyectos') || path.startsWith('/proyecto')
-  const isTeacherWorkspaceArea = /^\/workspaces\/[^/]+\/(plan|tablero|miembros|pulso)$/.test(path)
+  const isWorkspaceArea = path.startsWith(ROUTES.workspaces)
 
+  // Alumno y docente comparten area: lo que se puede hacer dentro de cada espacio lo
+  // decide el rol que se tiene en ese espacio (y el servidor lo comprueba), no el de la
+  // cuenta. Lo unico propio del docente es su panel de seguimiento.
   const hasAccess = user?.role === 'ADMIN'
     ? path === ROUTES.administracion
     : user?.role === 'DOCENTE'
-      ? path === ROUTES.docente || isTeacherWorkspaceArea
+      ? path === ROUTES.docente || isWorkspaceArea
       : isWorkspaceArea
 
   if (!hasAccess) return <Navigate to={homeForRole(user?.role ?? 'MIEMBRO')} replace />

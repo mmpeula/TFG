@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { GraduationCap, LayoutGrid, Plus, UserCog } from 'lucide-react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { GraduationCap, LayoutGrid, Plus } from 'lucide-react'
 import { HomeShell } from '@/components/shell/HomeShell'
 import { WorkspaceCard } from '@/components/workspace/WorkspaceCard'
 import { WorkspaceCardActions } from '@/components/workspace/WorkspaceCardActions'
@@ -15,7 +15,6 @@ import { useWorkspaceMutations, useWorkspaces } from '@/hooks/useData'
 import { useAuth } from '@/state/context'
 import { isAdmin, isTeacher } from '@/lib/roles'
 import { homeForRole, ROUTES } from '@/app/routes'
-import { Navigate } from 'react-router-dom'
 import type { WorkspaceResponse } from '@/types/api'
 
 /**
@@ -23,12 +22,15 @@ import type { WorkspaceResponse } from '@/types/api'
  *
  * Es la unica lista de la aplicacion. Todo lo demas cuelga de entrar en una de
  * estas tarjetas, y de ahi que la unica accion destacada sea crear otra. Por
- * eso el panel docente y el de administracion tampoco viven en un boton de la
- * cabecera: son una tarjeta mas de esta misma cuadricula (ver PanelCard).
+ * eso el panel docente tampoco vive en un boton de la cabecera: es una tarjeta
+ * mas de esta misma cuadricula (ver PanelCard). El administrador no pasa por
+ * aqui: tiene su propio panel.
  *
- * Un workspace donde solo se observa no aparece aqui como tarjeta propia: no
- * tiene sentido entrar a "trabajar" en algo que solo se sigue. Esos workspaces
- * viven exclusivamente dentro del panel docente.
+ * Un workspace donde solo se observa (donde se es DOCENTE) no aparece aqui como
+ * tarjeta propia: no tiene sentido entrar a "trabajar" en algo que solo se
+ * sigue. Esos workspaces viven dentro del panel docente. Una cuenta docente ve
+ * esta misma pantalla: crea los suyos, donde es responsable, y los que le
+ * anaden como docente le salen en esa tarjeta.
  */
 export function WorkspacesScreen() {
   const navigate = useNavigate()
@@ -39,14 +41,13 @@ export function WorkspacesScreen() {
 
   const propios = useMemo(() => (workspaces ?? []).filter((item) => !isTeacher(item.myRole)), [workspaces])
   const sigueAlgunEquipo = (workspaces ?? []).some((item) => isTeacher(item.myRole))
-  const esAdmin = isAdmin(user?.role)
-  const esMiembro = user?.role === 'MIEMBRO' || user?.role === 'RESPONSABLE'
-  const nadaQueMostrar = !isPending && propios.length === 0 && !sigueAlgunEquipo && !esAdmin
+  const nadaQueMostrar = !isPending && propios.length === 0 && !sigueAlgunEquipo
 
   const pendientes = propios.reduce((total, item) => total + item.pendingTasks, 0)
   const nombre = user?.fullName.split(' ')[0]
 
-  if (user && !esMiembro) return <Navigate to={homeForRole(user.role)} replace />
+  // Alumno y docente ven esta misma pantalla; solo el administrador tiene otra.
+  if (user && isAdmin(user.role)) return <Navigate to={homeForRole(user.role)} replace />
 
   function open(workspace: WorkspaceResponse) {
     // Se entra por el plan: la primera pregunta al abrir una asignatura es
@@ -107,14 +108,6 @@ export function WorkspacesScreen() {
               title="Panel docente"
               description="Los equipos que sigues como docente, con su progreso y sus alertas."
               onOpen={() => navigate(ROUTES.docente)}
-            />
-          )}
-          {esAdmin && (
-            <PanelCard
-              icon={<UserCog size={14} strokeWidth={2.75} />}
-              title="Administración"
-              description="Busca cuentas, cambia el rol global o da de baja a alguien."
-              onOpen={() => navigate(ROUTES.administracion)}
             />
           )}
         </div>

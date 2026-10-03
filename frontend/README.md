@@ -6,69 +6,86 @@ SPA en React + TypeScript + Vite contra la API de PlanifIA.
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # comprobacion de tipos + build de produccion
-npm run lint
+npm run lint       # oxlint
 ```
 
 Vite hace de proxy de `/api` hacia `http://localhost:8080` (configurable con
 `VITE_PROXY_TARGET`), así que en desarrollo no hay problemas de CORS. En Docker el
 proxy lo hace Nginx y la aplicación se sirve en el puerto 3000.
 
-## Las cuatro decisiones de producto
+## Pantallas
 
-1. **La app no abre en el tablero, abre en un estado narrado.** «Hoy» empieza con un
-   párrafo en lenguaje natural construido con las cifras reales del proyecto.
-2. **Las señales son objetos de primera clase**: se resuelven o se descartan, no son
-   avisos pasivos. Al resolver una, se navega al objeto implicado y se resalta 1 s.
-3. **El tablero muestra presión, no solo tarjetas**: contador, límite de trabajo en
-   curso y barra de presión por columna, más micro-badges en las tarjetas con problema.
-4. **El copiloto es un banco de trabajo, no un chat**: se elige una acción y se ejecuta
-   sobre el proyecto. Nada se escribe sin confirmación.
+| Ruta | Pantalla | Quién |
+|---|---|---|
+| `/login`, `/registro` | Inicio de sesión y alta (como alumno o como docente) | Cualquiera |
+| `/workspaces` | Mis espacios de trabajo: los propios y, si se sigue alguno como docente, la tarjeta del panel docente | Alumno y docente |
+| `/workspaces/:id/plan` | Plan por sprints (mis tareas o todo el equipo; el docente siempre ve todo el equipo) | Miembros del espacio |
+| `/workspaces/:id/tablero` | Tablero Kanban con señales y límites de trabajo en curso | Miembros del espacio |
+| `/workspaces/:id/generar-plan` | Generar plan con IA a partir de un documento o una descripción | Responsable del espacio |
+| `/workspaces/:id/miembros` | Equipo, roles e invitaciones | Miembros del espacio |
+| `/workspaces/:id/ajustes` | Calendario, foto y actividad del espacio (editable solo por el responsable) | Miembros del espacio |
+| `/workspaces/:id/pulso` | Métricas y progreso | Miembros del espacio |
+| `/docente` | Panel docente: los espacios que se siguen como docente, con sus alertas | Docente |
+| `/administracion` | Cuentas y espacios de toda la plataforma | Administrador |
+| `/configuracion` | Mi cuenta: nombre, foto y contraseña | Cualquiera con sesión |
+| `/invitacion/:token` | Responder a una invitación | La persona invitada |
+
+`/workspaces/:id` lleva al plan de ese espacio; cualquier ruta desconocida, a
+`/workspaces`.
 
 ## Qué viene del backend y qué se calcula aquí
 
-El backend no expone señales, métricas ni insights. Se derivan en el cliente a partir
-de datos reales, y cada cifra que se muestra sale de esos cálculos:
-
-| Pantalla | Origen |
+| Dato | Origen |
 |---|---|
-| Auth, equipos, proyectos, tableros, columnas, tareas, comentarios, adjuntos, actividad | **API real** |
-| Señales (`lib/signals.ts`) | Derivadas del tablero: columna por encima del WIP, fecha vencida, tarea sin tocar 4 días, tarea en curso sin responsable |
-| Pulso: KPIs, series semanales, distribuciones e insights (`lib/metrics.ts`) | Calculados de las tareas y sus fechas |
-| Generar plan | Llama a `POST /api/projects/{id}/ai-plan` (o a sus variantes con documento o descripción), que pide a **DeepSeek** el reparto completo de todos los sprints en una sola respuesta |
+| Cuentas, espacios, equipos, invitaciones, tableros, columnas, tareas, comentarios, adjuntos, actividad | **API real** |
+| Señales (`lib/signals.ts`) | Derivadas del tablero: columna por encima del WIP, fecha vencida, tarea sin tocar, tarea en curso sin responsable |
+| Pulso: KPIs, series e insights (`lib/metrics.ts`) | Calculados a partir de las tareas y sus fechas |
+| Plan por sprints (`lib/sprints.ts`) | Calculado a partir de las fechas del espacio y de las tareas |
+| Generar plan y asistente | `POST /api/projects/{id}/ai-plan…` y `POST /api/workspaces/{id}/ai/chat`, que el backend resuelve con **DeepSeek** |
 
 ## Estructura
 
 ```
 src/
-├── styles/          tokens.css (valores cerrados) + base.css
+├── styles/          tokens.css (sistema de diseño) + base.css
 ├── types/api.ts     DTOs del backend
 ├── api/endpoints.ts capa HTTP completa
-├── lib/             api-client (axios+JWT) · signals · metrics · roles · format
-├── state/           context (hooks) + providers de sesion e interfaz
-├── hooks/           useData (TanStack Query) · useShortcuts · useMediaQuery
-├── components/      ui · shell · common · home · board · task · pulse · copilot
-└── screens/         Login · Registro · Hoy · Equipos · Equipo · Proyectos ·
-                     Proyecto · Tablero · Pulso · Copiloto · Configuracion
+├── lib/             api-client (axios + JWT) · signals · metrics · sprints · roles · format
+├── state/           sesión, interfaz, trabajos de generación de plan, borradores y asistente
+├── hooks/           useData (TanStack Query) · useShortcuts · useMediaQuery · useDebouncedValue
+├── components/      ui · shell · common · workspace · board · task · pulse ·
+│                    generator · assistant · admin · home
+│                    (board/TaskCard es la tarjeta de tarea del tablero y del plan)
+└── screens/         una por ruta de la tabla de arriba
 ```
 
 ## Control de acceso en la interfaz
 
-Cada respuesta trae `myRole` (el rol del usuario **en el equipo** dueño del recurso).
-`lib/roles.ts` traduce eso a `canRead` / `canWrite` / `canManage`, y la UI oculta lo
-que además el backend rechazaría: un OBSERVADOR no ve asas de arrastre, ni «Añadir
-tarea», ni el formulario de comentarios. **Es cosmético**: la regla de verdad la
-aplica el servidor.
+Hay dos planos de rol. El **de cuenta** (`user.role`: alumno, docente o administrador)
+solo decide a qué zona se entra: el administrador tiene su panel; alumno y docente
+comparten la de espacios de trabajo. El **de cada espacio** (`myRole` en las respuestas:
+responsable, alumno o docente) decide qué se puede hacer dentro: `lib/roles.ts` lo
+traduce a `canWrite` / `canManage` / `isTeacher`. Una misma cuenta docente puede ser
+responsable de sus propios espacios y solo observar los de otros.
+
+La interfaz oculta lo que además el backend rechazaría (un docente no ve asas de
+arrastre, ni «Añadir tarea», ni el formulario de comentarios). **Es cosmético**: la
+regla de verdad la aplica el servidor.
 
 ## Sistema visual
 
-Los valores de `src/styles/tokens.css` son cerrados: paleta terracota/salvia/neutros
-sobre fondo `#f5ead8`, Caprasimo solo para títulos (peso 400), Figtree para el resto,
-radios 8/16/28 y 999 px, y anillo de foco terracota en todo lo interactivo. Terracota
-= atención y riesgo, salvia = éxito, neutros = estructura.
+Los valores de `src/styles/tokens.css` son cerrados y su cabecera explica el porqué: el
+tablero se lee como un log de git. Lo que se mide (horas, fechas, ids) va en
+monoespacio; lo que se escribe, en la tipografía del sistema. Los cuatro colores tienen
+un trabajo fijo y no se usan para otra cosa: **azul** para la acción principal, el foco
+y todo lo relacionado con la IA; **verde** para lo que va por debajo de lo estimado o
+está terminado; **rojo** para lo que va por encima, atrasado o crítico; **ámbar** para
+lo pendiente de revisar.
 
 Detalles que conviene conocer antes de tocar estilos:
 
 - Los `<button>` llevan `text-align: left` en `base.css`: el navegador los centra.
-- Caprasimo solo tiene peso 400; los títulos pequeños en negrita van en Figtree 700.
+- Casi todo se separa con líneas de 1 px; las sombras quedan para lo que flota de
+  verdad (modales, la tarjeta que se arrastra, el asistente).
 - En móvil el tablero muestra una columna cada vez con un selector de estado, y las
   tarjetas se mueven con el menú «Mover a…» en vez de arrastrando (`useMediaQuery`).

@@ -1,5 +1,9 @@
 package com.tfg.kanban.security;
 
+import com.tfg.kanban.domain.model.Role;
+import com.tfg.kanban.domain.model.User;
+import com.tfg.kanban.domain.repository.UserRepository;
+
 import com.tfg.kanban.TestSecurity;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
@@ -19,6 +23,7 @@ import static org.mockito.Mockito.verify;
 class JwtAuthenticationFilterTest {
 
     private JwtService jwtService;
+    private UserRepository userRepository;
     private JwtAuthenticationFilter filter;
     private FilterChain chain;
 
@@ -28,7 +33,12 @@ class JwtAuthenticationFilterTest {
         properties.setSecret("secreto-de-pruebas-con-al-menos-32-caracteres");
         properties.setIssuer("tfg-kanban-test");
         jwtService = new JwtService(properties);
-        filter = new JwtAuthenticationFilter(jwtService);
+        userRepository = org.mockito.Mockito.mock(UserRepository.class);
+        // Por defecto, la cuenta del token existe, esta habilitada y tiene el rol del token.
+        org.mockito.Mockito.when(userRepository.findById(org.mockito.ArgumentMatchers.anyLong())).thenAnswer(invocation ->
+                java.util.Optional.of(User.builder().id(invocation.getArgument(0)).email("ana@uni.es")
+                        .role(Role.MIEMBRO).enabled(true).build()));
+        filter = new JwtAuthenticationFilter(jwtService, userRepository);
         chain = mock(FilterChain.class);
     }
 
@@ -48,16 +58,51 @@ class JwtAuthenticationFilterTest {
     @Test
     @DisplayName("Con un token valido deja la autenticacion en el contexto")
     void authenticatesWithValidToken() throws Exception {
-        String token = jwtService.generateToken("ana@uni.es", 3L, "RESPONSABLE");
+        String token = jwtService.generateToken("ana@uni.es", 3L, "MIEMBRO");
 
         run("Bearer " + token);
 
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         assertThat(authentication).isNotNull();
         assertThat(authentication.getAuthorities()).extracting(Object::toString)
-                .containsExactly("ROLE_RESPONSABLE");
+                .containsExactly("ROLE_MIEMBRO");
         assertThat(((AppUserDetails) authentication.getPrincipal()).getId()).isEqualTo(3L);
         verify(chain).doFilter(any(), any());
+    }
+
+    @Test
+    @DisplayName("Una cuenta dada de baja no entra aunque su token siga vigente")
+    void disabledAccountIsNotAuthenticated() throws Exception {
+        org.mockito.Mockito.when(userRepository.findById(5L)).thenReturn(java.util.Optional.of(
+                User.builder().id(5L).email("baja@uni.es").role(Role.ADMIN).enabled(false).build()));
+        String token = jwtService.generateToken("baja@uni.es", 5L, "ADMIN");
+
+        run("Bearer " + token);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(chain).doFilter(any(), any());
+    }
+
+    @Test
+    @DisplayName("Una cuenta que ya no existe no entra")
+    void deletedAccountIsNotAuthenticated() throws Exception {
+        org.mockito.Mockito.when(userRepository.findById(6L)).thenReturn(java.util.Optional.empty());
+
+        run("Bearer " + jwtService.generateToken("nadie@uni.es", 6L, "MIEMBRO"));
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    @Test
+    @DisplayName("El rol es el de la cuenta ahora, no el que traia el token: un cambio de rol vale al instante")
+    void roleComesFromTheAccountNotTheToken() throws Exception {
+        org.mockito.Mockito.when(userRepository.findById(7L)).thenReturn(java.util.Optional.of(
+                User.builder().id(7L).email("luis@uni.es").role(Role.DOCENTE).enabled(true).build()));
+
+        run("Bearer " + jwtService.generateToken("luis@uni.es", 7L, "ADMIN"));
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+                .extracting(Object::toString).containsExactly("ROLE_DOCENTE");
     }
 
     @Test
@@ -91,7 +136,7 @@ class JwtAuthenticationFilterTest {
     @DisplayName("Si ya hay autenticacion en el contexto, el filtro no la pisa")
     void doesNotOverrideExistingAuthentication() throws Exception {
         TestSecurity.authenticateAs(99L, "DOCENTE");
-        String token = jwtService.generateToken("otra@uni.es", 1L, "RESPONSABLE");
+        String token = jwtService.generateToken("otra@uni.es", 1L, "MIEMBRO");
 
         run("Bearer " + token);
 

@@ -3,6 +3,14 @@
   gap: var(--space-4); flex-wrap: wrap;
 }
 .title { font-family: var(--font-heading); font-size: 30px; line-height: 1.1; }
+/* La vuelta a la pantalla de inicio, desde el panel docente: la misma de las secciones de un espacio. */
+.backLink {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 700; color: var(--color-neutral-600);
+  padding: 3px 8px 3px 4px; margin: 0 0 var(--space-2) -4px; border-radius: 999px;
+  transition: var(--transition);
+}
+.backLink:hover { background: var(--color-neutral-200); color: var(--color-text); }
 .subtitle { font-size: 13px; color: var(--color-neutral-600); margin-top: 5px; max-width: 52ch; }
 
 .grid {

@@ -1,7 +1,7 @@
 import { apiClient } from '@/lib/api-client'
 import type {
   ActivityLogResponse, AdminWorkspaceResponse, AiPlanResponse, AttachmentResponse, AuthResponse, BoardResponse,
-  ChatResponse, ChatTurn, ColumnResponse, CommentResponse, DetectedDateResponse, PageResponse,
+  ChatResponse, ChatTurn, ColumnResponse, CommentResponse, DetectedDateResponse, PageResponse, PlanProgressResponse, InviteCandidateResponse,
   InvitationResponse, MyInvitationResponse,
   PlanOptions, ProjectResponse, Role, ProposedTask, TaskPriority, TaskResponse, TaskType, TeamMemberResponse,
   UserResponse, WorkspaceResponse,
@@ -108,8 +108,13 @@ export const teams = {
     apiClient.delete(`/teams/${teamId}/members/${userId}`).then(() => undefined),
 
   /** Invitar no mete a nadie: deja la invitacion pendiente y manda el correo. */
-  invite: (teamId: number, payload: { email: string }) =>
+  invite: (teamId: number, payload: { email: string; role?: 'MIEMBRO' | 'DOCENTE' }) =>
     apiClient.post<InvitationResponse>(`/teams/${teamId}/invitations`, payload).then((r) => r.data),
+  /** Con que roles se puede invitar a ese correo; 404 si no hay cuenta. No crea nada. */
+  inviteCandidate: (teamId: number, email: string) =>
+    apiClient
+      .get<InviteCandidateResponse>(`/teams/${teamId}/invitations/candidate`, { params: { email } })
+      .then((r) => r.data),
   invitations: (teamId: number) =>
     apiClient.get<InvitationResponse[]>(`/teams/${teamId}/invitations`).then((r) => r.data),
   cancelInvitation: (teamId: number, invitationId: number) =>
@@ -173,6 +178,9 @@ export const projects = {
       })
       .then((r) => r.data)
   },
+  /** En que fase va la generacion en curso de un documento; sin ninguna, la respuesta no trae fase. */
+  aiPlanProgress: (projectId: number) =>
+    apiClient.get<PlanProgressResponse>(`/projects/${projectId}/ai-plan/progress`).then((r) => r.data),
   /** Lleva al tablero solo las tareas aceptadas por el usuario. */
   applyAiPlan: (projectId: number, boardId: number, tasks: ProposedTask[]) =>
     apiClient
@@ -213,11 +221,6 @@ export interface TaskPayload {
 }
 
 export const tasks = {
-  search: (filters: { projectId?: number; boardId?: number; assigneeId?: number }) =>
-    apiClient
-      .get<PageResponse<TaskResponse>>('/tasks', { params: { ...filters, size: 200 } })
-      .then((r) => r.data),
-  get: (taskId: number) => apiClient.get<TaskResponse>(`/tasks/${taskId}`).then((r) => r.data),
   create: (columnId: number, payload: TaskPayload) =>
     apiClient.post<TaskResponse>(`/columns/${columnId}/tasks`, payload).then((r) => r.data),
   update: (taskId: number, payload: TaskPayload) =>

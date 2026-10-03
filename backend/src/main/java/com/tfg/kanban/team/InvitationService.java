@@ -9,6 +9,7 @@ import com.tfg.kanban.domain.repository.TeamRepository;
 import com.tfg.kanban.domain.repository.UserRepository;
 import com.tfg.kanban.security.SecurityUtils;
 import com.tfg.kanban.team.dto.InvitationResponse;
+import com.tfg.kanban.team.dto.InviteCandidateResponse;
 import com.tfg.kanban.team.dto.InviteRequest;
 import com.tfg.kanban.team.dto.MyInvitationResponse;
 import com.tfg.kanban.team.dto.TeamMemberResponse;
@@ -65,11 +66,16 @@ public class InvitationService {
             throw new BusinessRuleException("Ya tiene una invitacion pendiente de responder");
         }
 
-        // El rol no lo elige quien invita: es el que le corresponde a la cuenta del
-        // invitado. Llegar a RESPONSABLE es un paso aparte, posterior a entrar. Se
-        // comprueba igual porque hay cuentas que no caben en ningun equipo (ADMIN):
-        // sin esto se mandaria una invitacion que nunca se podria aceptar.
-        Role role = TeamRoles.entryRoleFor(invited);
+        // Quien invita elige solo entre trabajar (alumno) o seguir (docente); sin elegir, entra
+        // como le corresponde a su cuenta. Una cuenta docente puede entrar como alumno para
+        // trabajar en este equipo. Llegar a RESPONSABLE es un paso aparte, posterior a entrar.
+        // Se comprueba igual porque hay cuentas que no caben en ningun equipo (ADMIN) o que no
+        // pueden seguir como docente: sin esto se mandaria una invitacion que nunca se podria aceptar.
+        Role role = request.role() != null ? request.role() : TeamRoles.entryRoleFor(invited);
+        if (role != Role.MIEMBRO && role != Role.DOCENTE) {
+            throw new BusinessRuleException(
+                    "Se invita como alumno o como docente: ser responsable es un paso posterior, ya dentro del equipo");
+        }
         TeamRoles.ensureRoleMatchesAccount(invited, role);
 
         User quienInvita = SecurityUtils.currentUserId().flatMap(userRepository::findById).orElse(null);
@@ -84,6 +90,20 @@ public class InvitationService {
 
         invitation.setEmailSent(avisar(invitation, quienInvita));
         return InvitationResponse.from(invitation);
+    }
+
+    /**
+     * Con que roles se puede invitar a la cuenta de ese correo. Es lo que necesita la pantalla de
+     * invitar para ofrecer la eleccion (docente o alumno) solo cuando la cuenta es de docente.
+     * Solo lo ve quien puede invitar, y no dice nada que la propia invitacion no vaya a decir.
+     */
+    public InviteCandidateResponse candidate(String email) {
+        User user = userRepository.findByEmailIgnoreCase(email.trim().toLowerCase())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No hay ninguna cuenta en PlanifIA con el email " + email.trim().toLowerCase()));
+        List<Role> allowed = TeamRoles.inviteRolesFor(user);
+        return new InviteCandidateResponse(user.getRole(),
+                allowed.isEmpty() ? null : allowed.get(0), allowed);
     }
 
     /** Las que siguen esperando respuesta, para la pantalla de miembros. */

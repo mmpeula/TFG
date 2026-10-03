@@ -40,6 +40,7 @@ public class WorkspaceService {
 
     private final ProjectRepository projectRepository;
     private final TeamRepository teamRepository;
+    private final InvitationRepository invitationRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final BoardColumnRepository columnRepository;
     private final TaskRepository taskRepository;
@@ -59,7 +60,7 @@ public class WorkspaceService {
     public List<WorkspaceResponse> findMine() {
         Long userId = SecurityUtils.requireCurrentUserId();
         List<Project> projects = projectRepository.findAll(
-                ProjectSpecifications.visibleTo(userId, null, null),
+                ProjectSpecifications.visibleTo(userId),
                 Sort.by(Sort.Direction.DESC, "createdAt"));
 
         if (projects.isEmpty()) {
@@ -136,8 +137,10 @@ public class WorkspaceService {
         Long userId = SecurityUtils.requireCurrentUserId();
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
-        if (owner.getRole() != Role.MIEMBRO && owner.getRole() != Role.RESPONSABLE) {
-            throw new BusinessRuleException("Solo una cuenta MIEMBRO puede crear un espacio de trabajo");
+        // Un docente crea espacios como cualquier alumno (y es su RESPONSABLE); lo que no puede
+        // hacer es un administrador, que no pertenece a ningun equipo.
+        if (owner.getRole() == Role.ADMIN) {
+            throw new BusinessRuleException("Una cuenta de administrador no puede crear espacios de trabajo");
         }
         String name = request.name().trim();
 
@@ -212,6 +215,9 @@ public class WorkspaceService {
         boolean vacio = projectRepository.findByTeam_Id(team.getId()).isEmpty();
         boolean esMio = team.getOwner() != null && team.getOwner().getId().equals(SecurityUtils.requireCurrentUserId());
         if (vacio && esMio) {
+            // Las invitaciones, aunque ya esten respondidas, apuntan al equipo: sin quitarlas antes,
+            // ningun espacio al que se haya invitado a alguien se podria borrar.
+            invitationRepository.deleteByTeam_Id(team.getId());
             teamRepository.delete(team);
         }
     }
@@ -253,10 +259,10 @@ public class WorkspaceService {
     @Transactional
     public WorkspaceResponse uploadCover(Long workspaceId, MultipartFile file) {
         Project project = getProject(workspaceId);
-        String storedName = fileStorageService.store(file);
+        FileStorageService.StoredImage image = fileStorageService.storeImage(file);
         String previous = project.getCoverStoredName();
-        project.setCoverStoredName(storedName);
-        project.setCoverContentType(file.getContentType());
+        project.setCoverStoredName(image.storedName());
+        project.setCoverContentType(image.contentType());
         if (previous != null) {
             fileStorageService.delete(previous);
         }

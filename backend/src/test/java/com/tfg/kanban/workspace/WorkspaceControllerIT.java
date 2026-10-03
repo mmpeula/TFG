@@ -18,6 +18,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class WorkspaceControllerIT extends AbstractApiIT {
 
+    /** La firma de un PNG: lo que mira el servidor para aceptar una foto, no la cabecera que manda el navegador. */
+    private static final byte[] PNG = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13};
+
+
     @Test
     @DisplayName("Crear un workspace deja equipo, tablero y columnas listos de una vez")
     void createLeavesEverythingReady() throws Exception {
@@ -189,6 +193,28 @@ class WorkspaceControllerIT extends AbstractApiIT {
     }
 
     @Test
+    @DisplayName("Un workspace al que se ha invitado a alguien tambien se puede borrar: sus invitaciones se van con el")
+    void deleteWorksAfterInvitingSomeone() throws Exception {
+        TestUser owner = registerUser(Role.MIEMBRO);
+        TestUser invited = registerUser(Role.MIEMBRO);
+        Workspace workspace = createWorkspace(owner, "Con invitados");
+        addMember(owner, workspace.teamId(), invited, Role.MIEMBRO);
+        // y una pendiente, sin responder
+        TestUser pending = registerUser(Role.MIEMBRO);
+        mockMvc.perform(authorized(post("/api/teams/{id}/invitations", workspace.teamId()), owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"%s\"}".formatted(pending.email())))
+                .andExpect(status().isCreated());
+        // Para que el equipo quede vacio, el borrado solo lo hace quien es su dueno y no queda otro proyecto.
+        mockMvc.perform(authorized(delete("/api/workspaces/{id}", workspace.id()), owner))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(authorized(get("/api/invitations/mine"), pending))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
     @DisplayName("Borrar el workspace se lleva por delante su tablero")
     void deleteRemovesTheBoard() throws Exception {
         TestUser user = registerUser(Role.MIEMBRO);
@@ -211,7 +237,7 @@ class WorkspaceControllerIT extends AbstractApiIT {
         TestUser user = registerUser(Role.MIEMBRO);
         Long workspaceId = createWorkspace(user, "Con foto").id();
         MockMultipartFile foto = new MockMultipartFile("file", "foto.png", "image/png",
-                new byte[] {1, 2, 3, 4});
+                PNG);
 
         mockMvc.perform(authorized(get("/api/workspaces/{id}", workspaceId), user))
                 .andExpect(jsonPath("$.coverUrl").doesNotExist());
@@ -225,7 +251,7 @@ class WorkspaceControllerIT extends AbstractApiIT {
         mockMvc.perform(authorized(get("/api/workspaces/{id}/photo", workspaceId), user))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/png"))
-                .andExpect(content().bytes(new byte[] {1, 2, 3, 4}));
+                .andExpect(content().bytes(PNG));
 
         mockMvc.perform(authorized(delete("/api/workspaces/{id}/photo", workspaceId), user))
                 .andExpect(status().isNoContent());
@@ -245,7 +271,7 @@ class WorkspaceControllerIT extends AbstractApiIT {
         addMember(owner, json(detail).get("teamId").asLong(), member, Role.MIEMBRO);
 
         MockMultipartFile foto = new MockMultipartFile("file", "foto.png", "image/png",
-                new byte[] {1, 2, 3, 4});
+                PNG);
 
         mockMvc.perform(multipart("/api/workspaces/{id}/photo", workspaceId)
                         .file(foto)

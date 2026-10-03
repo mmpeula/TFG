@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.tfg.kanban.ai.AiPlanServiceTest
--------------------------------------------------------------------------------
-Tests run: 57, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.288 s -- in com.tfg.kanban.ai.AiPlanServiceTest

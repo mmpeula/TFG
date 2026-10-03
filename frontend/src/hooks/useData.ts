@@ -45,6 +45,20 @@ export const useTeamInvitations = (teamId?: number) =>
     enabled: enabled(teamId),
   })
 
+/**
+ * Con que roles se puede invitar al correo que se esta escribiendo. Solo se consulta con un correo
+ * completo; sin cuenta (404) simplemente no hay eleccion que ofrecer, y el error de verdad
+ * lo da la invitacion al enviarla.
+ */
+export const useInviteCandidate = (teamId?: number, email?: string) =>
+  useQuery({
+    queryKey: ['teams', teamId, 'invite-candidate', email] as const,
+    queryFn: () => teams.inviteCandidate(teamId!, email!),
+    enabled: enabled(teamId) && !!email,
+    retry: false,
+    staleTime: 30_000,
+  })
+
 /** Las invitaciones que esperan respuesta del usuario que esta mirando. */
 export const useMyInvitations = () =>
   useQuery({ queryKey: keys.myInvitations, queryFn: invitations.mine })
@@ -164,7 +178,7 @@ export function useInvitationMutations(teamId?: number) {
 
   return {
     invite: useMutation({
-      mutationFn: (payload: { email: string }) => teams.invite(teamId!, payload),
+      mutationFn: (payload: { email: string; role?: 'MIEMBRO' | 'DOCENTE' }) => teams.invite(teamId!, payload),
       onSuccess: (invitation) => {
         if (teamId) queryClient.invalidateQueries({ queryKey: keys.invitations(teamId) })
         pushToast(invitation.emailSent

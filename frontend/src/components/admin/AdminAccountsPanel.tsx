@@ -13,7 +13,7 @@ import { useAuth } from '@/state/context'
 import { ROLE_LABELS } from '@/lib/roles'
 import type { Role, UserResponse } from '@/types/api'
 
-/** Los tres roles de cuenta. RESPONSABLE no esta: se es de un equipo, no de la plataforma. */
+/** Los tres tipos de cuenta, para filtrar. RESPONSABLE no esta: se es de un equipo, no de la plataforma. */
 const ROLES: Role[] = ['MIEMBRO', 'DOCENTE', 'ADMIN']
 
 type Filtro = Role | 'TODAS'
@@ -38,6 +38,8 @@ export function AdminAccountsPanel() {
   const { data, isPending } = useAdminUsers()
   const mutations = useAdminUserMutations()
   const [search, setSearch] = useState('')
+  // A quien se esta a punto de subir de rol, y a cual: no tiene vuelta atras, asi que se confirma.
+  const [promoting, setPromoting] = useState<{ person: UserResponse; role: 'DOCENTE' | 'ADMIN' } | null>(null)
   const [filtro, setFiltro] = useState<Filtro>('TODAS')
 
   const todas = useMemo(() => data?.content ?? [], [data])
@@ -116,30 +118,42 @@ export function AdminAccountsPanel() {
 
                 <span className={styles.cellMuted}>{person.email}</span>
 
-                <Dropdown
-                  trigger={({ toggle }) => (
-                    <button className={styles.roleButton} onClick={toggle}>
-                      {ROLE_LABELS[person.role]}
-                    </button>
-                  )}
-                >
-                  {(close) => (
-                    <>
-                      {ROLES.map((item) => (
+                {/* Los roles solo suben: alumno a docente o administrador, docente a administrador.
+                    Un administrador ya esta arriba del todo y no se degrada, asi que su rol no es un menu. */}
+                {person.role === 'ADMIN' ? (
+                  <span className={styles.roleStatic}>{ROLE_LABELS[person.role]}</span>
+                ) : (
+                  <Dropdown
+                    trigger={({ toggle }) => (
+                      <button className={styles.roleButton} onClick={toggle}>
+                        {ROLE_LABELS[person.role]}
+                      </button>
+                    )}
+                  >
+                    {(close) => (
+                      <>
+                        {person.role !== 'DOCENTE' && (
+                          <DropdownItem
+                            onClick={() => {
+                              close()
+                              setPromoting({ person, role: 'DOCENTE' })
+                            }}
+                          >
+                            Hacer docente
+                          </DropdownItem>
+                        )}
                         <DropdownItem
-                          key={item}
-                          active={item === person.role}
                           onClick={() => {
                             close()
-                            mutations.updateRole.mutate({ userId: person.id, role: item })
+                            setPromoting({ person, role: 'ADMIN' })
                           }}
                         >
-                          {ROLE_LABELS[item]}
+                          Hacer administrador
                         </DropdownItem>
-                      ))}
-                    </>
-                  )}
-                </Dropdown>
+                      </>
+                    )}
+                  </Dropdown>
+                )}
 
                 <span className={styles.cellActions}>
                   {person.enabled ? (
@@ -176,9 +190,21 @@ export function AdminAccountsPanel() {
         </ul>
       )}
 
+      <ConfirmDialog
+        open={promoting !== null}
+        onOpenChange={(open) => { if (!open) setPromoting(null) }}
+        title={`${promoting?.role === 'DOCENTE' ? 'Hacer docente' : 'Hacer administrador'} a ${promoting?.person.fullName ?? ''}`}
+        description={promoting?.role === 'DOCENTE'
+          ? 'Seguirá viendo los mismos espacios de trabajo, y podrá seguir como docente los que le añadan. No se puede volver a hacer alumno.'
+          : 'Podrá administrar todas las cuentas de la plataforma. Un administrador no se puede volver a degradar.'}
+        confirmLabel={promoting?.role === 'DOCENTE' ? 'Hacer docente' : 'Hacer administrador'}
+        onConfirm={() => mutations.updateRole.mutateAsync({ userId: promoting!.person.id, role: promoting!.role })}
+      />
+
       <p className={styles.help}>
-        El rol de cada equipo se gestiona desde ese equipo. Aquí solo se administra el rol de la
-        cuenta en la plataforma y el alta o baja.
+        El rol de cada equipo se gestiona desde ese equipo. Aquí los roles de cuenta solo suben:
+        alumno a docente o administrador, y docente a administrador. No hay vuelta atrás. También
+        se da de alta o de baja, y la plataforma siempre conserva al menos un administrador.
       </p>
     </div>
   )

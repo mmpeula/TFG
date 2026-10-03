@@ -15,9 +15,11 @@ package com.tfg.kanban.domain.model;
  *   <li>{@link #ADMIN}: administra las cuentas de la plataforma
  *       ({@code UserController}). No pertenece a ningun equipo. Es el unico rol
  *       que no se puede pedir al registrarse: lo concede otro administrador.</li>
- *   <li>{@link #DOCENTE}: sigue en modo lectura los equipos a los que se le anade.
- *       Se elige al crear la cuenta, porque no da permiso sobre nada de nadie:
- *       solo cambia con que panel se entra.</li>
+ *   <li>{@link #DOCENTE}: una cuenta con el mismo panel que un alumno. Puede crear
+ *       sus propios espacios (y es su RESPONSABLE) y seguir en modo lectura los que
+ *       otras personas le anaden como docente: lo que puede hacer en cada espacio lo
+ *       decide el rol que tiene <b>en ese espacio</b>, no el de su cuenta. Se elige al
+ *       crear la cuenta, o se llega a el desde alumno.</li>
  *   <li>{@link #RESPONSABLE}: coordina el equipo, crea proyectos/tableros y asigna tareas.</li>
  *   <li>{@link #MIEMBRO}: participa en el trabajo, mueve y edita sus tareas. Es lo
  *       que es una cuenta de estudiante y el valor por defecto al registrarse.</li>

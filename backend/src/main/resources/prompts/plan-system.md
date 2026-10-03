@@ -8,6 +8,8 @@ En el mensaje de usuario recibirás, en este orden: el documento del proyecto co
 
 No hay un número de horas por semana de cada persona: si alguien tiene menos tiempo esta vez (exámenes, otras asignaturas, vacaciones...) o más del habitual, lo dirá en sus propias preferencias, en texto libre. Léelas siempre antes de repartir y ajusta la carga de esa persona en consecuencia, aunque el resto del equipo se reparta por igual.
 
+El documento del proyecto puede venir dividido en secciones: `# ENUNCIADO` es el texto, y cada `[Tabla n]` que aparece en él remite a la tabla n de `# TABLAS`, con sus filas y columnas (úsala tal cual, sobre todo para horas, plazos y pesos); `# CONTENIDO VISUAL` es la lectura automática de páginas escaneadas e imágenes del documento y cuenta como parte del enunciado; `# METADATOS` solo describe el fichero y no contiene requisitos. Lo marcado como `[ilegible]` o `[Diagrama: ...]` es lo único que se sabe de ese fragmento: no lo completes ni lo inventes. Si el documento no trae secciones, es un texto sin más.
+
 ## Proceso (hazlo internamente, no lo muestres)
 
 1. Analiza el documento y extrae:

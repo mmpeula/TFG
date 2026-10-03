@@ -72,17 +72,41 @@ public class UserService {
         }
     }
 
+    /**
+     * Los cambios de rol son siempre hacia arriba: alumno puede pasar a docente o a
+     * administrador, y un docente a administrador.
+     *
+     * <p>No hay vuelta atras: un docente no vuelve a ser alumno ni un administrador
+     * se degrada. Asi nunca se pierde un rol por un clic, y la plataforma no puede
+     * quedarse sin nadie que la administre por este camino (por el de dar de baja,
+     * vease {@link #disable}). Pedir el rol que la cuenta ya tiene no cambia nada.</p>
+     */
     @Transactional
     public UserResponse updateGlobalRole(Long id, UpdateGlobalRoleRequest request) {
         User user = getUser(id);
-        if (!isAccountRole(request.role())) {
-            throw new BusinessRuleException("Una cuenta solo puede ser ADMIN, DOCENTE o MIEMBRO");
+        Role target = request.role();
+        if (target == Role.RESPONSABLE) {
+            throw new BusinessRuleException("RESPONSABLE es un rol de equipo, no de cuenta");
         }
-        if (user.getRole() == Role.ADMIN && request.role() != Role.ADMIN) {
-            ensureNotLastAdmin();
+        if (!isPromotion(user.getRole(), target)) {
+            throw new BusinessRuleException(switch (user.getRole()) {
+                case ADMIN -> "Un administrador no se puede degradar a otro rol";
+                case DOCENTE -> "Un docente solo puede pasar a administrador: no puede volver a ser alumno";
+                default -> "Una cuenta de alumno solo puede pasar a docente o a administrador";
+            });
         }
-        user.setRole(request.role());
+        user.setRole(target);
         return UserResponse.from(user);
+    }
+
+    /** Mismo rol (no cambia nada) o uno de los saltos permitidos: alumno -> docente -> administrador. */
+    private static boolean isPromotion(Role current, Role target) {
+        return switch (current) {
+            case ADMIN -> target == Role.ADMIN;
+            case DOCENTE -> target == Role.DOCENTE || target == Role.ADMIN;
+            // Alumno: puede pasar a docente o a administrador.
+            default -> true;
+        };
     }
 
     /**
@@ -95,7 +119,7 @@ public class UserService {
             throw new BusinessRuleException("No puedes deshabilitar tu propia cuenta");
         }
         User user = getUser(id);
-        if (user.getRole() == Role.ADMIN) {
+        if (user.getRole() == Role.ADMIN && user.isEnabled()) {
             ensureNotLastAdmin();
         }
         user.setEnabled(false);
@@ -111,10 +135,10 @@ public class UserService {
     @Transactional
     public UserResponse uploadAvatar(Long id, MultipartFile file) {
         User user = getUser(id);
-        String storedName = fileStorageService.store(file);
+        FileStorageService.StoredImage image = fileStorageService.storeImage(file);
         String previous = user.getAvatarStoredName();
-        user.setAvatarStoredName(storedName);
-        user.setAvatarContentType(file.getContentType());
+        user.setAvatarStoredName(image.storedName());
+        user.setAvatarContentType(image.contentType());
         if (previous != null) {
             fileStorageService.delete(previous);
         }
@@ -147,14 +171,11 @@ public class UserService {
     public record AvatarFile(Resource resource, String contentType) {
     }
 
+    /** Quedaria sin ningun administrador que pueda entrar: se cuentan solo los habilitados. */
     private void ensureNotLastAdmin() {
-        if (userRepository.countByRole(Role.ADMIN) <= 1) {
+        if (userRepository.countByRoleAndEnabledTrue(Role.ADMIN) <= 1) {
             throw new BusinessRuleException("La plataforma debe tener al menos un administrador");
         }
-    }
-
-    private boolean isAccountRole(Role role) {
-        return role == Role.ADMIN || role == Role.DOCENTE || role == Role.MIEMBRO;
     }
 
     public User getUser(Long id) {
