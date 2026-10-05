@@ -153,7 +153,6 @@ export interface TaskResponse {
   assignees: UserSummary[]
   createdBy?: UserSummary
   commentCount: number
-  attachmentCount: number
   createdAt: string
   updatedAt?: string
 }
@@ -162,7 +161,6 @@ export interface ColumnResponse {
   id: number
   name: string
   position: number
-  wipLimit?: number | null
   taskCount: number
   tasks?: TaskResponse[]
 }
@@ -186,17 +184,6 @@ export interface CommentResponse {
   edited: boolean
   createdAt: string
   updatedAt?: string
-}
-
-export interface AttachmentResponse {
-  id: number
-  filename: string
-  contentType?: string
-  sizeBytes: number
-  taskId: number
-  uploadedBy: UserSummary
-  downloadUrl: string
-  uploadedAt: string
 }
 
 export interface ActivityLogResponse {
@@ -339,7 +326,7 @@ export interface ChatResponse {
   generatedAt: string
 }
 
-export type SignalKind = 'parada' | 'saturacion' | 'fecha' | 'bloqueo'
+export type SignalKind = 'parada' | 'fecha' | 'bloqueo'
 
 /**
  * Las senales no vienen del backend: se calculan en el cliente a partir del

@@ -1,8 +1,13 @@
 import { useRef, useState, type ReactNode } from 'react'
 import {
-  AlertCircle, AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronDown, FileText, Plus, Upload, Users, X,
+  AlertCircle, AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronDown, FileText, Plus, Settings,
+  Sparkles, Upload, X,
 } from 'lucide-react'
+import { DateInput } from '@/components/ui/DateInput'
+import { Avatar } from '@/components/ui/Avatar'
+import { BreakableText } from '@/components/ui/BreakableText'
 import { Button } from '@/components/ui/Button'
+import { Card, CardGroup, InfoNote } from '@/components/ui/Card'
 import { Tag } from '@/components/ui/Tag'
 import styles from './PlanGenerator.module.css'
 import type { MemberWorkload, PlannedSprint, ProposedTask, TeamMemberResponse } from '@/types/api'
@@ -11,20 +16,22 @@ import { PRIORITY_LABELS } from '@/lib/roles'
 import { typeOf } from '@/lib/taskTypes'
 import { formatDate } from '@/lib/format'
 
+/** Que sale de la app al generar: la misma nota con «i» que el resto, en azul porque es de la IA. */
 export function PrivacyNote() {
   return (
-    <p className={styles.privacy}>
-      El enunciado, el equipo y las tareas se envian a DeepSeek para generar el plan. Nada se escribe en
+    <InfoNote tone="accent">
+      El enunciado, el equipo y las tareas se envían a DeepSeek para generar el plan. Nada se escribe en
       el tablero sin que lo confirmes.
-    </p>
+    </InfoNote>
   )
 }
 
 /**
- * Todo lo que hace falta para pedirle un plan a la IA, en una sola ventana
- * siempre visible: documento o descripcion escrita (una de las dos, no hace falta
- * abrir nada para elegir), el calendario, quien entra en el reparto y con que
- * datos, y el boton de generar. El resultado se pinta debajo, como children.
+ * Todo lo que hace falta para pedirle un plan a la IA, una tarjeta por cosa y
+ * todas a la vista: documento o descripcion escrita (una de las dos, no hace
+ * falta abrir nada para elegir), el calendario, quien entra en el reparto y
+ * con que datos, y el boton de generar. El resultado se pinta debajo, como
+ * children. Las tarjetas van en azul porque toda la pantalla es de la IA.
  */
 export function AiWorkbench({
   briefing,
@@ -87,124 +94,154 @@ export function AiWorkbench({
   const incluidos = team?.filter((person) => person.included) ?? []
   const sinEquipo = incluidos.length === 0
   const sinFechas = !startDate || !deadline
+  const calendarioAutomatico = Boolean(workspaceStartDate && workspaceDeadline)
 
   // Sin titulo propio: la pestana de arriba ya dice «Generar plan» y repetirlo
-  // dentro de la tarjeta solo gasta la primera pantalla sin decir nada nuevo.
+  // solo gasta la primera pantalla sin decir nada nuevo.
   return (
     <div className={styles.workbench}>
-      <div className={styles.context}>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".pdf,.docx,.txt,.md,.csv"
-          className={styles.hiddenInput}
-          onChange={(event) => onFile(event.target.files?.[0] ?? null)}
-        />
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,.docx,.txt,.md,.csv"
+        className={styles.hiddenInput}
+        onChange={(event) => onFile(event.target.files?.[0] ?? null)}
+      />
 
-        <div
-          className={[styles.drop, dragOver && styles.dropActive, file && styles.dropFilled]
-            .filter(Boolean)
-            .join(' ')}
-          role="button"
-          tabIndex={0}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(event) => event.key === 'Enter' && inputRef.current?.click()}
-          onDragOver={(event) => {
-            event.preventDefault()
-            setDragOver(true)
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(event) => {
-            event.preventDefault()
-            setDragOver(false)
-            const dropped = event.dataTransfer.files[0]
-            if (dropped) onFile(dropped)
-          }}
-        >
-          {file ? (
+      <CardGroup>
+        <Card
+          title="Documento de la actividad"
+          description="Sube el enunciado o documento para que se genere el plan."
+          aside={
             <>
-              <FileText size={15} strokeWidth={2.75} />
-              <span className={styles.dropName}>{file.name}</span>
-              <button
-                className={styles.dropClear}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onFile(null)
-                  if (inputRef.current) inputRef.current.value = ''
+              <div
+                className={[styles.drop, dragOver && styles.dropActive, file && styles.dropFilled]
+                  .filter(Boolean)
+                  .join(' ')}
+                role="button"
+                tabIndex={0}
+                onClick={() => inputRef.current?.click()}
+                onKeyDown={(event) => event.key === 'Enter' && inputRef.current?.click()}
+                onDragOver={(event) => {
+                  event.preventDefault()
+                  setDragOver(true)
                 }}
-                aria-label="Quitar el documento"
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  setDragOver(false)
+                  const dropped = event.dataTransfer.files[0]
+                  if (dropped) onFile(dropped)
+                }}
               >
-                <X size={13} strokeWidth={2.75} />
-              </button>
+                {file ? (
+                  <>
+                    <FileText size={15} strokeWidth={2} />
+                    <span className={styles.dropName}>{file.name}</span>
+                    <button
+                      className={styles.dropClear}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onFile(null)
+                        if (inputRef.current) inputRef.current.value = ''
+                      }}
+                      aria-label="Quitar el documento"
+                    >
+                      <X size={13} strokeWidth={2.75} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={18} strokeWidth={2} />
+                    <span className={styles.dropText}>
+                      Arrastra aquí el documento o pulsa para elegirlo
+                      <span className={styles.dropHint}>PDF, Word (.docx) o texto</span>
+                    </span>
+                  </>
+                )}
+              </div>
+              <Button variant="secondary" className={styles.pickButton} onClick={() => inputRef.current?.click()}>
+                <Upload size={14} strokeWidth={2.5} />
+                {file ? 'Cambiar archivo' : 'Seleccionar archivo'}
+              </Button>
             </>
-          ) : (
-            <>
-              <Upload size={15} strokeWidth={2.75} />
-              <span>
-                Arrastra aqui el documento de la actividad o pulsa para elegirlo
-                <span className={styles.dropHint}> · PDF, Word (.docx) o texto</span>
-              </span>
-            </>
-          )}
-        </div>
+          }
+        />
 
         {/* Alternativa al documento, no las dos a la vez: con archivo puesto no hace
             falta tambien escribir, y asi queda claro cual de las dos manda. */}
         {!file && (
-          <>
-            <p className={styles.orDivider}>o describe el trabajo a mano</p>
-            <textarea
-              className={styles.textarea}
-              rows={3}
-              value={text}
-              placeholder="Tenemos que hacer una practica de bases de datos: modelo E/R, script SQL y memoria de 10 paginas."
-              onChange={(event) => onText(event.target.value)}
-            />
-          </>
-        )}
-
-        {!file && !text.trim() && (
-          <p className={styles.sourceNote}>
-            {loading
-              ? 'Cargando el guion guardado en el proyecto…'
-              : briefing.trim()
-                ? 'Sin documento ni descripcion se usara el guion ya guardado en el proyecto.'
-                : 'Este proyecto no tiene guion guardado: sube un documento o describe el trabajo.'}
-          </p>
+          <Card
+            title="Descripción del trabajo"
+            description={
+              text.trim()
+                ? 'Cuéntanos qué tienes que hacer.'
+                : loading
+                  ? 'Cargando el guion guardado en el proyecto…'
+                  : briefing.trim()
+                    ? 'Si lo dejas vacío, se usará el guion ya guardado en el proyecto.'
+                    : 'Cuéntanos qué tienes que hacer, o sube un documento.'
+            }
+            aside={
+              <div className={styles.textareaWrap}>
+                <textarea
+                  className={styles.textarea}
+                  rows={2}
+                  value={text}
+                  placeholder="Tenemos que hacer una práctica de bases de datos: modelo E/R, script SQL y memoria de 10 páginas."
+                  aria-label="Descripción del trabajo"
+                  onChange={(event) => onText(event.target.value)}
+                />
+                <span className={styles.counter}>{text.length} caracteres</span>
+              </div>
+            }
+          />
         )}
 
         {/* Las fechas son lo primero que hace falta resolver, antes de generar nada:
             con las dos ya fijadas en el workspace el calendario es automatico; si
             falta alguna, se piden aqui mismo y no se genera hasta tenerlas. */}
-        {workspaceStartDate && workspaceDeadline ? (
-          <p className={styles.autoNote}>
-            <CalendarDays size={13} strokeWidth={2.5} />
-            Calendario automatico: de {formatDate(workspaceStartDate)} a {formatDate(workspaceDeadline)}, con
-            la duracion de sprint del espacio de trabajo.
-            <button type="button" className={styles.autoChange} onClick={onGoToSettings}>
-              Cambiar en Ajustes
-            </button>
-          </p>
-        ) : (
-          <DateFields startDate={startDate} deadline={deadline} onStartDate={onStartDate} onDeadline={onDeadline} />
-        )}
+        <Card
+          title={calendarioAutomatico ? 'Calendario automático' : 'Calendario del plan'}
+          description={
+            calendarioAutomatico
+              ? 'Se generará según la duración del sprint del espacio de trabajo.'
+              : 'El espacio de trabajo aún no tiene fechas: indica entre cuándo y cuándo repartir las tareas.'
+          }
+          aside={
+            calendarioAutomatico ? (
+              <>
+                <span className={styles.calendarRange}>
+                  <CalendarDays size={16} strokeWidth={2} />
+                  De {formatDate(workspaceStartDate)} a {formatDate(workspaceDeadline)}
+                </span>
+                <Button variant="secondary" onClick={onGoToSettings}>
+                  <Settings size={14} strokeWidth={2.5} />
+                  Cambiar en ajustes
+                </Button>
+              </>
+            ) : (
+              <DateFields startDate={startDate} deadline={deadline} onStartDate={onStartDate} onDeadline={onDeadline} />
+            )
+          }
+        />
 
-        <TeamEditor team={team} members={members} onTeam={onTeam} onSaveNotes={onSaveNotes} />
-
-        <div className={styles.contextFoot}>
-          <span className={styles.note}>
-            {team === undefined
-              ? 'Cargando el equipo…'
-              : sinEquipo
-                ? 'Incluye al menos a una persona en el reparto'
-                : `Se repartira entre ${incluidos.length} ${incluidos.length === 1 ? 'persona' : 'personas'}`}
-          </span>
-          <span className={styles.spacer} />
-          <Button onClick={onRun} disabled={running || loading || sinFuente || sinEquipo || sinFechas}>
-            {running ? 'Generando…' : 'Generar y repartir'}
-          </Button>
-        </div>
-      </div>
+        <TeamEditor team={team} members={members} onTeam={onTeam} onSaveNotes={onSaveNotes}>
+          <div className={styles.runFoot}>
+            <span className={styles.note}>
+              {team === undefined
+                ? 'Cargando el equipo…'
+                : sinEquipo
+                  ? 'Incluye al menos a una persona en el reparto'
+                  : `Se repartirá entre ${incluidos.length} ${incluidos.length === 1 ? 'persona' : 'personas'}`}
+            </span>
+            <Button variant="accent" onClick={onRun} disabled={running || loading || sinFuente || sinEquipo || sinFechas}>
+              <Sparkles size={14} strokeWidth={2.5} />
+              {running ? 'Generando…' : 'Generar y repartir'}
+            </Button>
+          </div>
+        </TeamEditor>
+      </CardGroup>
 
       {children}
     </div>
@@ -217,29 +254,34 @@ export function AiWorkbench({
  * Salen siempre del equipo real del workspace: aqui no se puede meter a nadie de
  * fuera, porque una tarea para alguien que no es miembro llegaria al tablero sin
  * responsable. Quitar a alguien no borra lo que se habia escrito de el: queda
- * aparte para volver a incluirlo. Nada de esto se guarda en su ficha de Miembros.
+ * aparte para volver a incluirlo. Nada de esto se guarda en su ficha de Miembros
+ * salvo que se pulse el check.
  */
 function TeamEditor({
   team,
   members,
   onTeam,
   onSaveNotes,
+  children,
 }: {
   team?: PlanTeamDraft[]
   members?: TeamMemberResponse[]
   onTeam: (team: PlanTeamDraft[]) => void
   onSaveNotes: (userId: number, preferences: string) => Promise<unknown>
+  /** Pie de la tarjeta: el recuento y el boton de generar. */
+  children?: ReactNode
 }) {
   const [guardandoId, setGuardandoId] = useState<number | null>(null)
-  if (!team) return null
 
   const cambiar = (userId: number, cambios: Partial<PlanTeamDraft>) =>
-    onTeam(team.map((person) => (person.userId === userId ? { ...person, ...cambios } : person)))
-  const incluidos = team.filter((person) => person.included)
-  const fuera = team.filter((person) => !person.included)
+    onTeam((team ?? []).map((person) => (person.userId === userId ? { ...person, ...cambios } : person)))
+  const incluidos = team?.filter((person) => person.included) ?? []
+  const fuera = team?.filter((person) => !person.included) ?? []
 
   /** Lo que ya hay guardado en la ficha de esa persona, para saber si ha cambiado. */
   const fichaDe = (userId: number) => members?.find((member) => member.user.id === userId)?.planNotes ?? ''
+  /** Para el avatar: la foto, si la tiene. */
+  const avatarDe = (userId: number) => members?.find((member) => member.user.id === userId)?.user.avatarUrl ?? null
 
   async function guardarFicha(userId: number, preferences: string) {
     setGuardandoId(userId)
@@ -251,59 +293,67 @@ function TeamEditor({
   }
 
   return (
-    <div className={styles.team}>
-      <span className={styles.teamTitle}>
-        <Users size={13} strokeWidth={2.75} />
-        Equipo para este reparto
-      </span>
+    <Card
+      title="Equipo para este reparto"
+      description="Define las preferencias de cada miembro del equipo."
+    >
+      {team && incluidos.length > 0 && (
+        <div className={styles.team}>
+          <div className={styles.teamHead} aria-hidden="true">
+            <span>Persona</span>
+            <span>Preferencias y restricciones</span>
+            <span />
+          </div>
 
-      {incluidos.length > 0 && (
-        <div className={styles.teamHead} aria-hidden="true">
-          <span>Persona</span>
-          <span>Preferencias y restricciones</span>
-          <span />
-        </div>
-      )}
-
-      {incluidos.map((person) => {
-        const guardada = fichaDe(person.userId)
-        const cambiado = person.preferences.trim() !== guardada.trim()
-        return (
-          <div key={person.userId} className={styles.teamRow}>
-            <span className={styles.teamName}>{person.name}</span>
-            <div className={styles.prefCell}>
-              <input
-                className={styles.input}
-                value={person.preferences}
-                placeholder="Prefiere backend; menos horas esta vez; vacaciones la semana 3…"
-                aria-label={`Preferencias de ${person.name}`}
-                maxLength={600}
-                onChange={(event) => cambiar(person.userId, { preferences: event.target.value })}
-              />
-              {cambiado && (
+          {incluidos.map((person) => {
+            const guardada = fichaDe(person.userId)
+            const cambiado = person.preferences.trim() !== guardada.trim()
+            return (
+              <div key={person.userId} className={styles.teamRow}>
+                <span className={styles.teamPerson}>
+                  <Avatar
+                    user={{ id: person.userId, fullName: person.name }}
+                    avatarUrl={avatarDe(person.userId)}
+                    size={28}
+                  />
+                  <span className={styles.teamName}>{person.name}</span>
+                </span>
+                <div className={styles.prefCell}>
+                  <input
+                    className={styles.input}
+                    value={person.preferences}
+                    placeholder="Prefiere backend; menos horas esta vez; vacaciones la semana 3…"
+                    aria-label={`Preferencias de ${person.name}`}
+                    maxLength={600}
+                    onChange={(event) => cambiar(person.userId, { preferences: event.target.value })}
+                  />
+                  {cambiado && (
+                    <button
+                      type="button"
+                      className={styles.prefSave}
+                      disabled={guardandoId === person.userId}
+                      aria-label={`Guardar las preferencias de ${person.name} en su ficha`}
+                      title="Guardar en su ficha: valdrá para los próximos planes"
+                      onClick={() => guardarFicha(person.userId, person.preferences)}
+                    >
+                      <Check size={13} strokeWidth={2.75} />
+                    </button>
+                  )}
+                </div>
                 <button
                   type="button"
-                  className={styles.prefSave}
-                  disabled={guardandoId === person.userId}
-                  aria-label={`Guardar las preferencias de ${person.name} en su ficha`}
-                  title="Guardar en su ficha: valdra para los proximos planes"
-                  onClick={() => guardarFicha(person.userId, person.preferences)}
+                  className={styles.teamRemove}
+                  aria-label={`Quitar a ${person.name} de este reparto`}
+                  title="Quitar de este reparto"
+                  onClick={() => cambiar(person.userId, { included: false })}
                 >
-                  <Check size={13} strokeWidth={2.75} />
+                  <X size={14} strokeWidth={2.5} />
                 </button>
-              )}
-            </div>
-            <button
-              type="button"
-              className={styles.teamRemove}
-              aria-label={`Quitar a ${person.name} de este reparto`}
-              onClick={() => cambiar(person.userId, { included: false })}
-            >
-              <X size={13} strokeWidth={2.75} />
-            </button>
-          </div>
-        )
-      })}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {fuera.length > 0 && (
         <div className={styles.teamOut}>
@@ -321,11 +371,55 @@ function TeamEditor({
         </div>
       )}
 
-      <span className={styles.optional}>
-        Las preferencias son la ficha de cada persona —el rol incluido, y si tiene menos o mas
-        tiempo que de costumbre esta vez—: pulsa <Check size={11} strokeWidth={2.75} /> para
-        guardarlas y que valgan tambien en los proximos planes.
-      </span>
+      <InfoNote tone="accent">
+        Las preferencias son la <b>ficha de cada persona</b> —el rol incluido, y si tiene menos o más
+        tiempo que de costumbre esta vez—; pulsa <Check size={12} strokeWidth={2.75} /> para guardarlas y
+        que valgan también en los próximos planes.
+      </InfoNote>
+
+      {children}
+    </Card>
+  )
+}
+
+/**
+ * Fecha de inicio y de fin del plan, lo primero que hace falta resolver antes
+ * de poder generar nada: sin las dos, no se sabe entre que ventana repartir
+ * las tareas y habria que adivinar (y luego regenerar si la adivinanza
+ * fallaba, una segunda llamada entera al modelo). Siempre editables, aunque
+ * vengan prerellenas de lo detectado en el documento.
+ */
+function DateFields({
+  startDate,
+  deadline,
+  onStartDate,
+  onDeadline,
+}: {
+  startDate: string
+  deadline: string
+  onStartDate: (value: string) => void
+  onDeadline: (value: string) => void
+}) {
+  return (
+    <div className={styles.dates}>
+      <label className={styles.label}>
+        Fecha de inicio
+        <DateInput
+          className={styles.input}
+          value={startDate}
+          onChange={onStartDate}
+        />
+        {!startDate && <span className={styles.dateMissing}>Falta la fecha de inicio</span>}
+      </label>
+      <label className={styles.label}>
+        Fecha de fin
+        <DateInput
+          className={styles.input}
+          value={deadline}
+          onChange={onDeadline}
+        />
+        {!deadline && <span className={styles.dateMissing}>Falta la fecha de fin</span>}
+      </label>
     </div>
   )
 }
@@ -364,53 +458,9 @@ export function WorkloadSummary({ workload }: { workload: MemberWorkload[] }) {
         <span className={styles.workloadNote}>
           {total < workload.length
             ? `Han salido ${total} ${total === 1 ? 'tarea' : 'tareas'} para ${workload.length} personas: no alcanzan para todos.`
-            : 'Alguien se queda sin tarea porque las propuestas no se pueden dividir mas.'}
+            : 'Alguien se queda sin tarea porque las propuestas no se pueden dividir más.'}
         </span>
       )}
-    </div>
-  )
-}
-
-/**
- * Fecha de inicio y de fin del plan, lo primero que hace falta resolver antes
- * de poder generar nada: sin las dos, no se sabe entre que ventana repartir
- * las tareas y habria que adivinar (y luego regenerar si la adivinanza
- * fallaba, una segunda llamada entera al modelo). Siempre editables, aunque
- * vengan prerellenas de lo detectado en el documento.
- */
-function DateFields({
-  startDate,
-  deadline,
-  onStartDate,
-  onDeadline,
-}: {
-  startDate: string
-  deadline: string
-  onStartDate: (value: string) => void
-  onDeadline: (value: string) => void
-}) {
-  return (
-    <div className={styles.dates}>
-      <label className={styles.label}>
-        Fecha de inicio
-        <input
-          type="date"
-          className={styles.input}
-          value={startDate}
-          onChange={(event) => onStartDate(event.target.value)}
-        />
-        {!startDate && <span className={styles.dateMissing}>Falta la fecha de inicio</span>}
-      </label>
-      <label className={styles.label}>
-        Fecha de fin
-        <input
-          type="date"
-          className={styles.input}
-          value={deadline}
-          onChange={(event) => onDeadline(event.target.value)}
-        />
-        {!deadline && <span className={styles.dateMissing}>Falta la fecha de fin</span>}
-      </label>
     </div>
   )
 }
@@ -437,7 +487,7 @@ function ProposedTaskRow({
         <Check size={13} strokeWidth={2.75} />
       </span>
       <span>
-        <span className={styles.rowTitle}>{task.title}</span>
+        <span className={styles.rowTitle}><BreakableText>{task.title}</BreakableText></span>
         <span className={styles.rowType} style={{ '--tipo': tipo.color } as React.CSSProperties}>
           <span className={styles.rowTypeDot} aria-hidden="true" />
           {tipo.label}
@@ -483,6 +533,7 @@ export function ProposalPanel({
   onRegenerate,
   applying,
   model,
+  children,
 }: {
   tasks: ProposedTask[]
   sprints: PlannedSprint[]
@@ -492,6 +543,8 @@ export function ProposalPanel({
   onRegenerate: () => void
   applying: boolean
   model: string
+  /** Lo que se lee antes de las tareas: de donde sale el plan, avisos y reparto. */
+  children?: ReactNode
 }) {
   const conIndice = tasks.map((task, index) => ({ task, index }))
   const numeros = new Set(sprints.map((sprint) => sprint.number))
@@ -508,57 +561,55 @@ export function ProposalPanel({
   )
 
   return (
-    <div className={styles.proposal}>
-      <header className={styles.proposalHead}>
-        <h3 className={styles.proposalTitle}>
-          Propuesta: {tasks.length} tareas en {sprints.length} {sprints.length === 1 ? 'sprint' : 'sprints'}
-        </h3>
-        <span className={styles.note}>
-          {selected.length} seleccionadas · modelo {model}
-        </span>
-      </header>
+    <CardGroup>
+      <Card
+        title={`Propuesta: ${tasks.length} tareas en ${sprints.length} ${sprints.length === 1 ? 'sprint' : 'sprints'}`}
+        description={`${selected.length} seleccionadas · modelo ${model}. Marca o desmarca antes de llevarlas al tablero.`}
+      >
+        {children}
 
-      {sprints.map((sprint) => {
-        const suyas = conIndice.filter(({ task }) => task.sprint === sprint.number)
-        return (
-          <section key={sprint.number} className={styles.sprint}>
+        {sprints.map((sprint) => {
+          const suyas = conIndice.filter(({ task }) => task.sprint === sprint.number)
+          return (
+            <section key={sprint.number} className={styles.sprint}>
+              <header className={styles.sprintHead}>
+                <span className={styles.sprintTitle}>Sprint {sprint.number}</span>
+                <span className={styles.sprintDates}>
+                  <CalendarDays size={11} strokeWidth={2} />
+                  {sprintDates(sprint)}
+                </span>
+                <span className={styles.note}>{suyas.length} {suyas.length === 1 ? 'tarea' : 'tareas'}</span>
+              </header>
+              {sprint.goal && <p className={styles.sprintGoal}>{sprint.goal}</p>}
+              <div className={styles.proposalRows}>
+                {suyas.length === 0
+                  ? <span className={styles.note}>Sin tareas en este sprint.</span>
+                  : suyas.map(fila)}
+              </div>
+            </section>
+          )
+        })}
+
+        {sueltas.length > 0 && (
+          <section className={styles.sprint}>
             <header className={styles.sprintHead}>
-              <span className={styles.sprintTitle}>Sprint {sprint.number}</span>
-              <span className={styles.sprintDates}>
-                <CalendarDays size={11} strokeWidth={2} />
-                {sprintDates(sprint)}
-              </span>
-              <span className={styles.note}>{suyas.length} {suyas.length === 1 ? 'tarea' : 'tareas'}</span>
+              <span className={styles.sprintTitle}>Sin sprint</span>
             </header>
-            {sprint.goal && <p className={styles.sprintGoal}>{sprint.goal}</p>}
-            <div className={styles.proposalRows}>
-              {suyas.length === 0
-                ? <span className={styles.note}>Sin tareas en este sprint.</span>
-                : suyas.map(fila)}
-            </div>
+            <div className={styles.proposalRows}>{sueltas.map(fila)}</div>
           </section>
-        )
-      })}
+        )}
 
-      {sueltas.length > 0 && (
-        <section className={styles.sprint}>
-          <header className={styles.sprintHead}>
-            <span className={styles.sprintTitle}>Sin sprint</span>
-          </header>
-          <div className={styles.proposalRows}>{sueltas.map(fila)}</div>
-        </section>
-      )}
-
-      <div className={styles.proposalFoot}>
-        <Button onClick={onApply} disabled={selected.length === 0 || applying}>
-          {applying ? 'Anadiendo…' : 'Anadir al tablero'}
-        </Button>
-        <Button variant="secondary" onClick={onRegenerate} disabled={applying}>
-          Regenerar
-        </Button>
-        <span className={styles.note}>Se crearan en la primera columna, cada una con su responsable</span>
-      </div>
-    </div>
+        <div className={styles.proposalFoot}>
+          <Button onClick={onApply} disabled={selected.length === 0 || applying}>
+            {applying ? 'Añadiendo…' : 'Añadir al tablero'}
+          </Button>
+          <Button variant="secondary" onClick={onRegenerate} disabled={applying}>
+            Regenerar
+          </Button>
+          <span className={styles.note}>Se crearán en la primera columna, cada una con su responsable</span>
+        </div>
+      </Card>
+    </CardGroup>
   )
 }
 
@@ -603,7 +654,7 @@ export function AppliedTasksSummary({ titles }: { titles: string[] }) {
       >
         <CheckCircle2 size={16} strokeWidth={2.75} />
         <span>
-          {titles.length} {titles.length === 1 ? 'tarea anadida' : 'tareas anadidas'} al tablero
+          {titles.length} {titles.length === 1 ? 'tarea añadida' : 'tareas añadidas'} al tablero
         </span>
         <ChevronDown className={[styles.appliedChevron, expanded && styles.appliedChevronOpen]
           .filter(Boolean).join(' ')} size={14} strokeWidth={2.75} />
@@ -625,7 +676,7 @@ export function AiErrorCard({ message, onRetry }: { message: string; onRetry: ()
     <div className={styles.error}>
       <span className={styles.errorHead}>
         <AlertCircle size={14} strokeWidth={2.75} />
-        No se ha podido generar la planificacion
+        No se ha podido generar la planificación
       </span>
       <p className={styles.errorBody}>{message}</p>
       <Button variant="secondary" small onClick={onRetry}>

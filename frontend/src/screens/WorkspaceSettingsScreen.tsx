@@ -4,6 +4,7 @@ import { Pencil, Trash2 } from 'lucide-react'
 import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
 import { WorkspaceFormModal } from '@/components/workspace/WorkspaceFormModal'
 import { Button } from '@/components/ui/Button'
+import { Card, CardGroup } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
@@ -41,13 +42,14 @@ export function WorkspaceSettingsScreen() {
       {isPending || !workspace ? (
         <Skeleton label="Cargando los ajustes…" lines={3} />
       ) : (
-        <div className={styles.layout}>
+        <CardGroup>
           <Section
             title="Datos del espacio de trabajo"
+            subtitle="Nombre, fechas y duración de los sprints."
             action={
               manageable && (
-                <Button small variant="secondary" onClick={() => setEditOpen(true)}>
-                  <Pencil size={13} strokeWidth={2.75} />
+                <Button variant="secondary" onClick={() => setEditOpen(true)}>
+                  <Pencil size={14} strokeWidth={2.5} />
                   Editar
                 </Button>
               )
@@ -59,8 +61,8 @@ export function WorkspaceSettingsScreen() {
                 <dd>{workspace.name}</dd>
               </div>
               <div>
-                <dt>Descripcion</dt>
-                <dd>{workspace.description || 'Sin descripcion'}</dd>
+                <dt>Descripción</dt>
+                <dd>{workspace.description || 'Sin descripción'}</dd>
               </div>
               <div>
                 <dt>Empieza</dt>
@@ -71,7 +73,7 @@ export function WorkspaceSettingsScreen() {
                 <dd className={styles.measured}>{workspace.deadline ? formatDate(workspace.deadline) : 'Sin fecha'}</dd>
               </div>
               <div>
-                <dt>Duracion del sprint</dt>
+                <dt>Duración del sprint</dt>
                 <dd className={styles.measured}>{(workspace.sprintDays ?? DEFAULT_SPRINT_DAYS) / 7} semanas</dd>
               </div>
               <div>
@@ -83,33 +85,37 @@ export function WorkspaceSettingsScreen() {
             </dl>
           </Section>
 
-          <Section title="Actividad reciente">
+          <Section title="Actividad reciente" subtitle="Los últimos cambios del equipo en el tablero.">
             {activity && activity.content.length > 0 ? (
               <ActivityFeed items={activity.content.slice(0, 8)} />
             ) : (
-              <EmptyState title="Sin actividad" body="Aqui apareceran los cambios del grupo." />
+              <EmptyState title="Sin actividad" body="Aquí aparecerán los cambios del grupo." />
             )}
           </Section>
 
           {manageable && (
-            <div className={styles.danger}>
-              <ConfirmDialog
-                trigger={
-                  <Button variant="secondary" small>
-                    <Trash2 size={13} strokeWidth={2.75} />
-                    Borrar este espacio de trabajo
-                  </Button>
-                }
-                title={`Borrar «${workspace.name}»`}
-                description="Se borraran su tablero, sus tareas, sus comentarios y sus ficheros. No se puede deshacer."
-                onConfirm={async () => {
-                  await mutations.remove.mutateAsync()
-                  navigate(ROUTES.workspaces)
-                }}
-              />
-            </div>
+            <Card
+              title="Borrar este espacio de trabajo"
+              description="Se borran su tablero, sus tareas, sus comentarios y su historial. No se puede deshacer."
+              aside={
+                <ConfirmDialog
+                  trigger={
+                    <Button variant="secondary">
+                      <Trash2 size={14} strokeWidth={2.5} />
+                      Borrar
+                    </Button>
+                  }
+                  title={`Borrar «${workspace.name}»`}
+                  description="Se borrarán su tablero, sus tareas, sus comentarios y su historial. No se puede deshacer."
+                  onConfirm={async () => {
+                    await mutations.remove.mutateAsync()
+                    navigate(ROUTES.workspaces)
+                  }}
+                />
+              }
+            />
           )}
-        </div>
+        </CardGroup>
       )}
 
       <WorkspaceFormModal

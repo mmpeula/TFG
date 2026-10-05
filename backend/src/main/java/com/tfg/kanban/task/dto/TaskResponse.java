@@ -17,7 +17,7 @@ import java.util.List;
          "columnId":11,"columnName":"En curso","boardId":3,"projectId":5,
          "assignees":[{"id":2,"fullName":"Luis Perez","email":"luis@uni.es"}],
          "createdBy":{"id":1,"fullName":"Ana Garcia","email":"ana@uni.es"},
-         "commentCount":2,"attachmentCount":1,
+         "commentCount":2,
          "createdAt":"2026-08-21T10:15:30Z","updatedAt":"2026-08-21T11:00:00Z"}
         """)
 public record TaskResponse(
@@ -38,12 +38,11 @@ public record TaskResponse(
         @Schema(description = "Miembros del equipo responsables; vacio si no tiene ninguno") List<UserSummary> assignees,
         UserSummary createdBy,
         long commentCount,
-        long attachmentCount,
         Instant createdAt,
         Instant updatedAt
 ) {
 
-    public static TaskResponse from(Task task, long commentCount, long attachmentCount) {
+    public static TaskResponse from(Task task, long commentCount) {
         var column = task.getBoardColumn();
         return new TaskResponse(
                 task.getId(), task.getTitle(), task.getDescription(), task.getPosition(),
@@ -52,6 +51,6 @@ public record TaskResponse(
                 task.isAiGenerated(), column.getId(), column.getName(), column.getBoard().getId(),
                 column.getBoard().getProject().getId(),
                 UserSummary.fromAll(task.getAssignees()), UserSummary.from(task.getCreatedBy()),
-                commentCount, attachmentCount, task.getCreatedAt(), task.getUpdatedAt());
+                commentCount, task.getCreatedAt(), task.getUpdatedAt());
     }
 }

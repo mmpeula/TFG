@@ -24,7 +24,7 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
                        AccessDeniedException accessDeniedException) throws IOException {
 
         ApiError body = ApiError.of(HttpStatus.FORBIDDEN.value(), HttpStatus.FORBIDDEN.getReasonPhrase(),
-                "FORBIDDEN", "No tienes permisos para realizar esta accion", request.getRequestURI());
+                "FORBIDDEN", "No tienes permisos para realizar esta acción", request.getRequestURI());
 
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

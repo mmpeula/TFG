@@ -42,6 +42,7 @@ public class TeamService {
     public TeamMemberResponse updateMemberRole(Long teamId, Long userId, UpdateMemberRoleRequest request) {
         TeamMember member = getMember(teamId, userId);
         Role role = TeamRoles.ensureTeamRole(request.role());
+        TeamRoles.ensureDocenteRoleUnchanged(member.getRole(), role);
         TeamRoles.ensureRoleMatchesAccount(member.getUser(), role);
 
         if (member.getRole() == Role.RESPONSABLE && role != Role.RESPONSABLE) {
@@ -108,7 +109,7 @@ public class TeamService {
                 .min(Comparator.comparing(TeamMember::getId))
                 .map(TeamMember::getUser)
                 .orElseThrow(() -> new BusinessRuleException(
-                        "Eres la unica persona responsable: nombra a otra antes de salirte del equipo"));
+                        "Eres la única persona responsable: nombra a otra antes de salirte del equipo"));
     }
 
     public Team getTeam(Long teamId) {
@@ -125,7 +126,7 @@ public class TeamService {
     private void ensureNotLastResponsable(Long teamId) {
         if (teamMemberRepository.countByTeam_IdAndRole(teamId, Role.RESPONSABLE) <= 1) {
             throw new BusinessRuleException(
-                    "El equipo se quedaria sin responsable: nombra antes a otra persona responsable");
+                    "El equipo se quedaría sin responsable: nombra antes a otra persona responsable");
         }
     }
 

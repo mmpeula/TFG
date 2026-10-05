@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Guarda los adjuntos en el sistema de ficheros local (un volumen de Docker en
+ * Guarda las fotos de perfil y de los espacios en el sistema de ficheros local (un volumen de Docker en
  * despliegue). No se usa S3 ni ningun servicio externo: el TFG no lo necesita.
  *
  * <p>Los ficheros se guardan con un nombre aleatorio, de forma que el nombre que
@@ -50,33 +50,16 @@ public class FileStorageService {
         try {
             root = Paths.get(properties.getUploadDir()).toAbsolutePath().normalize();
             Files.createDirectories(root);
-            log.info("Directorio de adjuntos: {}", root);
+            log.info("Directorio de ficheros subidos: {}", root);
         } catch (IOException ex) {
-            throw new UncheckedIOException("No se ha podido crear el directorio de adjuntos", ex);
+            throw new UncheckedIOException("No se ha podido crear el directorio de ficheros subidos", ex);
         }
-    }
-
-    /** Valida y guarda el fichero; devuelve el nombre con el que se ha almacenado. */
-    public String store(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new BusinessRuleException("El fichero esta vacio");
-        }
-        if (file.getSize() > properties.getMaxFileSize()) {
-            throw new BusinessRuleException("El fichero supera el tamano maximo permitido (%d MB)"
-                    .formatted(properties.getMaxFileSize() / (1024 * 1024)));
-        }
-        String contentType = file.getContentType();
-        if (contentType == null || !properties.getAllowedContentTypes().contains(contentType)) {
-            throw new BusinessRuleException("Tipo de fichero no permitido: " + contentType);
-        }
-
-        return write(file, UUID.randomUUID() + extensionOf(file.getOriginalFilename()));
     }
 
     private String write(MultipartFile file, String storedName) {
         Path destination = root.resolve(storedName).normalize();
         if (!destination.getParent().equals(root)) {
-            throw new BusinessRuleException("Ruta de destino invalida");
+            throw new BusinessRuleException("Ruta de destino inválida");
         }
 
         try (var input = file.getInputStream()) {
@@ -98,10 +81,10 @@ public class FileStorageService {
      */
     public StoredImage storeImage(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new BusinessRuleException("El fichero esta vacio");
+            throw new BusinessRuleException("El fichero está vacío");
         }
         if (file.getSize() > properties.getMaxFileSize()) {
-            throw new BusinessRuleException("La imagen supera el tamano maximo permitido (%d MB)"
+            throw new BusinessRuleException("La imagen supera el tamaño máximo permitido (%d MB)"
                     .formatted(properties.getMaxFileSize() / (1024 * 1024)));
         }
         String detected;
@@ -121,11 +104,11 @@ public class FileStorageService {
         try {
             Path file = root.resolve(storedName).normalize();
             if (!file.getParent().equals(root)) {
-                throw new BusinessRuleException("Ruta de fichero invalida");
+                throw new BusinessRuleException("Ruta de fichero inválida");
             }
             Resource resource = new UrlResource(file.toUri());
             if (!resource.exists() || !resource.isReadable()) {
-                throw new ResourceNotFoundException("El fichero ya no esta disponible en el servidor");
+                throw new ResourceNotFoundException("El fichero ya no está disponible en el servidor");
             }
             return resource;
         } catch (IOException ex) {
@@ -144,17 +127,12 @@ public class FileStorageService {
         }
     }
 
-    /** Nombre original saneado, para usarlo en la cabecera de descarga. */
+    /** Nombre original saneado, sin ruta, comillas ni saltos de linea: se usa al leer un documento subido. */
     public static String cleanFilename(String originalFilename) {
         String name = StringUtils.getFilename(originalFilename);
         if (!StringUtils.hasText(name)) {
-            return "adjunto";
+            return "documento";
         }
         return name.replaceAll("[\\r\\n\"]", "").trim();
-    }
-
-    private String extensionOf(String originalFilename) {
-        String extension = StringUtils.getFilenameExtension(originalFilename);
-        return StringUtils.hasText(extension) ? "." + extension.toLowerCase() : "";
     }
 }

@@ -36,8 +36,8 @@ export function PulseScreen() {
         <Skeleton label="Calculando el pulso del proyecto…" lines={4} />
       ) : !hasTasks ? (
         <EmptyState
-          title="Todavia no hay datos que medir"
-          body="En cuanto el tablero tenga tareas, aqui apareceran el progreso, la velocidad, el tiempo de ciclo y los insights."
+          title="Todavía no hay datos que medir"
+          body="En cuanto el tablero tenga tareas, aquí aparecerán el progreso, la velocidad, el tiempo de ciclo y los insights."
         />
       ) : (
         <>
@@ -65,7 +65,7 @@ export function PulseScreen() {
           </div>
 
           <div className={styles.split}>
-            <BarChart series={pulse.weekly} title="Evolucion temporal" />
+            <BarChart series={pulse.weekly} title="Evolución temporal" />
             <div className={styles.side}>
               <DistributionBars title="Por estado" rows={pulse.byStatus} />
               {pulse.byPriority.length > 0 && (
@@ -75,6 +75,7 @@ export function PulseScreen() {
           </div>
 
           <Section
+            plain
             title="Insights inteligentes"
             subtitle="calculados a partir de la actividad real del tablero"
           >

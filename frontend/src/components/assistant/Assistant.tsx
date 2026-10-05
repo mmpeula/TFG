@@ -49,7 +49,7 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
     onError: (err) => {
       const status = axios.isAxiosError(err) ? err.response?.status : undefined
       const content = status === 503
-        ? `${toErrorMessage(err)} Revisa la conexion con DeepSeek y su API key.`
+        ? `${toErrorMessage(err)} Revisa la conexión con DeepSeek y su API key.`
         : toErrorMessage(err)
       append(workspaceId, { role: 'assistant', content, error: true })
     },
@@ -91,7 +91,7 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
             <Chat
               messages={messages}
               pending={ask.isPending}
-              placeholder={activeTask ? `Preguntale algo sobre «${activeTask.title}»…` : undefined}
+              placeholder={activeTask ? `Pregúntale algo sobre «${activeTask.title}»…` : undefined}
               onSend={send}
               onReset={() => reset(workspaceId)}
             />

@@ -67,7 +67,7 @@ public class UserController {
 
     @Operation(summary = "Deshabilitar una cuenta",
             description = "Baja logica: la cuenta deja de poder acceder pero se conserva su historial. "
-                    + "No se puede dar de baja al unico administrador habilitado.")
+                    + "No se puede dar de baja al único administrador habilitado.")
     @ApiResponses(@ApiResponse(responseCode = "204", description = "Cuenta deshabilitada"))
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")

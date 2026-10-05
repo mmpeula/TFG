@@ -12,12 +12,12 @@ import jakarta.validation.constraints.Size;
 public record RegisterRequest(
 
         @NotBlank(message = "el email es obligatorio")
-        @Email(message = "el email no tiene un formato valido")
+        @Email(message = "el email no tiene un formato válido")
         @Size(max = 180)
         String email,
 
-        @NotBlank(message = "la contrasena es obligatoria")
-        @Size(min = 8, max = 72, message = "la contrasena debe tener entre 8 y 72 caracteres")
+        @NotBlank(message = "la contraseña es obligatoria")
+        @Size(min = 8, max = 72, message = "la contraseña debe tener entre 8 y 72 caracteres")
         String password,
 
         @NotBlank(message = "el nombre es obligatorio")

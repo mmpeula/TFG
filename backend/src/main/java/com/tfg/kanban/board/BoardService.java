@@ -1,8 +1,6 @@
 package com.tfg.kanban.board;
 
-import com.tfg.kanban.activity.ActivityService;
 import com.tfg.kanban.board.dto.*;
-import com.tfg.kanban.common.BusinessRuleException;
 import com.tfg.kanban.common.ResourceNotFoundException;
 import com.tfg.kanban.domain.model.*;
 import com.tfg.kanban.domain.repository.BoardColumnRepository;
@@ -22,7 +20,9 @@ import java.util.stream.Collectors;
 
 /**
  * El tablero de cada workspace y sus columnas. El tablero nace con su workspace
- * (ver {@link DefaultBoard}); aqui se lee y se editan sus columnas.
+ * (ver {@link DefaultBoard}) con tres columnas fijas —Por hacer, En progreso y
+ * Hecho— que no se crean, editan ni borran: aqui solo se leen. Todo lo demas
+ * (el plan, las senales, «hecha» = ultima columna) cuenta con esas tres.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,7 +33,6 @@ public class BoardService {
     private final BoardColumnRepository columnRepository;
     private final TaskRepository taskRepository;
     private final TeamMemberRepository teamMemberRepository;
-    private final ActivityService activityService;
     private final TaskMapper taskMapper;
 
     public List<BoardResponse> findByProject(Long projectId) {
@@ -59,66 +58,6 @@ public class BoardService {
         return BoardResponse.detail(board, roleInBoard(board), columnResponses);
     }
 
-    @Transactional
-    public ColumnResponse createColumn(Long boardId, ColumnRequest request) {
-        Board board = getBoard(boardId);
-        int position = (int) columnRepository.countByBoard_Id(boardId);
-
-        BoardColumn column = columnRepository.save(BoardColumn.builder()
-                .board(board)
-                .name(request.name().trim())
-                .wipLimit(request.wipLimit())
-                .position(position)
-                .build());
-
-        activityService.record(board.getProject(), ActivityAction.CREACION, "BoardColumn", column.getId(),
-                "Creo la columna '%s'".formatted(column.getName()));
-
-        return ColumnResponse.summary(column, 0);
-    }
-
-    @Transactional
-    public ColumnResponse updateColumn(Long columnId, ColumnRequest request) {
-        BoardColumn column = getColumn(columnId);
-        long tasks = taskRepository.countByBoardColumn_Id(columnId);
-
-        if (request.wipLimit() != null && tasks > request.wipLimit()) {
-            throw new BusinessRuleException(
-                    "La columna tiene %d tareas, mas que el limite WIP solicitado (%d)"
-                            .formatted(tasks, request.wipLimit()));
-        }
-
-        column.setName(request.name().trim());
-        column.setWipLimit(request.wipLimit());
-
-        activityService.record(column.getBoard().getProject(), ActivityAction.ACTUALIZACION,
-                "BoardColumn", column.getId(), "Actualizo la columna '%s'".formatted(column.getName()));
-
-        return ColumnResponse.summary(column, (int) tasks);
-    }
-
-    @Transactional
-    public void deleteColumn(Long columnId) {
-        BoardColumn column = getColumn(columnId);
-        Long boardId = column.getBoard().getId();
-
-        if (taskRepository.countByBoardColumn_Id(columnId) > 0) {
-            throw new BusinessRuleException(
-                    "La columna tiene tareas; muevelas o borralas antes de eliminar la columna");
-        }
-        if (columnRepository.countByBoard_Id(boardId) <= 1) {
-            throw new BusinessRuleException("El tablero debe tener al menos una columna");
-        }
-
-        activityService.record(column.getBoard().getProject(), ActivityAction.BORRADO,
-                "BoardColumn", column.getId(), "Borro la columna '%s'".formatted(column.getName()));
-
-        columnRepository.delete(column);
-        reindex(columnRepository.findByBoard_IdOrderByPositionAsc(boardId).stream()
-                .filter(item -> !item.getId().equals(columnId))
-                .toList());
-    }
-
     public Board getBoard(Long boardId) {
         return boardRepository.findById(boardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tablero", boardId));
@@ -127,12 +66,6 @@ public class BoardService {
     public BoardColumn getColumn(Long columnId) {
         return columnRepository.findById(columnId)
                 .orElseThrow(() -> new ResourceNotFoundException("Columna", columnId));
-    }
-
-    private void reindex(List<BoardColumn> columns) {
-        for (int i = 0; i < columns.size(); i++) {
-            columns.get(i).setPosition(i);
-        }
     }
 
     private Role roleInBoard(Board board) {

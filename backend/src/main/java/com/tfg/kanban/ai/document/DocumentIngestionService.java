@@ -101,10 +101,10 @@ public class DocumentIngestionService {
 
         if (!properties.getDocument().isVisionEnabled()) {
             if (!scanned.isEmpty()) {
-                throw new BusinessRuleException(("El documento tiene %d paginas sin texto (escaneadas) y el analisis "
-                        + "visual esta desactivado en el servidor. Sube una version con texto.").formatted(scanned.size()));
+                throw new BusinessRuleException(("El documento tiene %d páginas sin texto (escaneadas) y el análisis "
+                        + "visual está desactivado en el servidor. Sube una versión con texto.").formatted(scanned.size()));
             }
-            warnings.add("Se han omitido %d imagenes o tablas dificiles porque el analisis visual esta desactivado."
+            warnings.add("Se han omitido %d imágenes o tablas difíciles porque el análisis visual está desactivado."
                     .formatted(optional.size()));
             return List.of();
         }
@@ -119,7 +119,7 @@ public class DocumentIngestionService {
             String unread = scanned.stream().map(VisualCandidate::page).filter(page -> !read.contains(page))
                     .map(String::valueOf).collect(Collectors.joining(", "));
             if (!unread.isBlank()) {
-                warnings.add("No se ha podido leer el contenido de las paginas: " + unread + ".");
+                warnings.add("No se ha podido leer el contenido de las páginas: " + unread + ".");
             }
         }
         // Una imagen o una tabla dudosa si: el documento ya tiene su texto, esto solo lo mejora.
@@ -128,7 +128,7 @@ public class DocumentIngestionService {
                 findings.addAll(visionAnalyzer.analyze(optional));
             } catch (AiUnavailableException ex) {
                 log.warn("Vision opcional fallida: {}", ex.getMessage());
-                warnings.add("No se han podido analizar las imagenes del documento: " + ex.getMessage());
+                warnings.add("No se han podido analizar las imágenes del documento: " + ex.getMessage());
             }
         }
         return findings;
@@ -153,7 +153,7 @@ public class DocumentIngestionService {
             ExtractedTable table = raw.tables().get(i);
             if (tablesChars + table.markdown().length() > config.getMaxTablesChars()) {
                 text = text.replace("[Tabla %d]".formatted(i + 1), "[Tabla %d omitida por longitud]".formatted(i + 1));
-                warnings.add("La tabla %d se ha omitido: las tablas ya ocupaban el maximo.".formatted(i + 1));
+                warnings.add("La tabla %d se ha omitido: las tablas ya ocupaban el máximo.".formatted(i + 1));
                 // Las siguientes mantienen su numero, asi que el hueco se rellena con un marcador.
                 tables.add(new ExtractedTable(table.page(), "(omitida por longitud)"));
                 continue;
@@ -186,14 +186,14 @@ public class DocumentIngestionService {
         if (useful >= MIN_USEFUL_CHARS) return;
 
         if (raw.pages() > 0 && raw.blankPages() == raw.pages()) {
-            throw new BusinessRuleException("El documento tiene %d paginas y todas estan en blanco".formatted(raw.pages()));
+            throw new BusinessRuleException("El documento tiene %d páginas y todas están en blanco".formatted(raw.pages()));
         }
         boolean hadVisuals = raw.visuals().stream().anyMatch(v -> v.kind() == VisualCandidate.Kind.SCANNED_PAGE);
         if (hadVisuals) {
             throw new BusinessRuleException("El documento parece escaneado y el modelo no ha podido leer su contenido. "
-                    + "Prueba con una version de mas calidad o con texto seleccionable.");
+                    + "Prueba con una versión de más calidad o con texto seleccionable.");
         }
         throw new BusinessRuleException(
-                "El documento no contiene texto legible ni imagenes con informacion que se puedan leer.");
+                "El documento no contiene texto legible ni imágenes con información que se puedan leer.");
     }
 }

@@ -215,7 +215,7 @@ public class AssistantChatService {
     @Transactional(readOnly = true)
     public ChatResponse answer(Long workspaceId, ChatRequest request) {
         if (!properties.isEnabled()) {
-            throw new AiUnavailableException("El modulo de IA esta desactivado en la configuracion del servidor");
+            throw new AiUnavailableException("El módulo de IA está desactivado en la configuración del servidor");
         }
 
         Project project = workspaceService.getProject(workspaceId);
@@ -234,7 +234,7 @@ public class AssistantChatService {
 
         String answer = deepSeekClient.chatText(SYSTEM_PROMPT, messages).trim();
         if (answer.isBlank()) {
-            throw new AiUnavailableException("El modelo no ha sabido que responder; prueba a reformular la pregunta");
+            throw new AiUnavailableException("El modelo no ha sabido qué responder; prueba a reformular la pregunta");
         }
 
         log.info("Asistente: respuesta para el espacio de trabajo {} con {} tareas de contexto{}", workspaceId,

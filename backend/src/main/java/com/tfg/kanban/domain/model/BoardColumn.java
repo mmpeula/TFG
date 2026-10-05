@@ -43,11 +43,6 @@ public class BoardColumn extends Auditable {
     @Builder.Default
     private Integer position = 0;
 
-    /** Limite WIP opcional: numero maximo de tareas simultaneas en la columna. */
-    @Min(1)
-    @Column(name = "WIP_LIMIT")
-    private Integer wipLimit;
-
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "BOARD_ID", nullable = false, foreignKey = @ForeignKey(name = "FK_COLUMNS_BOARD"))
     private Board board;

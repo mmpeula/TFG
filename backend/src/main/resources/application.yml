@@ -107,7 +107,7 @@ app:
       images-per-request: ${AI_DOC_IMAGES_PER_REQUEST:4}
       vision-max-output-tokens: ${AI_VISION_MAX_OUTPUT_TOKENS:8000}
   storage:
-    # Directorio de los ficheros adjuntos (volumen de Docker en despliegue).
+    # Directorio de las fotos de perfil y de los espacios (volumen de Docker en despliegue).
     upload-dir: ${UPLOAD_DIR:./uploads}
     # Tamano maximo por fichero en bytes (10 MB): es el que se comprueba con un mensaje claro.
     max-file-size: 10485760

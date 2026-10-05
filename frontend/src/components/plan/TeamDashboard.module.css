@@ -1,0 +1,80 @@
+/* Resumen del equipo: cifras arriba, una fila por persona debajo. Todo lo medible en monoespacio. */
+.dashboard { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-4); }
+
+.kpis { display: grid; grid-template-columns: minmax(300px, 1.6fr) repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.kpi {
+  display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  padding: 14px var(--space-4);
+}
+.kpiLabel { font-size: 12px; color: var(--color-neutral-600); }
+.kpiValue {
+  font-family: var(--font-mono); font-size: 22px; font-weight: 600;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.kpiDetail { font-size: 12px; color: var(--color-neutral-500); }
+
+.good { color: var(--color-accent-2-700); }
+
+/* Rueda del estado de las tareas */
+.wheelCard { gap: var(--space-2); }
+.wheel { display: flex; align-items: center; gap: var(--space-4); }
+.wheelSvg { width: 112px; height: 112px; flex: none; }
+.wheelValue { font-family: var(--font-mono); font-size: 17px; font-weight: 600; fill: var(--color-text); }
+.wheelCaption { font-size: 8px; fill: var(--color-neutral-500); }
+.legend { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.legend li { display: flex; align-items: center; gap: var(--space-2); font-size: 12.5px; }
+.legendDot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.legendLabel { flex: 1; color: var(--color-neutral-700); }
+.legendValue { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--color-text); }
+.legendTotal { border-top: 1px solid var(--color-divider); padding-top: 5px; margin-top: 2px; }
+.legendTotal .legendLabel { color: var(--color-neutral-500); padding-left: 17px; }
+.bad { color: var(--color-danger-600); font-weight: 600; }
+.warn { color: var(--color-warning-700); }
+
+.people {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-4);
+}
+.peopleHead, .row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.4fr) minmax(120px, 1.6fr) repeat(4, 72px);
+  gap: var(--space-3);
+  align-items: center;
+}
+.peopleHead { font-size: 11px; color: var(--color-neutral-500); padding: var(--space-2) 0; white-space: nowrap; }
+/* Las cabeceras son texto, no cifras: en la letra normal aunque vayan alineadas como ellas. */
+.peopleHead .num { font-family: var(--font-body); font-size: 11px; color: var(--color-neutral-500); }
+.row { padding: 10px 0; border-top: 1px solid var(--color-divider); }
+
+.person { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.progress { display: flex; align-items: center; gap: var(--space-2); }
+.progress > :first-child { flex: 1; }
+.pct, .num {
+  font-family: var(--font-mono); font-size: 12.5px; font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-700);
+}
+.pct { width: 38px; text-align: right; }
+.num { text-align: right; }
+.num.bad { color: var(--color-danger-600); font-weight: 600; }
+.none { font-size: 12px; color: var(--color-neutral-400); }
+
+@media (max-width: 1023px) {
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .wheelCard { grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+  .kpis { grid-template-columns: 1fr; }
+}
+/* En movil cada persona es una ficha: nombre y avance arriba, cifras debajo con su etiqueta. */
+@media (max-width: 767px) {
+  .peopleHead { display: none; }
+  .row { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 6px; }
+  .person, .progress { grid-column: 1 / -1; }
+  .num { text-align: left; }
+  .num::before { content: attr(data-label); display: block; font-family: var(--font-body); font-size: 10px; color: var(--color-neutral-500); }
+}

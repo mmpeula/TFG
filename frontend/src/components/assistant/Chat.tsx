@@ -90,7 +90,7 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
                     </li>
                   ))}
                 </ul>
-                <p className={styles.text}>¿En que puedo ayudarte hoy?</p>
+                <p className={styles.text}>¿En qué puedo ayudarte hoy?</p>
               </div>
               <span className={styles.timestamp}>{welcomeTime}</span>
             </div>
@@ -152,7 +152,7 @@ export function Chat({ messages, pending, disabled, placeholder, onSend, onReset
           rows={2}
           value={value}
           disabled={disabled}
-          placeholder={placeholder ?? 'Preguntale algo sobre este espacio de trabajo…'}
+          placeholder={placeholder ?? 'Pregúntale algo sobre este espacio de trabajo…'}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {

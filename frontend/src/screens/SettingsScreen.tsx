@@ -3,10 +3,10 @@ import { KeyRound, Pencil } from 'lucide-react'
 import { HomeShell } from '@/components/shell/HomeShell'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
+import { Card, CardGroup } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Tag } from '@/components/ui/Tag'
-import { Section } from './Section'
 import styles from './SettingsScreen.module.css'
 import { useUserMutations } from '@/hooks/useData'
 import { useAuth } from '@/state/context'
@@ -28,40 +28,54 @@ export function SettingsScreen() {
       <div className={styles.layout}>
         <h1 className={styles.pageTitle}>Mi cuenta</h1>
 
-        <Section
-          title="Perfil"
-          action={
-            <div className={styles.headerActions}>
-              <Button variant="secondary" small onClick={() => setPasswordOpen(true)}>
-                <KeyRound size={13} strokeWidth={2.75} />
+        <CardGroup>
+
+          <Card
+            title="Perfil"
+            description="Tu nombre y tu foto, como te ven los demás en el equipo."
+            aside={
+              <Button variant="secondary" onClick={() => setEditOpen(true)}>
+                <Pencil size={14} strokeWidth={2.5} />
+                Editar perfil
+              </Button>
+            }
+          >
+            <div className={styles.profile}>
+              <Avatar user={user} avatarUrl={user?.avatarUrl} size={56} />
+              <div className={styles.identity}>
+                <div className={styles.name}>{user?.fullName}</div>
+                <div className={styles.hint}>{user?.email}</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card
+            title="Contraseña"
+            description="Para cambiarla se pide también la que usas ahora."
+            aside={
+              <Button variant="secondary" onClick={() => setPasswordOpen(true)}>
+                <KeyRound size={14} strokeWidth={2.5} />
                 Cambiar contraseña
               </Button>
-              <Button variant="secondary" small onClick={() => setEditOpen(true)}>
-                <Pencil size={13} strokeWidth={2.75} />
-                Editar
-              </Button>
-            </div>
-          }
-        >
-          <div className={styles.profile}>
-            <Avatar user={user} avatarUrl={user?.avatarUrl} size={56} />
-            <div className={styles.identity}>
-              <div className={styles.name}>{user?.fullName}</div>
-              <div className={styles.hint}>{user?.email}</div>
-            </div>
-          </div>
+            }
+          />
 
-          <dl className={styles.data}>
-            <div>
-              <dt>Rol global</dt>
-              <dd>{user && <Tag variant="outline">{ROLE_LABELS[user.role]}</Tag>}</dd>
-            </div>
-            <div>
-              <dt>Cuenta creada</dt>
-              <dd>{formatDateTime(user?.createdAt)}</dd>
-            </div>
-          </dl>
-        </Section>
+          <Card
+            title="Cuenta"
+            description="Tu tipo de cuenta en la plataforma y desde cuándo la tienes."
+          >
+            <dl className={styles.data}>
+              <div>
+                <dt>Rol global</dt>
+                <dd>{user && <Tag variant="outline">{ROLE_LABELS[user.role]}</Tag>}</dd>
+              </div>
+              <div>
+                <dt>Cuenta creada</dt>
+                <dd className={styles.measured}>{formatDateTime(user?.createdAt)}</dd>
+              </div>
+            </dl>
+          </Card>
+        </CardGroup>
       </div>
 
       <EditProfileModal open={editOpen} user={user ?? null} onClose={() => setEditOpen(false)} />
@@ -265,7 +279,7 @@ function ChangePasswordForm({ user, onClose }: { user: UserResponse; onClose: ()
             onChange={(event) => setCurrentPassword(event.target.value)}
           />
           <span className={styles.optional}>
-            Se pide para que una sesion abierta y sin vigilancia no baste para cambiarla.
+            Se pide para que una sesión abierta y sin vigilancia no baste para cambiarla.
           </span>
         </label>
 

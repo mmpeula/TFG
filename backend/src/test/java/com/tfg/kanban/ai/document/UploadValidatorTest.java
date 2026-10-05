@@ -51,7 +51,7 @@ class UploadValidatorTest {
         storage.setMaxFileSize(1024);
 
         assertThatThrownBy(() -> validate("grande.txt", "text/plain", new byte[2048]))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("maximo");
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("máximo");
     }
 
     @Test
@@ -70,7 +70,7 @@ class UploadValidatorTest {
     void sanitizesFilenames() {
         assertThat(UploadValidator.safeFilename("../../etc/passwd")).isEqualTo("passwd");
         assertThat(UploadValidator.safeFilename("a\r\nb\"c.txt")).isEqualTo("abc.txt");
-        assertThat(UploadValidator.safeFilename(null)).isEqualTo("adjunto");
+        assertThat(UploadValidator.safeFilename(null)).isEqualTo("documento");
         assertThat(UploadValidator.safeFilename("x".repeat(500) + ".txt")).hasSize(120);
     }
 

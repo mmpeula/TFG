@@ -40,6 +40,19 @@
 .close { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 999px; color: var(--color-neutral-600); flex: none; }
 .close:hover { background: var(--color-accent-100); color: var(--color-accent-700); }
 .body { padding: 0 var(--space-6) var(--space-8); display: flex; flex-direction: column; gap: var(--space-6); }
+
+/* Aviso de la tarea: el motivo por el que sale en «Avisos» y que hacer. */
+.warning {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  border-radius: var(--radius-md);
+  padding: 10px var(--space-3);
+  border: 1px solid;
+}
+.warning svg { flex: none; margin-top: 2px; }
+.warningLate { background: var(--color-danger-100); border-color: var(--color-danger-300); color: var(--color-danger-700); }
+.warningAttention { background: var(--color-warning-100); border-color: var(--color-warning-300); color: var(--color-warning-700); }
+.warningTitle { font-size: 13px; font-weight: 650; }
+.warningText { font-size: 12.5px; line-height: 1.5; margin-top: 2px; color: var(--color-neutral-700); }
 .description {
   width: 100%;
   border: 1px solid transparent;
@@ -65,6 +78,7 @@
   font-size: 13px; font-weight: 600;
   color: var(--color-neutral-800);
 }
+.propValue svg { flex: none; color: var(--color-neutral-500); }
 .propValue:hover { background: var(--color-neutral-200); }
 .propInput {
   width: 100%;
@@ -104,22 +118,6 @@
 .composerInput { width: 100%; border: none; background: none; outline: none; font-size: 13px; resize: vertical; min-height: 54px; }
 .composerFoot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .hint { font-size: 11px; color: var(--color-neutral-600); }
-
-.drop {
-  border: 2px dashed var(--color-neutral-300);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  text-align: center;
-  font-size: 12px;
-  color: var(--color-neutral-600);
-}
-.dropActive { border-color: var(--color-accent-400); background: var(--color-accent-100); color: var(--color-accent-700); font-weight: 700; }
-.file { display: flex; align-items: center; gap: var(--space-2); font-size: 12px; margin-top: var(--space-2); }
-
-/* Azul, como el resto de lo que es la IA en la app (ver la etiqueta "IA" de las tarjetas). */
-.ai { background: var(--color-accent-100); border-radius: var(--radius-md); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
-.aiKicker { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--color-accent-700); }
-.aiActions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 .history { display: flex; flex-direction: column; gap: var(--space-2); font-size: 12px; color: var(--color-neutral-600); }
 @media (max-width: 767px) { .panel { width: 100vw; } }

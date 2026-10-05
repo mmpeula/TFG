@@ -33,7 +33,7 @@ export function LoginScreen() {
         <div className={styles.brand}>
           <span className={styles.mark}><img src={logo} alt="" /></span>
           <span className={styles.name}>Planif<span className={styles.ia}>IA</span></span>
-          <span className={styles.claim}>Gestion colaborativa de proyectos universitarios</span>
+          <span className={styles.claim}>Gestión colaborativa de proyectos universitarios</span>
         </div>
 
         <div className={styles.card}>
@@ -74,7 +74,7 @@ export function LoginScreen() {
         </div>
 
         <p className={styles.foot}>
-          ¿No tienes cuenta? <Link className={styles.link} to={ROUTES.register}>Registrate</Link>
+          ¿No tienes cuenta? <Link className={styles.link} to={ROUTES.register}>Regístrate</Link>
         </p>
       </div>
     </div>

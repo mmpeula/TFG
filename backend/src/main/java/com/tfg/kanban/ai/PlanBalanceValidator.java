@@ -110,8 +110,8 @@ final class PlanBalanceValidator {
         PlanTeam.Member menosCargado = horas.entrySet().stream().min(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey).orElseThrow();
         return List.of(new Violation("HOURS_GAP",
-                ("Diferencia de horas del %d %% (maximo %d %%): %s lleva %s h y %s lleva %s h. Si alguno tiene "
-                        + "menos tiempo esta vez, deberia decirlo en sus preferencias.")
+                ("Diferencia de horas del %d %% (máximo %d %%): %s lleva %s h y %s lleva %s h. Si alguno tiene "
+                        + "menos tiempo esta vez, debería decirlo en sus preferencias.")
                         .formatted(percent(gap), percent(MAX_HOURS_GAP), masCargado.name(),
                                 plano(horas.get(masCargado)), menosCargado.name(),
                                 plano(horas.get(menosCargado)))));
@@ -127,7 +127,7 @@ final class PlanBalanceValidator {
         for (Map.Entry<PlanTeam.Member, Long> entry : criticas.entrySet()) {
             if (entry.getValue() > limite) {
                 violaciones.add(new Violation("CRITICAL_SHARE",
-                        "%s tiene %d de %d tareas criticas (maximo %d): reparte alguna con otra persona."
+                        "%s tiene %d de %d tareas críticas (máximo %d): reparte alguna con otra persona."
                                 .formatted(entry.getKey().name(), entry.getValue(), total, limite)));
             }
         }
@@ -165,8 +165,8 @@ final class PlanBalanceValidator {
             // Solo si CADA validador de la epica tambien la implemento: nadie de fuera la revisa.
             if (ajenos.isEmpty() && implementadoresEpica.containsAll(validadoresEpica)) {
                 violaciones.add(new Violation("SELF_VALIDATION",
-                        "En «%s», quien valida es tambien quien implementa: asigna esa prueba o revision a alguien "
-                                + "que no haya hecho esa parte.".formatted(entry.getKey())));
+                        ("En «%s», quien valida es también quien implementa: asigna esa prueba o revisión a alguien "
+                                + "que no haya hecho esa parte.").formatted(entry.getKey())));
             }
         }
         return violaciones;
@@ -202,7 +202,7 @@ final class PlanBalanceValidator {
             for (PlanTeam.Member member : miembros) {
                 if (!conTarea.contains(member)) {
                     violaciones.add(new Violation("SPRINT_COVERAGE",
-                            "En el sprint %d, %s no tiene ninguna tarea critica ni alta."
+                            "En el sprint %d, %s no tiene ninguna tarea crítica ni alta."
                                     .formatted(sprint, member.name())));
                 }
             }

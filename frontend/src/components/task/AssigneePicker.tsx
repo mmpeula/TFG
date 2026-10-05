@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import { Dropdown, DropdownItem } from '@/components/ui/Controls'
 import styles from './AssigneePicker.module.css'
@@ -43,6 +44,7 @@ export function AssigneePicker({ members, selected, onChange, align = 'left', cl
               : selected.map((user) => <Avatar key={user.id} user={user} avatarUrl={user.avatarUrl} size={20} />)}
           </span>
           {selected.length === 0 ? 'Sin asignar' : selected.map((user) => user.fullName).join(', ')}
+          <ChevronDown size={14} strokeWidth={2.75} aria-hidden="true" />
         </button>
       )}
     >

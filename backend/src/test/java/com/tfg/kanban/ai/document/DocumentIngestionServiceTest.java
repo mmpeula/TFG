@@ -324,7 +324,7 @@ class DocumentIngestionServiceTest {
         ProcessedDocument document = ingestPdf(TestDocuments.pdfScanned(5));
 
         assertThat(document.visuallyReadPages()).isEqualTo(2);
-        assertThat(document.warnings()).anyMatch(w -> w.contains("5 paginas") && w.contains("limite es 2"));
+        assertThat(document.warnings()).anyMatch(w -> w.contains("5 páginas") && w.contains("límite es 2"));
     }
 
     @Test
@@ -381,21 +381,21 @@ class DocumentIngestionServiceTest {
     @DisplayName("7a. Un fichero vacio se rechaza")
     void rejectsEmptyFile() {
         assertThatThrownBy(() -> ingest("vacio.txt", "text/plain", new byte[0]))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("vacio");
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("vacío");
     }
 
     @Test
     @DisplayName("7b. Sin documento se avisa en vez de reventar con un nulo")
     void rejectsMissingFile() {
         assertThatThrownBy(() -> service.ingest(null, stages::add))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("ningun documento");
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("ningún documento");
     }
 
     @Test
     @DisplayName("7c. Un PDF con solo paginas en blanco se rechaza diciendo que estan en blanco")
     void rejectsBlankPdf() throws Exception {
         assertThatThrownBy(() -> ingestPdf(TestDocuments.pdfBlank(3)))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("3 paginas").hasMessageContaining("en blanco");
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("3 páginas").hasMessageContaining("en blanco");
         verifyNoInteractions(deepSeek);
     }
 
@@ -440,7 +440,7 @@ class DocumentIngestionServiceTest {
     @DisplayName("Un PDF protegido con contrasena se rechaza pidiendo que se la quiten")
     void rejectsEncryptedPdf() throws Exception {
         assertThatThrownBy(() -> ingestPdf(TestDocuments.pdfEncrypted("Contenido secreto")))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("contrasena");
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("contraseña");
     }
 
     @Test
@@ -517,7 +517,7 @@ class DocumentIngestionServiceTest {
         ProcessedDocument document = ingestPdf(TestDocuments.pdf(pages));
 
         assertThat(document.text()).contains("pagina numero 3").doesNotContain("pagina numero 4");
-        assertThat(document.warnings()).anyMatch(w -> w.contains("6 paginas") && w.contains("3 primeras"));
+        assertThat(document.warnings()).anyMatch(w -> w.contains("6 páginas") && w.contains("3 primeras"));
     }
 
     // -------------------------------------------------------------- seguridad

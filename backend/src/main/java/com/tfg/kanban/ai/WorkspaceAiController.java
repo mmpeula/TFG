@@ -70,7 +70,7 @@ public class WorkspaceAiController {
              "options":{"startDate":"2026-10-01","sprintDays":14}}
             """)
     public record TextRequest(
-            @NotBlank(message = "escribe de que va el trabajo") String text,
+            @NotBlank(message = "escribe de qué va el trabajo") String text,
             @Valid PlanOptions options
     ) {
     }

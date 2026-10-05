@@ -67,7 +67,7 @@ export function WorkspaceCardActions({ workspace }: { workspace: WorkspaceRespon
         open={confirmando === 'salir'}
         onOpenChange={(abierto) => setConfirmando(abierto ? 'salir' : null)}
         title={`Salir de «${workspace.name}»`}
-        description="Dejaras de ver este espacio de trabajo y sus tareas. Lo que ya hiciste se queda con el equipo."
+        description="Dejarás de ver este espacio de trabajo y sus tareas. Lo que ya hiciste se queda con el equipo."
         confirmLabel="Salir"
         isPending={removeMember.isPending}
         onConfirm={async () => {
@@ -79,7 +79,7 @@ export function WorkspaceCardActions({ workspace }: { workspace: WorkspaceRespon
         open={confirmando === 'borrar'}
         onOpenChange={(abierto) => setConfirmando(abierto ? 'borrar' : null)}
         title={`Borrar «${workspace.name}»`}
-        description="Se borraran su tablero, sus tareas, sus comentarios y sus ficheros, para todo el equipo. No se puede deshacer."
+        description="Se borrarán su tablero, sus tareas, sus comentarios y su historial, para todo el equipo. No se puede deshacer."
         isPending={remove.isPending}
         onConfirm={() => remove.mutateAsync()}
       />

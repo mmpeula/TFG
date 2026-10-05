@@ -1,8 +1,7 @@
+/* Misma barra que la de encima del tablero: sin linea, contexto a la izquierda y controles a la derecha. */
 .head {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: var(--space-4); flex-wrap: wrap;
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--color-divider);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3); flex-wrap: wrap;
 }
 .window { font-size: 13px; color: var(--color-neutral-700); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .dim { color: var(--color-neutral-500); font-weight: 400; font-family: var(--font-body); }
@@ -26,17 +25,17 @@
   padding-bottom: var(--space-2);
 }
 
+/* Cada sprint se ve como una columna del tablero: sin caja, cabecera con nombre y
+   recuento, la linea de avance debajo y las tarjetas. El sprint en curso lo marca
+   la etiqueta «ahora». */
 .sprint {
   flex: 0 0 300px;
   width: 300px;
-  border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-lg);
-  padding: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-3);
 }
-/* El sprint en curso se marca oscureciendo su borde: sin fondo ni color de mas. */
-.currentSprint { border-color: var(--color-neutral-900); }
 
 .sprintHead { display: flex; flex-direction: column; gap: 6px; }
+.sprintTitleRow { display: flex; align-items: center; gap: var(--space-2); }
 .sprintName {
   font-size: 13px; font-weight: 600; letter-spacing: -0.01em;
   display: inline-flex; align-items: center; gap: var(--space-2);
@@ -49,11 +48,11 @@
 .range { font-size: 12px; color: var(--color-neutral-500); font-family: var(--font-mono); }
 .count { font-size: 11px; color: var(--color-neutral-500); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-.sprintEmpty { font-size: 12px; color: var(--color-neutral-400); margin-top: var(--space-2); }
+.sprintEmpty { font-size: 12px; color: var(--color-neutral-600); padding: var(--space-2); }
 
 /* Todas las tareas del sprint juntas, sin bandas por estado: eso se ve en la
    insignia de cada tarjeta (TaskCard, la misma del tablero), no separandolas en la pantalla. */
-.cards { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+.cards { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .loose { padding-top: var(--space-4); margin-top: var(--space-4); border-top: 1px solid var(--color-divider); }
 .looseTitle { font-size: 13px; font-weight: 600; }

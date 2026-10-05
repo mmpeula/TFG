@@ -11,7 +11,7 @@ public record LoginRequest(
         @NotBlank(message = "el email es obligatorio")
         String email,
 
-        @NotBlank(message = "la contrasena es obligatoria")
+        @NotBlank(message = "la contraseña es obligatoria")
         String password
 ) {
 }

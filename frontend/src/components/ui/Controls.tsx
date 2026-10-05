@@ -37,10 +37,13 @@ export function Chip({
   children,
   active,
   onClick,
+  title,
 }: {
   children: ReactNode
   active?: boolean
   onClick?: () => void
+  /** Explicacion al pasar el raton, si la etiqueta sola no basta. */
+  title?: string
 }) {
   return (
     <button
@@ -48,6 +51,7 @@ export function Chip({
       className={[styles.chip, active && styles.chipActive].filter(Boolean).join(' ')}
       onClick={onClick}
       aria-pressed={active}
+      title={title}
     >
       {children}
     </button>

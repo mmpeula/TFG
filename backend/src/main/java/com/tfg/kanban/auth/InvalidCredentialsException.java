@@ -6,6 +6,6 @@ import org.springframework.security.core.AuthenticationException;
 public class InvalidCredentialsException extends AuthenticationException {
 
     public InvalidCredentialsException() {
-        super("Email o contrasena incorrectos");
+        super("Email o contraseña incorrectos");
     }
 }

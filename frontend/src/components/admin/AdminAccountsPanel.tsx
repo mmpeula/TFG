@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Search, UserCheck, UserX } from 'lucide-react'
+import { ChevronDown, Search, UserCheck, UserX } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Tag'
@@ -11,6 +11,7 @@ import styles from './AdminPanel.module.css'
 import { useAdminUserMutations, useAdminUsers } from '@/hooks/useData'
 import { useAuth } from '@/state/context'
 import { ROLE_LABELS } from '@/lib/roles'
+import { formatDate } from '@/lib/format'
 import type { Role, UserResponse } from '@/types/api'
 
 /** Los tres tipos de cuenta, para filtrar. RESPONSABLE no esta: se es de un equipo, no de la plataforma. */
@@ -118,6 +119,8 @@ export function AdminAccountsPanel() {
 
                 <span className={styles.cellMuted}>{person.email}</span>
 
+                <span className={styles.cellDate} title="Fecha de alta">{formatDate(person.createdAt)}</span>
+
                 {/* Los roles solo suben: alumno a docente o administrador, docente a administrador.
                     Un administrador ya esta arriba del todo y no se degrada, asi que su rol no es un menu. */}
                 {person.role === 'ADMIN' ? (
@@ -127,6 +130,7 @@ export function AdminAccountsPanel() {
                     trigger={({ toggle }) => (
                       <button className={styles.roleButton} onClick={toggle}>
                         {ROLE_LABELS[person.role]}
+                        <ChevronDown size={14} strokeWidth={2.75} aria-hidden="true" />
                       </button>
                     )}
                   >

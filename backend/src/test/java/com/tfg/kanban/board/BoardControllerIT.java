@@ -29,46 +29,29 @@ class BoardControllerIT extends AbstractApiIT {
     }
 
     @Test
-    @DisplayName("Solo el RESPONSABLE crea y borra columnas")
-    void columnManagementIsRestricted() throws Exception {
+    @DisplayName("Las tres columnas son fijas: ni el RESPONSABLE puede crear, editar ni borrar una")
+    void columnsAreFixed() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
-        TestUser miembro = registerUser(Role.MIEMBRO);
         Workspace workspace = createWorkspace(responsable, "Equipo columnas");
-        Long teamId = workspace.teamId();
-        addMember(responsable, teamId, miembro, Role.MIEMBRO);
-        Long boardId = workspace.boardId();
-
-        mockMvc.perform(authorized(post("/api/boards/{id}/columns", boardId), miembro)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Bloqueado\"}"))
-                .andExpect(status().isForbidden());
-
-        Long columnId = json(mockMvc.perform(authorized(post("/api/boards/{id}/columns", boardId), responsable)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"name\":\"Revision\",\"wipLimit\":2}"))
-                        .andExpect(status().isCreated())
-                        .andExpect(jsonPath("$.position").value(3))
-                        .andReturn())
-                .path("id").asLong();
-
-
-        mockMvc.perform(authorized(delete("/api/columns/{id}", columnId), responsable))
-                .andExpect(status().isNoContent());
-    }
-
-    @Test
-    @DisplayName("No se borra una columna que tiene tareas")
-    void cannotDeleteColumnWithTasks() throws Exception {
-        TestUser responsable = registerUser(Role.MIEMBRO);
-        Workspace workspace = createWorkspace(responsable, "Equipo columna llena");
-        Long teamId = workspace.teamId();
         Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);
-        createTask(responsable, columns[0], "Tarea que estorba");
 
-        mockMvc.perform(authorized(delete("/api/columns/{id}", columns[0]), responsable))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+        mockMvc.perform(authorized(post("/api/boards/{id}/columns", boardId), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Revision\"}"))
+                .andExpect(status().is4xxClientError());
+        mockMvc.perform(authorized(put("/api/columns/{id}", columns[1]), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Otra\"}"))
+                .andExpect(status().is4xxClientError());
+        mockMvc.perform(authorized(delete("/api/columns/{id}", columns[2]), responsable))
+                .andExpect(status().is4xxClientError());
+
+        mockMvc.perform(authorized(get("/api/boards/{id}", boardId), responsable))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.columns.length()").value(3))
+                .andExpect(jsonPath("$.columns[1].name").value("En progreso"))
+                .andExpect(jsonPath("$.columns[2].name").value("Hecho"));
     }
 
     @Test

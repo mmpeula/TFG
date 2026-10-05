@@ -5,6 +5,7 @@
   font: inherit; font-size: 13px; font-weight: 600;
   color: var(--color-neutral-800);
 }
+.trigger svg { flex: none; color: var(--color-neutral-500); }
 .trigger:hover { background: var(--color-neutral-200); }
 
 /* Un avatar solapa un poco al anterior: varias personas se leen como un grupo, no como una lista. */

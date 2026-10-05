@@ -46,7 +46,7 @@ public class GlobalExceptionHandler {
                 .toList();
 
         ApiError body = ApiError.of(HttpStatus.BAD_REQUEST.value(), HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                "VALIDATION_ERROR", "La peticion contiene campos invalidos",
+                "VALIDATION_ERROR", "La petición contiene campos inválidos",
                 request.getRequestURI(), fieldErrors);
         return ResponseEntity.badRequest().body(body);
     }
@@ -61,7 +61,7 @@ public class GlobalExceptionHandler {
                 .toList();
 
         ApiError body = ApiError.of(HttpStatus.BAD_REQUEST.value(), HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                "VALIDATION_ERROR", "Parametros invalidos", request.getRequestURI(), fieldErrors);
+                "VALIDATION_ERROR", "Parámetros inválidos", request.getRequestURI(), fieldErrors);
         return ResponseEntity.badRequest().body(body);
     }
 
@@ -76,18 +76,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleUploadTooLarge(MaxUploadSizeExceededException ex,
                                                          HttpServletRequest request) {
         return build(HttpStatus.PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE",
-                "El fichero supera el tamano maximo permitido", request);
+                "El fichero supera el tamaño máximo permitido", request);
     }
 
     @ExceptionHandler({MissingServletRequestPartException.class, MissingServletRequestParameterException.class})
     public ResponseEntity<ApiError> handleMissingPart(Exception ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER",
-                "Falta un parametro obligatorio en la peticion", request);
+                "Falta un parámetro obligatorio en la petición", request);
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ApiError> handleMalformedRequest(Exception ex, HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", "La peticion no se ha podido interpretar", request);
+        return build(HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", "La petición no se ha podido interpretar", request);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -95,17 +95,17 @@ public class GlobalExceptionHandler {
                                                         HttpServletRequest request) {
         log.warn("Violacion de integridad en {}: {}", request.getRequestURI(), ex.getMostSpecificCause().getMessage());
         return build(HttpStatus.CONFLICT, "DATA_INTEGRITY_VIOLATION",
-                "La operacion viola una restriccion de integridad de datos", request);
+                "La operación viola una restricción de integridad de datos", request);
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiError> handleAuthentication(AuthenticationException ex, HttpServletRequest request) {
-        return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Credenciales invalidas o ausentes", request);
+        return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Credenciales inválidas o ausentes", request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
-        return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "No tienes permisos para realizar esta accion", request);
+        return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "No tienes permisos para realizar esta acción", request);
     }
 
     /**
@@ -127,7 +127,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex,
                                                            HttpServletRequest request) {
         return build(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
-                "El endpoint no admite el metodo " + ex.getMethod(), request);
+                "El endpoint no admite el método " + ex.getMethod(), request);
     }
 
     /** Red de seguridad: cualquier error no contemplado se devuelve como 500 sin filtrar detalles internos. */

@@ -172,7 +172,7 @@ public class WorkspaceService {
         Project saved = projectRepository.save(project);
 
         activityService.record(saved, ActivityAction.CREACION, "Project", saved.getId(),
-                "Creo el espacio de trabajo '%s'".formatted(saved.getName()));
+                "Creó el espacio de trabajo '%s'".formatted(saved.getName()));
 
         return findById(saved.getId());
     }
@@ -195,7 +195,7 @@ public class WorkspaceService {
         }
 
         activityService.record(project, ActivityAction.ACTUALIZACION, "Project", project.getId(),
-                "Actualizo el espacio de trabajo '%s'".formatted(project.getName()));
+                "Actualizó el espacio de trabajo '%s'".formatted(project.getName()));
 
         return findById(workspaceId);
     }

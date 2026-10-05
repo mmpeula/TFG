@@ -103,10 +103,12 @@ public class AdminWorkspaceService {
      *
      * <p>Sirve sobre todo para el caso que deja un equipo muerto —la unica persona
      * responsable se fue o se le deshabilito la cuenta, y nadie puede administrarlo
-     * desde dentro—, pero vale para cualquier rol: tambien se puede degradar a
-     * alguien o dejarlo como docente.</p>
+     * desde dentro—: se nombra responsable a otro de sus miembros. Tambien vale para
+     * degradar a alguien a alumno.</p>
      *
-     * <p>Dos limites que no se saltan ni desde soporte. Solo se cambia el rol de
+     * <p>Tres limites que no se saltan ni desde soporte. Ser docente se elige al
+     * invitar y no se cambia despues, ni hacia el ni desde el (ver
+     * {@code TeamRoles.ensureDocenteRoleUnchanged}). Solo se cambia el rol de
      * quien <b>ya pertenece</b> al equipo: si un administrador pudiera anadir a
      * cualquiera, tendria una puerta de entrada a todos los grupos. Y el equipo
      * nunca se queda sin responsable, porque sin nadie que pueda administrarlo el
@@ -120,12 +122,12 @@ public class AdminWorkspaceService {
 
         TeamMember member = teamMemberRepository.findByTeam_IdAndUser_Id(teamId, userId)
                 .orElseThrow(() -> new BusinessRuleException(
-                        "Esa persona no esta en el equipo. Desde soporte solo se puede cambiar "
+                        "Esa persona no está en el equipo. Desde soporte solo se puede cambiar "
                                 + "el rol de quien ya pertenece al espacio de trabajo."));
 
         if (!member.getUser().isEnabled()) {
             throw new BusinessRuleException(
-                    "Esa cuenta esta deshabilitada: reactivala antes de cambiarle el rol");
+                    "Esa cuenta está deshabilitada: reactívala antes de cambiarle el rol");
         }
 
         Role anterior = member.getRole();
@@ -135,7 +137,7 @@ public class AdminWorkspaceService {
 
         // Queda en la actividad del propio workspace: el equipo ve quien lo toco.
         activityService.record(project, ActivityAction.ACTUALIZACION, "TeamMember", userId,
-                "Soporte cambio el rol de '%s': %s -> %s".formatted(
+                "Soporte cambió el rol de '%s': %s -> %s".formatted(
                         member.getUser().getFullName(), anterior, role));
         log.info("Soporte: {} pasa de {} a {} en el workspace {}",
                 member.getUser().getEmail(), anterior, role, workspaceId);
@@ -160,7 +162,7 @@ public class AdminWorkspaceService {
         // Se anota antes de que deje de estar accesible, para que el equipo lo vea
         // al volver: es la explicacion de por que se quedo parado.
         activityService.record(project, ActivityAction.ACTUALIZACION, "Project", workspaceId,
-                enabled ? "Soporte reactivo el espacio de trabajo" : "Soporte suspendio el espacio de trabajo");
+                enabled ? "Soporte reactivó el espacio de trabajo" : "Soporte suspendió el espacio de trabajo");
         log.info("Soporte: workspace {} {}", workspaceId, enabled ? "reactivado" : "suspendido");
     }
 

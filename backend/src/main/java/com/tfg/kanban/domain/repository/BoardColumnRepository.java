@@ -11,8 +11,6 @@ public interface BoardColumnRepository extends JpaRepository<BoardColumn, Long> 
 
     List<BoardColumn> findByBoard_IdOrderByPositionAsc(Long boardId);
 
-    long countByBoard_Id(Long boardId);
-
     /** Columnas de un lote de proyectos, para pintar la pantalla de workspaces sin N+1. */
     @Query("""
             select c from BoardColumn c

@@ -18,7 +18,7 @@ import java.util.List;
         """)
 public record TaskRequest(
 
-        @NotBlank(message = "el titulo es obligatorio")
+        @NotBlank(message = "el título es obligatorio")
         @Size(max = 200)
         String title,
 
@@ -32,7 +32,7 @@ public record TaskRequest(
 
         LocalDate dueDate,
 
-        @DecimalMin(value = "0.0", inclusive = false, message = "la estimacion debe ser mayor que 0")
+        @DecimalMin(value = "0.0", inclusive = false, message = "la estimación debe ser mayor que 0")
         @Digits(integer = 4, fraction = 2)
         BigDecimal estimatedHours,
 

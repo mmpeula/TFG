@@ -1,23 +1,29 @@
 import { useEffect, useState } from 'react'
-import { Loader2, MessageSquare, Paperclip, Send, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, MessageSquare, Send, Trash2, X } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Tag'
 import { Dropdown, DropdownItem } from '@/components/ui/Controls'
 import { AssigneePicker } from './AssigneePicker'
+import { DateInput } from '@/components/ui/DateInput'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import styles from './TaskPanel.module.css'
-import {
-  useAttachmentMutations, useAttachments, useCommentMutations, useComments, useTaskMutations,
-} from '@/hooks/useData'
+import { useCommentMutations, useComments, useTaskMutations } from '@/hooks/useData'
 import { useAuth } from '@/state/context'
-import { useUi } from '@/state/context'
 import { canManage, canWrite as canWriteRole, PRIORITY_LABELS } from '@/lib/roles'
 import { TASK_TYPES, TASK_TYPE_IDS, typeOf } from '@/lib/taskTypes'
-import { formatDate, formatDateTime, formatFileSize, relativeTime } from '@/lib/format'
+import { taskWarning, type TaskWarningKind } from '@/lib/signals'
+import { formatDate, formatDateTime, relativeTime } from '@/lib/format'
 import type { ColumnResponse, Role, TaskPriority, TaskResponse, TeamMemberResponse } from '@/types/api'
 
 const PRIORITIES: TaskPriority[] = ['BAJA', 'MEDIA', 'ALTA', 'CRITICA']
+
+/** Titular del aviso de la tarea, segun su motivo. */
+const WARNING_TITLES: Record<TaskWarningKind, string> = {
+  fecha: 'Esta tarea va tarde',
+  parada: 'Esta tarea está parada',
+  'sin-responsable': 'Esta tarea no tiene responsable',
+}
 
 interface Props {
   task: TaskResponse | null
@@ -35,16 +41,12 @@ interface Props {
  */
 export function TaskPanel({ task, columns, members, role, boardId, projectId, onClose }: Props) {
   const { user } = useAuth()
-  const { pushToast } = useUi()
   const taskMutations = useTaskMutations(boardId, projectId)
   const [comment, setComment] = useState('')
-  const [dragOver, setDragOver] = useState(false)
 
   const taskId = task?.id
   const { data: comments, isPending: loadingComments } = useComments(taskId)
-  const { data: attachments } = useAttachments(taskId)
   const commentMutations = useCommentMutations(taskId ?? 0)
-  const attachmentMutations = useAttachmentMutations(taskId ?? 0)
 
   useEffect(() => {
     if (!task) return
@@ -58,6 +60,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
   if (!task) return null
 
   const writable = canWriteRole(role)
+  const warning = taskWarning(task, columns)
   const responsable = canManage(role)
 
   // Hecha, para PlanifIA, es estar en la ultima columna del tablero: no hay otro
@@ -74,6 +77,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
   function patch(values: Partial<Pick<TaskResponse, 'title' | 'description' | 'type' | 'priority' | 'columnId'>> & {
     assigneeIds?: number[]
     actualHours?: number | null
+    dueDate?: string | null
   }) {
     taskMutations.update.mutate({
       taskId: task!.id,
@@ -82,7 +86,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
         description: values.description ?? task!.description,
         type: values.type ?? task!.type,
         priority: values.priority ?? task!.priority,
-        dueDate: task!.dueDate ?? null,
+        dueDate: 'dueDate' in values ? (values.dueDate ?? null) : (task!.dueDate ?? null),
         estimatedHours: task!.estimatedHours ?? null,
         actualHours: 'actualHours' in values ? (values.actualHours ?? null) : (task!.actualHours ?? null),
         assigneeIds: values.assigneeIds ?? task!.assignees.map((assignee) => assignee.id),
@@ -103,7 +107,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
               rows={1}
               defaultValue={task.title}
               readOnly={!writable}
-              aria-label="Titulo de la tarea"
+              aria-label="Título de la tarea"
               ref={(node) => {
                 if (node) {
                   node.style.height = 'auto'
@@ -126,13 +130,28 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
         </header>
 
         <div className={styles.body}>
+          {warning && (
+            // Por que esta tarea sale en «Avisos» y que hacer para que deje de salir. Rojo si va
+            // tarde, ambar si solo pide atencion (parada o sin responsable): el color tiene ese trabajo.
+            <div
+              className={[styles.warning, warning.kind === 'fecha' ? styles.warningLate : styles.warningAttention].join(' ')}
+              role="status"
+            >
+              <AlertTriangle size={15} strokeWidth={2.5} aria-hidden="true" />
+              <div>
+                <p className={styles.warningTitle}>{WARNING_TITLES[warning.kind]}</p>
+                <p className={styles.warningText}>{warning.detail} {warning.action}</p>
+              </div>
+            </div>
+          )}
+
           <textarea
             key={`desc-${task.id}`}
             className={styles.description}
             defaultValue={task.description ?? ''}
-            placeholder="Sin descripcion. Escribe aqui el contexto de la tarea."
+            placeholder="Sin descripción. Escribe aquí el contexto de la tarea."
             readOnly={!writable}
-            aria-label="Descripcion"
+            aria-label="Descripción"
             onBlur={(event) => {
               if (writable && event.target.value !== (task.description ?? '')) {
                 patch({ description: event.target.value })
@@ -168,7 +187,10 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
               <Dropdown
                 align="left"
                 trigger={({ toggle }) => (
-                  <button className={styles.propValue} onClick={toggle}>{task.columnName}</button>
+                  <button className={styles.propValue} onClick={toggle}>
+                    {task.columnName}
+                    <ChevronDown size={14} strokeWidth={2.75} aria-hidden="true" />
+                  </button>
                 )}
               >
                 {(close) => (
@@ -200,6 +222,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                   <button className={styles.propValue} onClick={toggle}>
                     <span className={styles.typeDot} style={{ background: typeOf(task.type).color }} />
                     {typeOf(task.type).label}
+                    <ChevronDown size={14} strokeWidth={2.75} aria-hidden="true" />
                   </button>
                 )}
               >
@@ -232,6 +255,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                 trigger={({ toggle }) => (
                   <button className={styles.propValue} onClick={toggle}>
                     {PRIORITY_LABELS[task.priority]}
+                    <ChevronDown size={14} strokeWidth={2.75} aria-hidden="true" />
                   </button>
                 )}
               >
@@ -253,10 +277,24 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
               <span className={styles.propValue}>{PRIORITY_LABELS[task.priority]}</span>
             )}
 
-            <span className={styles.propLabel}>Fecha</span>
-            <span className={[styles.propValue, styles.measured].join(' ')}>{formatDate(task.dueDate)}</span>
+            {/* La fecha limite decide en que sprint cae la tarea en el plan: cambiarla es
+                tambien la forma de moverla de sprint, o de sacarla de «Sin fecha». */}
+            <span className={styles.propLabel}>Fecha límite</span>
+            {writable ? (
+              <DateInput
+                key={`due-${task.id}`}
+                className={[styles.propInput, styles.measured].join(' ')}
+                value={task.dueDate ?? ''}
+                aria-label="Fecha límite de la tarea"
+                onChange={(iso) => {
+                  if (iso !== (task.dueDate ?? '')) patch({ dueDate: iso || null })
+                }}
+              />
+            ) : (
+              <span className={[styles.propValue, styles.measured].join(' ')}>{formatDate(task.dueDate)}</span>
+            )}
 
-            <span className={styles.propLabel}>Estimacion</span>
+            <span className={styles.propLabel}>Estimación</span>
             <span className={[styles.propValue, styles.measured].join(' ')}>
               {task.estimatedHours != null ? `${task.estimatedHours} h` : '—'}
             </span>
@@ -272,7 +310,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                       step={0.5}
                       className={[styles.propInput, styles.measured].join(' ')}
                       defaultValue={task.actualHours ?? ''}
-                      placeholder="Cuanto ha costado de verdad"
+                      placeholder="Cuánto ha costado de verdad"
                       aria-label="Horas reales dedicadas a esta tarea"
                       onBlur={(event) => {
                         const raw = event.target.value.trim()
@@ -312,7 +350,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                   </Button>
                 }
                 title={`Borrar «${task.title}»`}
-                description="Se borraran tambien sus comentarios y adjuntos."
+                description="Se borrarán también sus comentarios. No se puede deshacer."
                 onConfirm={async () => {
                   await taskMutations.remove.mutateAsync(task.id)
                   onClose()
@@ -329,7 +367,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', margin: 'var(--space-3) 0' }}>
               {loadingComments && <p className={styles.hint}>Cargando comentarios…</p>}
-              {comments?.content.length === 0 && <p className={styles.hint}>Todavia no hay comentarios.</p>}
+              {comments?.content.length === 0 && <p className={styles.hint}>Todavía no hay comentarios.</p>}
               {comments?.content.map((item) => (
                 <div key={item.id} className={styles.comment}>
                   <Avatar user={item.author} avatarUrl={item.author.avatarUrl} size={26} />
@@ -373,7 +411,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                   }}
                 />
                 <div className={styles.composerFoot}>
-                  <span className={styles.hint}>⌘+Enter envia</span>
+                  <span className={styles.hint}>⌘+Enter envía</span>
                   <Button
                     small
                     disabled={!comment.trim() || commentMutations.create.isPending}
@@ -392,75 +430,10 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
             )}
           </section>
 
-          <section>
-            <h3 className={styles.sectionTitle}>
-              <Paperclip size={14} strokeWidth={2.75} style={{ verticalAlign: -2, marginRight: 6 }} />
-              Adjuntos ({attachments?.length ?? task.attachmentCount})
-            </h3>
-
-            {writable && (
-              <div
-                className={[styles.drop, dragOver && styles.dropActive].filter(Boolean).join(' ')}
-                style={{ marginTop: 'var(--space-2)' }}
-                onDragOver={(event) => { event.preventDefault(); setDragOver(true) }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(event) => {
-                  event.preventDefault()
-                  setDragOver(false)
-                  const file = event.dataTransfer.files[0]
-                  if (file) attachmentMutations.upload.mutate(file)
-                }}
-              >
-                {attachmentMutations.upload.isPending ? (
-                  <span><Loader2 size={13} className="spin" strokeWidth={2.75} /> Subiendo…</span>
-                ) : dragOver ? (
-                  'Suelta el fichero aqui'
-                ) : (
-                  <>
-                    <Upload size={13} strokeWidth={2.75} /> Arrastra un fichero aqui (maximo 10 MB)
-                  </>
-                )}
-              </div>
-            )}
-
-            {attachments?.map((item) => (
-              <div key={item.id} className={styles.file}>
-                <Paperclip size={12} strokeWidth={2.75} />
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  {item.filename}
-                  <span className={styles.commentMeta}> · {formatFileSize(item.sizeBytes)} · {item.uploadedBy.fullName}</span>
-                </span>
-                <Button variant="ghost" small onClick={() => attachmentMutations.download.mutate(item)}>
-                  Descargar
-                </Button>
-                {(item.uploadedBy.id === user?.id || responsable) && (
-                  <Button variant="ghost" small onClick={() => attachmentMutations.remove.mutate(item.id)}>
-                    Borrar
-                  </Button>
-                )}
-              </div>
-            ))}
-          </section>
-
-          <div className={styles.ai}>
-            <span className={styles.aiKicker}>
-              <Sparkles size={12} strokeWidth={2.75} />
-              PlanifIA puede ayudarte
-            </span>
-            <div className={styles.aiActions}>
-              <Button small variant="secondary" onClick={() => pushToast('La ayuda con IA estara disponible proximamente')}>
-                Desglosar en subtareas
-              </Button>
-              <Button small variant="secondary" onClick={() => pushToast('La ayuda con IA estara disponible proximamente')}>
-                Resumir la discusion
-              </Button>
-            </div>
-          </div>
-
           <section className={styles.history}>
             <h3 className={styles.sectionTitle}>Historial</h3>
             <span>Creada por {task.createdBy?.fullName ?? 'desconocido'} · {formatDateTime(task.createdAt)}</span>
-            {task.updatedAt && <span>Ultimo cambio · {formatDateTime(task.updatedAt)}</span>}
+            {task.updatedAt && <span>Último cambio · {formatDateTime(task.updatedAt)}</span>}
             {task.aiGenerated && <Tag variant="accent" small>Generada por IA</Tag>}
           </section>
         </div>

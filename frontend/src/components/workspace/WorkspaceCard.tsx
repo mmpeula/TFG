@@ -60,7 +60,7 @@ export function WorkspaceCard({
 
         <div className={styles.status}>
           {vacio ? (
-            <span className={styles.pending}>Sin tareas todavia</span>
+            <span className={styles.pending}>Sin tareas todavía</span>
           ) : terminado ? (
             <span className={styles.done}>
               <CheckCircle2 size={13} strokeWidth={2.75} />

@@ -6,7 +6,7 @@ import type { Role } from '@/types/api'
  * de AccessService: aqui solo se oculta lo que ademas el servidor rechaza.
  */
 
-/** RESPONSABLE y MIEMBRO: tareas, comentarios y adjuntos. */
+/** RESPONSABLE y MIEMBRO: crean y editan tareas y comentarios. */
 export function canWrite(role: Role | null | undefined): boolean {
   return role === 'RESPONSABLE' || role === 'MIEMBRO'
 }
@@ -41,7 +41,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 }
 
 export const PRIORITY_LABELS = {
-  BAJA: 'Baja', MEDIA: 'Media', ALTA: 'Alta', CRITICA: 'Critica',
+  BAJA: 'Baja', MEDIA: 'Media', ALTA: 'Alta', CRITICA: 'Crítica',
 } as const
 
 /*

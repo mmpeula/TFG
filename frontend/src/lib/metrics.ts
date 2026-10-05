@@ -68,10 +68,9 @@ export function derivePulse(board?: BoardResponse, project?: ProjectResponse): P
   const signals = deriveSignals(board)
   // Tareas distintas, no senales: una misma tarea parada y ademas sin responsable
   // levanta dos senales, y contarlas sueltas decia «hay 4 tareas atascadas» de un
-  // tablero que solo tenia dos. Las de saturacion son de columna, no de tarea.
+  // tablero que solo tenia dos.
   const blocked = new Set(
     signals
-      .filter((signal) => signal.kind !== 'saturacion')
       .map((signal) => signal.target.taskId)
       .filter((taskId): taskId is number => taskId !== undefined),
   ).size
@@ -152,7 +151,7 @@ function weeklySeries(tasks: TaskResponse[], done: TaskResponse[]) {
 
 function priorityBreakdown(tasks: TaskResponse[]) {
   const config = [
-    { key: 'CRITICA', label: 'Critica', color: 'var(--color-accent-700)' },
+    { key: 'CRITICA', label: 'Crítica', color: 'var(--color-accent-700)' },
     { key: 'ALTA', label: 'Alta', color: 'var(--color-accent-600)' },
     { key: 'MEDIA', label: 'Media', color: 'var(--color-accent-400)' },
     { key: 'BAJA', label: 'Baja', color: 'var(--color-accent-2-400)' },
@@ -168,7 +167,7 @@ function priorityBreakdown(tasks: TaskResponse[]) {
 
 interface InsightInput {
   project?: ProjectResponse
-  columns: { id: number; name: string; wipLimit?: number | null; tasks?: TaskResponse[]; taskCount: number }[]
+  columns: { id: number; name: string; tasks?: TaskResponse[]; taskCount: number }[]
   tasks: TaskResponse[]
   pending: TaskResponse[]
   done: TaskResponse[]
@@ -193,12 +192,12 @@ function buildInsights(input: InsightInput): Insight[] {
 
     const body =
       velocity <= 0
-        ? `Quedan ${pending.length} tareas y en el ultimo mes no se ha cerrado ninguna, asi que todavia no hay ritmo con el que estimar la fecha de entrega.`
+        ? `Quedan ${pending.length} tareas y en el último mes no se ha cerrado ninguna, así que todavía no hay ritmo con el que estimar la fecha de entrega.`
         : remaining === null
           ? `Quedan ${pending.length} tareas a un ritmo de ${decimal(velocity)} por semana: unas ${decimal(weeksNeeded)} semanas de trabajo. El proyecto no tiene fecha de entrega fijada.`
           : weeksLeft !== null && weeksNeeded > weeksLeft
-            ? `Quedan ${pending.length} tareas a ${decimal(velocity)} por semana, es decir ${decimal(weeksNeeded)} semanas, pero hasta la entrega solo hay ${remaining} dias. Al ritmo actual se llega tarde.`
-            : `Quedan ${pending.length} tareas a ${decimal(velocity)} por semana y hasta la entrega hay ${remaining} dias: el ritmo actual llega a tiempo.`
+            ? `Quedan ${pending.length} tareas a ${decimal(velocity)} por semana, es decir ${decimal(weeksNeeded)} semanas, pero hasta la entrega solo hay ${remaining} días. Al ritmo actual se llega tarde.`
+            : `Quedan ${pending.length} tareas a ${decimal(velocity)} por semana y hasta la entrega hay ${remaining} días: el ritmo actual llega a tiempo.`
 
     insights.push({
       id: 'riesgo',
@@ -224,7 +223,7 @@ function buildInsights(input: InsightInput): Insight[] {
       variant: 'block',
       kicker: 'Bloqueos',
       title: blocked === 1 ? 'Hay una tarea atascada' : `Hay ${blocked} tareas atascadas`,
-      body: `${worst.text} Desatascarla es lo que mas mueve la fecha de entrega.`,
+      body: `${worst.text} Desatascarla es lo que más mueve la fecha de entrega.`,
       actions: [{ label: 'Abrir la tarea', primary: true }],
     })
   }
@@ -242,10 +241,10 @@ function buildInsights(input: InsightInput): Insight[] {
       title: `${busiest.name} concentra ${count} de las tareas`,
       body:
         cycleSamples === 0
-          ? `Todavia no se ha cerrado ninguna tarea, asi que aun no hay tiempo de ciclo que medir. En cuanto se cierre la primera, aqui aparecera la media.`
+          ? `Todavía no se ha cerrado ninguna tarea, así que aún no hay tiempo de ciclo que medir. En cuanto se cierre la primera, aquí aparecerá la media.`
           : cycleDays < 1
-            ? `Las ${cycleSamples === 1 ? 'tarea cerrada se resolvio' : `${cycleSamples} tareas cerradas se resolvieron`} en menos de un dia. Vaciar ${busiest.name} es la via mas rapida para mantener ese ritmo.`
-            : `El tiempo medio desde que se crea una tarea hasta que se cierra es de ${decimal(cycleDays)} dias, medido sobre ${cycleSamples} ${cycleSamples === 1 ? 'tarea cerrada' : 'tareas cerradas'}. Vaciar ${busiest.name} es la via mas rapida para bajarlo.`,
+            ? `Las ${cycleSamples === 1 ? 'tarea cerrada se resolvió' : `${cycleSamples} tareas cerradas se resolvieron`} en menos de un día. Vaciar ${busiest.name} es la vía más rápida para mantener ese ritmo.`
+            : `El tiempo medio desde que se crea una tarea hasta que se cierra es de ${decimal(cycleDays)} días, medido sobre ${cycleSamples} ${cycleSamples === 1 ? 'tarea cerrada' : 'tareas cerradas'}. Vaciar ${busiest.name} es la vía más rápida para bajarlo.`,
       actions: [{ label: 'Ir a la columna', primary: true }],
     })
   }

@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { GraduationCap, LayoutGrid, Plus } from 'lucide-react'
+import { LayoutGrid, Plus } from 'lucide-react'
 import { HomeShell } from '@/components/shell/HomeShell'
+import { HomeTabs } from '@/components/shell/HomeTabs'
 import { WorkspaceCard } from '@/components/workspace/WorkspaceCard'
 import { WorkspaceCardActions } from '@/components/workspace/WorkspaceCardActions'
-import { PanelCard } from '@/components/workspace/PanelCard'
 import { InvitationsBanner } from '@/components/workspace/InvitationsBanner'
 import { WorkspaceFormModal } from '@/components/workspace/WorkspaceFormModal'
 import { Button } from '@/components/ui/Button'
@@ -21,16 +21,14 @@ import type { WorkspaceResponse } from '@/types/api'
  * Pantalla inicial: las asignaturas y trabajos del estudiante.
  *
  * Es la unica lista de la aplicacion. Todo lo demas cuelga de entrar en una de
- * estas tarjetas, y de ahi que la unica accion destacada sea crear otra. Por
- * eso el panel docente tampoco vive en un boton de la cabecera: es una tarjeta
- * mas de esta misma cuadricula (ver PanelCard). El administrador no pasa por
- * aqui: tiene su propio panel.
+ * estas tarjetas, y de ahi que la unica accion destacada sea crear otra. El
+ * administrador no pasa por aqui: tiene su propio panel.
  *
  * Un workspace donde solo se observa (donde se es DOCENTE) no aparece aqui como
  * tarjeta propia: no tiene sentido entrar a "trabajar" en algo que solo se
  * sigue. Esos workspaces viven dentro del panel docente. Una cuenta docente ve
- * esta misma pantalla: crea los suyos, donde es responsable, y los que le
- * anaden como docente le salen en esa tarjeta.
+ * esta misma pantalla, con dos pestañas arriba (ver HomeTabs): esta, con los
+ * suyos, donde es responsable, y el panel docente, con los que sigue.
  */
 export function WorkspacesScreen() {
   const navigate = useNavigate()
@@ -40,8 +38,7 @@ export function WorkspacesScreen() {
   const [formOpen, setFormOpen] = useState(false)
 
   const propios = useMemo(() => (workspaces ?? []).filter((item) => !isTeacher(item.myRole)), [workspaces])
-  const sigueAlgunEquipo = (workspaces ?? []).some((item) => isTeacher(item.myRole))
-  const nadaQueMostrar = !isPending && propios.length === 0 && !sigueAlgunEquipo
+  const nadaQueMostrar = !isPending && propios.length === 0
 
   const pendientes = propios.reduce((total, item) => total + item.pendingTasks, 0)
   const nombre = user?.fullName.split(' ')[0]
@@ -55,26 +52,38 @@ export function WorkspacesScreen() {
     navigate(ROUTES.planById(workspace.id))
   }
 
+  const saludo = isPending
+    ? 'Cargando…'
+    : propios.length > 0
+      ? pendientes > 0
+        ? `Hola${nombre ? `, ${nombre}` : ''}. Tienes ${pendientes} ${pendientes === 1 ? 'tarea pendiente' : 'tareas pendientes'} en total.`
+        : `Hola${nombre ? `, ${nombre}` : ''}. No te queda nada pendiente.`
+      : 'Una asignatura, una práctica o un trabajo en grupo: cada cosa, su espacio de trabajo.'
+
+  const nuevo = (
+    <Button onClick={() => setFormOpen(true)}>
+      <Plus size={15} strokeWidth={2.75} />
+      Nuevo espacio de trabajo
+    </Button>
+  )
+
   return (
     <HomeShell>
-      <header className={styles.head}>
-        <div>
-          <h1 className={styles.title}>Mis espacios de trabajo</h1>
-          <p className={styles.subtitle}>
-            {isPending
-              ? 'Cargando…'
-              : propios.length > 0
-                ? pendientes > 0
-                  ? `Hola${nombre ? `, ${nombre}` : ''}. Tienes ${pendientes} ${pendientes === 1 ? 'tarea pendiente' : 'tareas pendientes'} en total.`
-                  : `Hola${nombre ? `, ${nombre}` : ''}. No te queda nada pendiente.`
-                : 'Una asignatura, una practica o un trabajo en grupo: cada cosa, su espacio de trabajo.'}
-          </p>
+      {isTeacher(user?.role) ? (
+        // Cuenta docente: las pestañas ya dicen donde se esta, no hace falta otro titulo.
+        <div className={styles.tabbedHead}>
+          <HomeTabs action={nuevo} />
+          <p className={styles.subtitle}>{saludo}</p>
         </div>
-        <Button onClick={() => setFormOpen(true)}>
-          <Plus size={15} strokeWidth={2.75} />
-          Nuevo espacio de trabajo
-        </Button>
-      </header>
+      ) : (
+        <header className={styles.head}>
+          <div>
+            <h1 className={styles.title}>Mis espacios de trabajo</h1>
+            <p className={styles.subtitle}>{saludo}</p>
+          </div>
+          {nuevo}
+        </header>
+      )}
 
       <InvitationsBanner />
 
@@ -83,7 +92,7 @@ export function WorkspacesScreen() {
       ) : nadaQueMostrar ? (
         <EmptyState
           icon={<LayoutGrid size={22} strokeWidth={2.75} />}
-          title="Todavia no tienes ningun espacio de trabajo"
+          title="Todavía no tienes ningún espacio de trabajo"
           body="Crea uno por cada asignatura o trabajo. Nace con su tablero listo: Por hacer, En progreso y Hecho."
           action={
             <Button onClick={() => setFormOpen(true)}>
@@ -102,14 +111,6 @@ export function WorkspacesScreen() {
               actions={<WorkspaceCardActions workspace={workspace} />}
             />
           ))}
-          {sigueAlgunEquipo && (
-            <PanelCard
-              icon={<GraduationCap size={14} strokeWidth={2.75} />}
-              title="Panel docente"
-              description="Los equipos que sigues como docente, con su progreso y sus alertas."
-              onOpen={() => navigate(ROUTES.docente)}
-            />
-          )}
         </div>
       )}
 

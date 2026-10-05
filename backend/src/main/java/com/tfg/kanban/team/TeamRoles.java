@@ -30,6 +30,25 @@ final class TeamRoles {
     }
 
     /**
+     * Ser docente de un equipo se decide al invitar y ya no se cambia desde dentro:
+     * ni quien sigue el equipo como docente pasa a trabajar en el, ni alguien que
+     * trabaja pasa a solo mirar. Son dos papeles distintos (uno evalua, el otro es
+     * evaluado), y cambiar de uno a otro sin que nadie lo vuelva a aceptar dejaria
+     * a un docente con tareas del reparto, o a un alumno fuera de el sin avisar.
+     * Si hace falta, se le saca del equipo y se le invita otra vez con el otro papel.
+     */
+    static void ensureDocenteRoleUnchanged(Role current, Role requested) {
+        if (current == Role.DOCENTE && requested != Role.DOCENTE) {
+            throw new BusinessRuleException("El rol de un docente no se puede cambiar: se elige al invitarle. "
+                    + "Si tiene que trabajar en el equipo, sácale e invítale otra vez como alumno");
+        }
+        if (current != Role.DOCENTE && requested == Role.DOCENTE) {
+            throw new BusinessRuleException("Nadie pasa a docente desde dentro del equipo: ese papel se elige al "
+                    + "invitar. Sácale e invítale otra vez como docente");
+        }
+    }
+
+    /**
      * El rol en el equipo tiene que encajar con lo que esa cuenta es en la plataforma.
      *
      * <p>El rol que cuenta en cada espacio es el que se tiene <b>en ese espacio</b>.

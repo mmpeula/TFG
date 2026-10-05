@@ -14,7 +14,7 @@ import type { TaskType } from '@/types/api'
  * en la misma banda sin que la pantalla parezca un semaforo.
  */
 export const TASK_TYPES = {
-  EPICA: { label: 'Epica', color: '#6b52a8' },
+  EPICA: { label: 'Épica', color: '#6b52a8' },
   HISTORIA: { label: 'Historia de usuario', color: '#3466cf' },
   TAREA: { label: 'Tarea', color: '#467e59' },
   BUG: { label: 'Bug', color: '#a86a1a' },

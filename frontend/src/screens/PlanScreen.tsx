@@ -4,6 +4,7 @@ import { CalendarRange, Plus, Users } from 'lucide-react'
 import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
 import { TaskCard } from '@/components/board/TaskCard'
 import { TaskPanel } from '@/components/task/TaskPanel'
+import { TeamDashboard } from '@/components/plan/TeamDashboard'
 import { Button } from '@/components/ui/Button'
 import { Segmented } from '@/components/ui/Controls'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -13,14 +14,14 @@ import styles from './PlanScreen.module.css'
 import { useBoard, useProjectBoards, useTaskMutations, useTeamMembers, useWorkspace } from '@/hooks/useData'
 import { buildPlan, DEFAULT_SPRINT_DAYS, isoDate, sprintRange, type Sprint } from '@/lib/sprints'
 import { STATE_COLORS } from '@/lib/planStatus'
-import { canWrite, isTeacher } from '@/lib/roles'
+import { canManage, canWrite, isTeacher } from '@/lib/roles'
 import { formatDate } from '@/lib/format'
 import { useAuth } from '@/state/context'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { ROUTES } from '@/app/routes'
 import type { ColumnResponse, TaskResponse } from '@/types/api'
 
-/** Quien vale para ver: por defecto, solo lo tuyo. */
+/** Que ve el responsable: lo suyo o el equipo entero (con su resumen). */
 const ALCANCES = [
   { value: 'mine', label: 'Mis tareas' },
   { value: 'team', label: 'Todo el equipo' },
@@ -50,9 +51,13 @@ function guardar(clave: string, valor: string) {
  * El tablero responde a «que estoy haciendo ahora»; esta pantalla responde a
  * «llegamos». Cada sprint es una columna con sus tareas en una unica lista,
  * ordenada por fecha: no hay bandas ni columnas separadas por estado, que se ve
- * solo en la insignia de cada tarjeta (color y texto). Por defecto solo se ve
- * lo propio, que es la pregunta que un estudiante se hace de verdad al abrir
- * esto.
+ * solo en la insignia de cada tarjeta (color y texto).
+ *
+ * Que se ve depende del rol en este espacio. Un alumno ve solo sus tareas, sin
+ * nada que elegir: es la pregunta que se hace de verdad al abrir esto. Quien es
+ * responsable elige entre lo suyo y «Todo el equipo», que cambia los sprints
+ * por un resumen de como va el equipo y cada persona (ver TeamDashboard). Un
+ * docente, que solo observa, ve siempre ese resumen.
  *
  * La duracion del sprint no se elige aqui: se fija una vez al crear el
  * workspace (y se puede cambiar en sus ajustes), para que todos los sprints
@@ -75,10 +80,11 @@ export function PlanScreen() {
   const [chosenScope, setScope] = useState<'mine' | 'team'>(
     () => (leerGuardado(GUARDADO_ALCANCE, 'mine') as 'mine' | 'team') ?? 'mine',
   )
-  // Un docente que solo observa este espacio no tiene tareas suyas: siempre ve las de todo el equipo,
-  // y ni se le ofrece elegir. Lo decide su rol en ESTE espacio, no el de su cuenta.
+  // Lo decide el rol en ESTE espacio, no el de la cuenta. Un docente no tiene tareas suyas: siempre
+  // ve el equipo. Un alumno, siempre lo suyo. Solo quien es responsable puede elegir.
   const soloObserva = isTeacher(workspace?.myRole)
-  const scope = soloObserva ? 'team' : chosenScope
+  const responsable = canManage(workspace?.myRole)
+  const scope = soloObserva ? 'team' : responsable ? chosenScope : 'mine'
   const [mobileSprint, setMobileSprint] = useState<number | null>(null)
   const [openTask, setOpenTask] = useState<TaskResponse | null>(null)
 
@@ -124,8 +130,8 @@ export function PlanScreen() {
       ) : sinTareasEnAbsoluto ? (
         <EmptyState
           icon={<CalendarRange size={22} strokeWidth={2} />}
-          title="Todavia no hay nada que planificar"
-          body="En cuanto haya tareas con fecha limite, apareceran aqui repartidas por sprints."
+          title="Todavía no hay nada que planificar"
+          body="En cuanto haya tareas con fecha límite, aparecerán aquí repartidas por sprints."
           action={
             writable ? (
               <Button onClick={() => navigate(ROUTES.tableroById(workspaceId))}>
@@ -159,19 +165,23 @@ export function PlanScreen() {
                 <p className={styles.note}>
                   Sprints de {DEFAULT_SPRINT_DAYS / 7} semanas, por defecto.{' '}
                   <button className={styles.link} onClick={() => navigate(ROUTES.ajustesById(workspaceId))}>
-                    Cambiar la duracion
+                    Cambiar la duración
                   </button>
                 </p>
               )}
             </div>
             <div className={styles.headActions}>
-              {!soloObserva && (
-                <Segmented options={ALCANCES} value={scope} onChange={elegirAlcance} ariaLabel="Que tareas ver" />
+              {responsable && (
+                <Segmented options={ALCANCES} value={scope} onChange={elegirAlcance} ariaLabel="Qué tareas ver" />
               )}
             </div>
           </header>
 
-          {isMobile && plan.sprints.length > 1 && (
+          {scope === 'team' && (
+            <TeamDashboard tasks={tasks} columns={columns} members={members ?? []} sprints={plan.sprints} />
+          )}
+
+          {scope === 'mine' && isMobile && plan.sprints.length > 1 && (
             <div className={styles.mobileTabs}>
               <Segmented
                 options={plan.sprints.map((sprint, index) => ({ value: String(index), label: `Sprint ${sprint.number}` }))}
@@ -182,15 +192,21 @@ export function PlanScreen() {
             </div>
           )}
 
-          {sinTareasPropias ? (
+          {scope === 'team' ? null : sinTareasPropias ? (
             <EmptyState
               icon={<Users size={22} strokeWidth={2} />}
-              title="No tienes tareas asignadas aqui"
-              body="Este espacio de trabajo tiene trabajo, pero ninguna tarea es tuya todavia."
+              title="No tienes tareas asignadas aquí"
+              body={
+                responsable
+                  ? 'Este espacio de trabajo tiene trabajo, pero ninguna tarea es tuya todavía.'
+                  : 'Cuando te asignen alguna tarea, aparecerá aquí en su sprint.'
+              }
               action={
-                <Button variant="secondary" onClick={() => elegirAlcance('team')}>
-                  Ver todo el equipo
-                </Button>
+                responsable ? (
+                  <Button variant="secondary" onClick={() => elegirAlcance('team')}>
+                    Ver todo el equipo
+                  </Button>
+                ) : undefined
               }
             />
           ) : (
@@ -207,13 +223,13 @@ export function PlanScreen() {
             </div>
           )}
 
-          {plan.sinFecha.length > 0 && (
+          {scope === 'mine' && plan.sinFecha.length > 0 && (
             <section className={styles.loose} aria-label="Tareas sin fecha">
               <h2 className={styles.looseTitle}>
                 Sin fecha <span className={styles.dim}>· {plan.sinFecha.length}</span>
               </h2>
               <p className={styles.note}>
-                No entran en ningun sprint. Ponles fecha limite desde el tablero para que cuenten.
+                No entran en ningún sprint. Ábrelas y ponles una fecha límite: entrarán en el sprint que contenga esa fecha.
               </p>
               <div className={styles.looseCards}>
                 {plan.sinFecha.map((item) => (
@@ -267,27 +283,24 @@ function SprintColumn({
   onDelete: (task: TaskResponse) => void
 }) {
   return (
-    <section
-      className={[styles.sprint, sprint.current && styles.currentSprint].filter(Boolean).join(' ')}
-      aria-label={`Sprint ${sprint.number}`}
-    >
+    <section className={styles.sprint} aria-label={`Sprint ${sprint.number}`}>
       <header className={styles.sprintHead}>
-        <h2 className={styles.sprintName}>
-          Sprint {sprint.number}
-          {sprint.current && <span className={styles.now}>ahora</span>}
-        </h2>
+        <div className={styles.sprintTitleRow}>
+          <h2 className={styles.sprintName}>
+            Sprint {sprint.number}
+            {sprint.current && <span className={styles.now}>ahora</span>}
+          </h2>
+          <span className={styles.count}>
+            {sprint.tasks.length === 0 ? '0' : `${sprint.terminadas.length}/${sprint.tasks.length}`}
+          </span>
+        </div>
         <span className={styles.range}>{sprintRange(sprint)}</span>
         <ProgressBar
           value={sprint.progress}
-          height={3}
+          height={2}
           color={sprint.progress === 100 ? 'var(--color-accent-2-500)' : 'var(--color-neutral-700)'}
-          label={`Avance del sprint ${sprint.number}`}
+          label={`Avance del sprint ${sprint.number}: ${sprint.terminadas.length} de ${sprint.tasks.length} completadas`}
         />
-        <span className={styles.count}>
-          {sprint.tasks.length === 0
-            ? 'vacio'
-            : `${sprint.terminadas.length}/${sprint.tasks.length} completadas`}
-        </span>
       </header>
 
       {sprint.tasks.length === 0 ? (

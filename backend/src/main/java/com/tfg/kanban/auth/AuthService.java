@@ -75,7 +75,7 @@ public class AuthService {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, request.password()));
         } catch (DisabledException ex) {
-            throw new BusinessRuleException("La cuenta esta deshabilitada");
+            throw new BusinessRuleException("La cuenta está deshabilitada");
         } catch (AuthenticationException ex) {
             throw new InvalidCredentialsException();
         }

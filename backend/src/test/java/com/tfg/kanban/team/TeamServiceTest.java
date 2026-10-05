@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -164,6 +165,40 @@ class TeamServiceTest {
         assertThatThrownBy(() -> teamService.updateMemberRole(5L, 2L, request))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("En un equipo solo se puede asignar");
+    }
+
+    @Test
+    @DisplayName("Un docente del equipo no puede pasar a alumno ni a responsable: se elige al invitar")
+    void docenteRoleCannotChange() {
+        Team team = Team.builder().id(5L).name("Grupo 4").owner(owner).build();
+        User profe = User.builder().id(2L).fullName("Ana Profe").role(Role.DOCENTE).build();
+        TeamMember membership = TeamMember.builder().id(9L).team(team).user(profe).role(Role.DOCENTE).build();
+
+        when(teamMemberRepository.findByTeam_IdAndUser_Id(5L, 2L)).thenReturn(Optional.of(membership));
+
+        for (Role nuevo : List.of(Role.MIEMBRO, Role.RESPONSABLE)) {
+            UpdateMemberRoleRequest request = new UpdateMemberRoleRequest(nuevo);
+            assertThatThrownBy(() -> teamService.updateMemberRole(5L, 2L, request))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("El rol de un docente no se puede cambiar");
+        }
+        assertThat(membership.getRole()).isEqualTo(Role.DOCENTE);
+    }
+
+    @Test
+    @DisplayName("Quien trabaja en el equipo no pasa a docente, aunque su cuenta lo sea")
+    void cannotBecomeDocenteFromInside() {
+        Team team = Team.builder().id(5L).name("Grupo 4").owner(owner).build();
+        User profe = User.builder().id(2L).fullName("Ana Profe").role(Role.DOCENTE).build();
+        TeamMember membership = TeamMember.builder().id(9L).team(team).user(profe).role(Role.MIEMBRO).build();
+
+        when(teamMemberRepository.findByTeam_IdAndUser_Id(5L, 2L)).thenReturn(Optional.of(membership));
+
+        UpdateMemberRoleRequest request = new UpdateMemberRoleRequest(Role.DOCENTE);
+        assertThatThrownBy(() -> teamService.updateMemberRole(5L, 2L, request))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Nadie pasa a docente");
+        assertThat(membership.getRole()).isEqualTo(Role.MIEMBRO);
     }
 
     @Test

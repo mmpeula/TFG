@@ -67,7 +67,7 @@ public class HealthController {
     private HealthResponse.DatabaseStatus checkDatabase() {
         try (Connection connection = dataSource.getConnection()) {
             if (!connection.isValid(VALIDATION_TIMEOUT_SECONDS)) {
-                return new HealthResponse.DatabaseStatus("DOWN", null, null, "La conexion no es valida");
+                return new HealthResponse.DatabaseStatus("DOWN", null, null, "La conexión no es válida");
             }
             DatabaseMetaData metaData = connection.getMetaData();
             return new HealthResponse.DatabaseStatus(

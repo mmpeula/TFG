@@ -169,7 +169,7 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.update(2L,
                 new UpdateUserRequest("Luis", null, "nuevaClave456")))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("contrasena actual");
+                .hasMessageContaining("contraseña actual");
 
         assertThatThrownBy(() -> userService.update(2L,
                 new UpdateUserRequest("Luis", "noEsLaSuya", "nuevaClave456")))

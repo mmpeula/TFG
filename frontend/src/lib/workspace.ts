@@ -13,7 +13,7 @@ export const WORKSPACE_COLORS = [
   { id: 'tinta', label: 'Tinta', value: '#3f3f46' },
   { id: 'azul', label: 'Azul', value: '#3466cf' },
   { id: 'verde', label: 'Verde', value: '#467e59' },
-  { id: 'ambar', label: 'Ambar', value: '#a86a1a' },
+  { id: 'ambar', label: 'Ámbar', value: '#a86a1a' },
   { id: 'granate', label: 'Granate', value: '#9b3a44' },
   { id: 'morado', label: 'Morado', value: '#6b52a8' },
 ] as const
@@ -35,14 +35,14 @@ export function iconOf(workspace: Pick<WorkspaceResponse, 'name' | 'icon'>): str
 /** Texto de la ultima actividad en lenguaje corriente: «hace 2 dias». */
 export function lastActivityLabel(iso?: string): string {
   const minutes = minutesSince(iso)
-  if (minutes === null) return 'sin actividad todavia'
+  if (minutes === null) return 'sin actividad todavía'
 
   const reciente = withinTheDay(minutes)
   if (reciente) return reciente
 
   const days = Math.floor(minutes / 1440)
   if (days === 1) return 'ayer'
-  if (days < 30) return `hace ${days} dias`
+  if (days < 30) return `hace ${days} días`
   const months = Math.floor(days / 30)
   return months === 1 ? 'hace un mes' : `hace ${months} meses`
 }

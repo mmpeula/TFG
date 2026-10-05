@@ -10,7 +10,7 @@ import { toErrorMessage } from '@/lib/api-client'
 /** Documento si lo hay, si no la descripcion, si tampoco el guion ya guardado. */
 function sourceLabelOf(file: File | null, text: string): string {
   if (file) return `«${file.name}»`
-  if (text.trim()) return 'la descripcion escrita'
+  if (text.trim()) return 'la descripción escrita'
   return 'el guion guardado'
 }
 
@@ -42,12 +42,12 @@ export function PlanJobsProvider({ children }: { children: ReactNode }) {
           setJobs((current) => ({ ...current, [workspaceId]: { status: 'done', sourceLabel, plan, options } }))
           // Subir un documento actualiza el guion guardado del proyecto; lo demas no lo toca.
           if (file) queryClient.invalidateQueries({ queryKey: keys.project(workspaceId) })
-          pushToast(`Propuesta de planificacion lista para «${workspaceName}»`, verElPlan)
+          pushToast(`Propuesta de planificación lista para «${workspaceName}»`, verElPlan)
         },
         (err) => {
           const message = toErrorMessage(err)
           setJobs((current) => ({ ...current, [workspaceId]: { status: 'error', sourceLabel, error: message } }))
-          pushToast(`No se ha podido generar la planificacion de «${workspaceName}»`, verElPlan)
+          pushToast(`No se ha podido generar la planificación de «${workspaceName}»`, verElPlan)
         },
       )
     },

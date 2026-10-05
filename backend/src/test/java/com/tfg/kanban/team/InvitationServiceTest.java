@@ -120,7 +120,7 @@ class InvitationServiceTest {
 
         assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es", null)))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("ya esta en el equipo");
+                .hasMessageContaining("ya está en el equipo");
     }
 
     @Test
@@ -131,7 +131,7 @@ class InvitationServiceTest {
 
         assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es", null)))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("invitacion pendiente");
+                .hasMessageContaining("invitación pendiente");
     }
 
     @Test
@@ -246,7 +246,7 @@ class InvitationServiceTest {
 
         assertThatThrownBy(() -> service.accept("tok"))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("no existe o ya no es valida");
+                .hasMessageContaining("no existe o ya no es válida");
         verify(teamMemberRepository, never()).save(any());
     }
 
@@ -260,7 +260,7 @@ class InvitationServiceTest {
 
         assertThatThrownBy(() -> service.accept("tok"))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("ya esta respondida");
+                .hasMessageContaining("ya está respondida");
     }
 
     @Test

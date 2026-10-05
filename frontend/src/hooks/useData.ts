@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  adminWorkspaces, boards, comments, attachments, invitations, projects, tasks, teams, users, workspaces,
+  adminWorkspaces, boards, comments, invitations, projects, tasks, teams, users, workspaces,
   type TaskPayload, type WorkspacePayload,
 } from '@/api/endpoints'
 import { toErrorMessage } from '@/lib/api-client'
 import { useUi } from '@/state/context'
-import type { AttachmentResponse, Role } from '@/types/api'
+import type { Role } from '@/types/api'
 
 export const keys = {
   workspaces: ['workspaces'] as const,
@@ -18,7 +18,6 @@ export const keys = {
   boards: (projectId: number) => ['projects', 'detalle', projectId, 'boards'] as const,
   board: (id: number) => ['boards', id] as const,
   comments: (taskId: number) => ['tasks', taskId, 'comments'] as const,
-  attachments: (taskId: number) => ['tasks', taskId, 'attachments'] as const,
   adminUsers: ['admin', 'users'] as const,
   adminWorkspaces: ['admin', 'workspaces'] as const,
 }
@@ -77,9 +76,6 @@ export const useBoard = (boardId?: number) =>
 
 export const useComments = (taskId?: number) =>
   useQuery({ queryKey: keys.comments(taskId!), queryFn: () => comments.byTask(taskId!), enabled: enabled(taskId) })
-
-export const useAttachments = (taskId?: number) =>
-  useQuery({ queryKey: keys.attachments(taskId!), queryFn: () => attachments.byTask(taskId!), enabled: enabled(taskId) })
 
 /** Toda mutacion avisa con un toast y refresca lo que toca. */
 function useOnError() {
@@ -182,24 +178,24 @@ export function useInvitationMutations(teamId?: number) {
       onSuccess: (invitation) => {
         if (teamId) queryClient.invalidateQueries({ queryKey: keys.invitations(teamId) })
         pushToast(invitation.emailSent
-          ? `Invitacion enviada a ${invitation.invited.email}`
-          : `Invitacion creada para ${invitation.invited.email}, pero el correo no ha podido salir`)
+          ? `Invitación enviada a ${invitation.invited.email}`
+          : `Invitación creada para ${invitation.invited.email}, pero el correo no ha podido salir`)
       },
       onError,
     }),
     cancel: useMutation({
       mutationFn: (invitationId: number) => teams.cancelInvitation(teamId!, invitationId),
-      onSuccess: () => { refrescarEquipo(); pushToast('Invitacion cancelada') },
+      onSuccess: () => { refrescarEquipo(); pushToast('Invitación cancelada') },
       onError,
     }),
     accept: useMutation({
       mutationFn: (token: string) => invitations.accept(token),
-      onSuccess: () => { refrescarEquipo(); refrescarMias(); pushToast('Ya estas en el equipo') },
+      onSuccess: () => { refrescarEquipo(); refrescarMias(); pushToast('Ya estás en el equipo') },
       onError,
     }),
     reject: useMutation({
       mutationFn: (token: string) => invitations.reject(token),
-      onSuccess: () => { refrescarMias(); pushToast('Invitacion rechazada') },
+      onSuccess: () => { refrescarMias(); pushToast('Invitación rechazada') },
       onError,
     }),
   }
@@ -276,7 +272,7 @@ export function useMemberMutations(teamId?: number) {
     }),
     removeMember: useMutation({
       mutationFn: (userId: number) => teams.removeMember(teamId!, userId),
-      onSuccess: () => { invalidate(); pushToast('Ya no esta en el espacio de trabajo') },
+      onSuccess: () => { invalidate(); pushToast('Ya no está en el espacio de trabajo') },
       onError,
     }),
   }
@@ -385,39 +381,6 @@ export function useAdminUserMutations() {
   }
 }
 
-export function useBoardMutations(boardId?: number, projectId?: number) {
-  const queryClient = useQueryClient()
-  const { pushToast } = useUi()
-  const onError = useOnError()
-  const invalidate = () => {
-    if (boardId) queryClient.invalidateQueries({ queryKey: keys.board(boardId) })
-    if (projectId) {
-      queryClient.invalidateQueries({ queryKey: keys.boards(projectId) })
-      queryClient.invalidateQueries({ queryKey: keys.activity(projectId) })
-    }
-    queryClient.invalidateQueries({ queryKey: ['tasks'] })
-  }
-
-  return {
-    createColumn: useMutation({
-      mutationFn: (payload: { name: string; wipLimit?: number | null }) => boards.createColumn(boardId!, payload),
-      onSuccess: () => { invalidate(); pushToast('Columna creada') },
-      onError,
-    }),
-    updateColumn: useMutation({
-      mutationFn: ({ columnId, payload }: { columnId: number; payload: { name: string; wipLimit?: number | null } }) =>
-        boards.updateColumn(columnId, payload),
-      onSuccess: () => { invalidate(); pushToast('Columna actualizada') },
-      onError,
-    }),
-    removeColumn: useMutation({
-      mutationFn: (columnId: number) => boards.removeColumn(columnId),
-      onSuccess: () => { invalidate(); pushToast('Columna borrada') },
-      onError,
-    }),
-  }
-}
-
 export function useTaskMutations(boardId?: number, projectId?: number) {
   const queryClient = useQueryClient()
   const { pushToast } = useUi()
@@ -479,26 +442,3 @@ export function useCommentMutations(taskId: number, onChanged?: () => void) {
   }
 }
 
-export function useAttachmentMutations(taskId: number, onChanged?: () => void) {
-  const queryClient = useQueryClient()
-  const { pushToast } = useUi()
-  const onError = useOnError()
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: keys.attachments(taskId) })
-    onChanged?.()
-  }
-
-  return {
-    upload: useMutation({
-      mutationFn: (file: File) => attachments.upload(taskId, file),
-      onSuccess: () => { invalidate(); pushToast('Fichero adjuntado') },
-      onError,
-    }),
-    remove: useMutation({
-      mutationFn: (attachmentId: number) => attachments.remove(attachmentId),
-      onSuccess: () => { invalidate(); pushToast('Adjunto borrado') },
-      onError,
-    }),
-    download: useMutation({ mutationFn: (item: AttachmentResponse) => attachments.download(item), onError }),
-  }
-}

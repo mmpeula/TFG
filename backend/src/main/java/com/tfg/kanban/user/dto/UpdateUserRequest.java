@@ -24,7 +24,7 @@ public record UpdateUserRequest(
         String currentPassword,
 
         @Schema(description = "Nueva contrasena; si se omite, no se cambia")
-        @Size(min = 8, max = 72, message = "la contrasena debe tener entre 8 y 72 caracteres")
+        @Size(min = 8, max = 72, message = "la contraseña debe tener entre 8 y 72 caracteres")
         String password
 ) {
 }

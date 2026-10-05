@@ -12,9 +12,8 @@ import { useAuth } from '@/state/context'
  * Marco de la pantalla inicial. No lleva barra lateral a proposito: en el nivel
  * de «mis espacios de trabajo» no hay nada que navegar todavia, solo elegir uno.
  *
- * El panel docente y el de administracion no tienen boton aqui a proposito:
- * viven como una tarjeta mas en la cuadricula de "Mis espacios de trabajo" (ver
- * PanelCard), no en la cabecera. Es la unica lista de la aplicacion.
+ * El panel docente no tiene boton aqui: es la segunda pestaña del inicio de
+ * una cuenta docente (ver HomeTabs), no algo de la cabecera.
  */
 export function HomeShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth()
@@ -35,8 +34,8 @@ export function HomeShell({ children }: { children: ReactNode }) {
             <Avatar user={user} avatarUrl={user?.avatarUrl} size={30} />
             <span className={styles.profileName}>{user?.fullName}</span>
           </button>
-          <Tooltip label="Cerrar sesion">
-            <button className={styles.icon} onClick={signOut} aria-label="Cerrar sesion">
+          <Tooltip label="Cerrar sesión">
+            <button className={styles.icon} onClick={signOut} aria-label="Cerrar sesión">
               <LogOut size={16} strokeWidth={2.75} />
             </button>
           </Tooltip>

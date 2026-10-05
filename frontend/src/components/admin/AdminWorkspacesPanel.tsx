@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, ChevronRight, LayoutGrid, PauseCircle, PlayCircle, Search, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, LayoutGrid, PauseCircle, PlayCircle, Search, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Tag } from '@/components/ui/Tag'
@@ -31,7 +31,7 @@ function matches(workspace: AdminWorkspaceResponse, term: string): boolean {
  * pantalla de datos que no se leen.
  *
  * Lo que no hay, ni en la lista ni en el detalle, es el contenido del tablero:
- * ni tareas, ni comentarios, ni ficheros. El backend tampoco los sirve aqui.
+ * ni tareas, ni comentarios. El backend tampoco los sirve aqui.
  */
 export function AdminWorkspacesPanel() {
   const { data, isPending } = useAdminWorkspaces()
@@ -162,8 +162,9 @@ function WorkspaceDetail({
    * pueda administrarlo (eso tambien lo rechaza el servidor; esto solo evita
    * ofrecer algo que va a fallar).
    */
+  // Sin docente: ese papel se elige al invitar y no se cambia desde dentro, ni hacia el ni
+  // desde el (el servidor lo rechaza). Un docente ni siquiera tiene menu, ver abajo.
   function rolesPara(member: AdminWorkspaceResponse['members'][number]): Role[] {
-    if (member.role === 'DOCENTE') return ['DOCENTE', 'MIEMBRO', 'RESPONSABLE']
     const esUltimoResponsable = member.role === 'RESPONSABLE' && responsablesActivos.length === 1
     return esUltimoResponsable ? ['RESPONSABLE'] : ['RESPONSABLE', 'MIEMBRO']
   }
@@ -221,11 +222,18 @@ function WorkspaceDetail({
                 >
                   <span className={styles.teamName}>{member.fullName}</span>
                   <span className={styles.cellMuted}>{member.email}</span>
-                  {member.enabled ? (
+                  {!member.enabled ? (
+                    <span className={styles.teamRole}>deshabilitada</span>
+                  ) : member.role === 'DOCENTE' ? (
+                    <span className={styles.roleStatic} title="El rol de docente se elige al invitar y no se cambia">
+                      {ROLE_LABELS[member.role]}
+                    </span>
+                  ) : (
                     <Dropdown
                       trigger={({ toggle }) => (
                         <button className={styles.roleButton} onClick={toggle}>
                           {ROLE_LABELS[member.role]}
+                          <ChevronDown size={14} strokeWidth={2.75} aria-hidden="true" />
                         </button>
                       )}
                     >
@@ -250,8 +258,6 @@ function WorkspaceDetail({
                         </>
                       )}
                     </Dropdown>
-                  ) : (
-                    <span className={styles.teamRole}>deshabilitada</span>
                   )}
                 </li>
               ))}
@@ -266,8 +272,8 @@ function WorkspaceDetail({
         </section>
 
         <p className={styles.help}>
-          Desde aquí se ve el estado del espacio de trabajo, no su contenido: las tareas, los comentarios y los
-          ficheros son del equipo. Lo que hagas queda anotado en la actividad del propio espacio de trabajo.
+          Desde aquí se ve el estado del espacio de trabajo, no su contenido: las tareas y los comentarios
+          son del equipo. Lo que hagas queda anotado en la actividad del propio espacio de trabajo.
         </p>
 
         <div className={styles.detailDanger}>
@@ -311,7 +317,7 @@ function WorkspaceDetail({
               </Button>
             }
             title={`Borrar «${workspace.name}»`}
-            description="Se borrará para todo el equipo, con su tablero, sus tareas y sus ficheros. No se puede deshacer."
+            description="Se borrará para todo el equipo, con su tablero, sus tareas y sus comentarios. No se puede deshacer."
             isPending={mutations.remove.isPending}
             onConfirm={() => mutations.remove.mutateAsync(workspace.id).then(onClose)}
           />

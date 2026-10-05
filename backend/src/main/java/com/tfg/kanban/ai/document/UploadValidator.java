@@ -39,13 +39,13 @@ public class UploadValidator {
 
     public ValidatedUpload validate(MultipartFile file) {
         if (file == null) {
-            throw new BusinessRuleException("No se ha recibido ningun documento");
+            throw new BusinessRuleException("No se ha recibido ningún documento");
         }
         if (file.isEmpty()) {
-            throw new BusinessRuleException("El documento esta vacio (0 bytes). Comprueba que has subido el fichero correcto.");
+            throw new BusinessRuleException("El documento está vacío (0 bytes). Comprueba que has subido el fichero correcto.");
         }
         if (file.getSize() > storage.getMaxFileSize()) {
-            throw new BusinessRuleException("El documento pesa %.1f MB y el maximo es %d MB"
+            throw new BusinessRuleException("El documento pesa %.1f MB y el máximo es %d MB"
                     .formatted(file.getSize() / (double) MEGABYTE, storage.getMaxFileSize() / MEGABYTE));
         }
 
@@ -89,7 +89,7 @@ public class UploadValidator {
         }
         if (mime.startsWith("image/")) {
             throw new BusinessRuleException(
-                    "Una imagen suelta no se admite como documento. Pegala dentro de un PDF o de un Word y sube ese.");
+                    "Una imagen suelta no se admite como documento. Pégala dentro de un PDF o de un Word y sube ese.");
         }
         throw new BusinessRuleException("Formato no admitido (%s). Sube el guion en PDF, Word (.docx) o texto plano."
                 .formatted(extension.isBlank() ? mime : extension));
@@ -103,7 +103,7 @@ public class UploadValidator {
     private static void requireExtension(String extension, String label, String expected) {
         if (!extension.isBlank() && !extension.equals(expected)) {
             throw new BusinessRuleException(
-                    "El fichero se llama .%s pero su contenido es %s. Cambiale la extension o sube el original."
+                    "El fichero se llama .%s pero su contenido es %s. Cámbiale la extensión o sube el original."
                             .formatted(extension, label));
         }
     }

@@ -12,8 +12,8 @@ public record MoveTaskRequest(
         @NotNull(message = "la columna destino es obligatoria")
         Long columnId,
 
-        @NotNull(message = "la posicion es obligatoria")
-        @Min(value = 0, message = "la posicion no puede ser negativa")
+        @NotNull(message = "la posición es obligatoria")
+        @Min(value = 0, message = "la posición no puede ser negativa")
         Integer position
 ) {
 }

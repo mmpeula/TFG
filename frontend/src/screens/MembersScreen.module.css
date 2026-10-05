@@ -1,18 +1,8 @@
-.layout { display: flex; flex-direction: column; gap: var(--space-4); max-width: 760px; }
 
-.invite {
-  display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap;
-  background: var(--color-neutral-100);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-}
-.inviteField { flex: 1; min-width: 200px; }
-
-.label { display: block; font-size: 11px; font-weight: 500; color: var(--color-neutral-600); margin-bottom: 5px; }
+.inviteForm { display: contents; }
 
 .control {
-  width: 100%;
+  flex: 1; min-width: 0; max-width: 420px;
   font-family: inherit; font-size: 14px; color: var(--color-text);
   background: var(--color-bg);
   border: 1px solid var(--color-neutral-300);
@@ -23,6 +13,7 @@
 .control:focus { outline: none; border-color: var(--color-neutral-900); }
 
 .roleButton {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
   font-size: 13px; font-weight: 600;
   background: var(--color-bg);
   border: 1px solid var(--color-neutral-300);
@@ -30,16 +21,18 @@
   padding: 9px 11px;
   transition: var(--transition);
 }
+.roleButton svg { flex: none; color: var(--color-neutral-500); }
 .roleButton:hover { border-color: var(--color-neutral-400); }
 
-.members { display: flex; flex-direction: column; gap: var(--space-2); }
+/* Dentro de la tarjeta, las personas van en filas separadas por una linea,
+   como una tabla: otra caja gris por persona serian tarjetas dentro de tarjeta. */
+.members { display: flex; flex-direction: column; }
 .member {
   display: flex; flex-direction: column; gap: var(--space-2);
-  background: var(--color-neutral-100);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-divider);
 }
+.member:first-child { border-top: none; padding-top: 0; }
 .memberRow { display: flex; align-items: center; gap: var(--space-3); }
 .identity { min-width: 0; flex: 1; }
 .name { font-size: 14px; font-weight: 700; }
@@ -47,26 +40,16 @@
 .mail { font-size: 12px; color: var(--color-neutral-600); }
 .joined { font-size: 11px; color: var(--color-neutral-500); white-space: nowrap; }
 
-.help { font-size: 12px; color: var(--color-neutral-600); line-height: 1.5; }
 
 @media (max-width: 640px) {
   .joined { display: none; }
-  .invite { flex-direction: column; align-items: stretch; }
+  .control { max-width: none; }
 }
-
-/* Los invitados van aparte y en gris: todavia no son del equipo, y mezclarlos
-   con quien si lo es haria creer que ya tienen acceso. */
-.pending { display: flex; flex-direction: column; gap: var(--space-2); }
-.pendingTitle {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--color-neutral-500);
-}
-.pending .member { background: var(--color-neutral-100); }
 
 /* La eleccion de rol aparece bajo el correo solo si la cuenta es de docente: es un ajuste de esta invitacion. */
-.inviteChoice { border: 0; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.inviteChoice { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .inviteChoiceLegend { font-size: 12px; font-weight: 600; color: var(--color-neutral-700); padding: 0; margin-bottom: 4px; }
+.inviteChoiceHint { font-weight: 500; color: var(--color-warning-700); }
 .inviteOption {
   display: flex; align-items: flex-start; gap: var(--space-2);
   font-size: 12px; color: var(--color-neutral-600);

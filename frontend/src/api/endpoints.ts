@@ -1,7 +1,7 @@
 import { apiClient } from '@/lib/api-client'
 import type {
-  ActivityLogResponse, AdminWorkspaceResponse, AiPlanResponse, AttachmentResponse, AuthResponse, BoardResponse,
-  ChatResponse, ChatTurn, ColumnResponse, CommentResponse, DetectedDateResponse, PageResponse, PlanProgressResponse, InviteCandidateResponse,
+  ActivityLogResponse, AdminWorkspaceResponse, AiPlanResponse, AuthResponse, BoardResponse,
+  ChatResponse, ChatTurn, CommentResponse, DetectedDateResponse, PageResponse, PlanProgressResponse, InviteCandidateResponse,
   InvitationResponse, MyInvitationResponse,
   PlanOptions, ProjectResponse, Role, ProposedTask, TaskPriority, TaskResponse, TaskType, TeamMemberResponse,
   UserResponse, WorkspaceResponse,
@@ -202,11 +202,6 @@ export const boards = {
   byProject: (projectId: number) =>
     apiClient.get<BoardResponse[]>(`/projects/${projectId}/boards`).then((r) => r.data),
   get: (boardId: number) => apiClient.get<BoardResponse>(`/boards/${boardId}`).then((r) => r.data),
-  createColumn: (boardId: number, payload: { name: string; wipLimit?: number | null }) =>
-    apiClient.post<ColumnResponse>(`/boards/${boardId}/columns`, payload).then((r) => r.data),
-  updateColumn: (columnId: number, payload: { name: string; wipLimit?: number | null }) =>
-    apiClient.put<ColumnResponse>(`/columns/${columnId}`, payload).then((r) => r.data),
-  removeColumn: (columnId: number) => apiClient.delete(`/columns/${columnId}`).then(() => undefined),
 }
 
 export interface TaskPayload {
@@ -238,35 +233,6 @@ export const comments = {
   update: (commentId: number, content: string) =>
     apiClient.put<CommentResponse>(`/comments/${commentId}`, { content }).then((r) => r.data),
   remove: (commentId: number) => apiClient.delete(`/comments/${commentId}`).then(() => undefined),
-}
-
-export const attachments = {
-  byTask: (taskId: number) =>
-    apiClient.get<AttachmentResponse[]>(`/tasks/${taskId}/attachments`).then((r) => r.data),
-  upload: (taskId: number, file: File) => {
-    const form = new FormData()
-    form.append('file', file)
-    return apiClient
-      .post<AttachmentResponse>(`/tasks/${taskId}/attachments`, form, {
-        headers: { 'Content-Type': undefined },
-      })
-      .then((r) => r.data)
-  },
-  remove: (attachmentId: number) => apiClient.delete(`/attachments/${attachmentId}`).then(() => undefined),
-  /** La descarga pasa por axios para que lleve el token; se entrega con una URL temporal. */
-  download: async (attachment: AttachmentResponse) => {
-    const response = await apiClient.get<Blob>(`/attachments/${attachment.id}/download`, {
-      responseType: 'blob',
-    })
-    const url = URL.createObjectURL(response.data)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = attachment.filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
-  },
 }
 
 export const users = {

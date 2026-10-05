@@ -1,0 +1,28 @@
+.wrap { position: relative; display: block; min-width: 0; }
+
+/* El aspecto lo pone la clase del formulario que lo usa; aqui solo se deja
+   sitio al boton y se escribe en monoespacio, porque una fecha es una medida. */
+.text {
+  width: 100%;
+  padding-right: 36px !important;
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.button {
+  position: absolute; top: 50%; right: 6px;
+  transform: translateY(-50%);
+  display: grid; place-items: center;
+  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  color: var(--color-neutral-600);
+}
+.button:hover { background: var(--color-neutral-200); color: var(--color-text); }
+
+/* El selector nativo sigue ahi para abrir su calendario, pero no se ve ni se
+   puede pulsar: el calendario se abre en la esquina donde esta el boton. */
+.picker {
+  position: absolute; right: 0; bottom: 0;
+  width: 1px; height: 1px;
+  opacity: 0; pointer-events: none;
+  border: 0; padding: 0;
+}

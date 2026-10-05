@@ -73,40 +73,6 @@ class TaskControllerIT extends AbstractApiIT {
     }
 
     @Test
-    @DisplayName("El limite WIP de la columna destino bloquea el movimiento")
-    void wipLimitBlocksMove() throws Exception {
-        TestUser responsable = registerUser(Role.MIEMBRO);
-        Workspace workspace = createWorkspace(responsable, "Equipo WIP");
-        Long teamId = workspace.teamId();
-        Long boardId = workspace.boardId();
-        long[] columns = columnIds(responsable, boardId);
-
-        // La columna "En curso" admite una sola tarea
-        mockMvc.perform(authorized(put("/api/columns/{id}", columns[1]), responsable)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"En curso\",\"wipLimit\":1}"))
-                .andExpect(status().isOk());
-
-        Long first = createTask(responsable, columns[0], "Tarea A");
-        Long second = createTask(responsable, columns[0], "Tarea B");
-
-        mockMvc.perform(authorized(patch("/api/tasks/{id}/move", first), responsable)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"columnId":%d,"position":0}
-                                """.formatted(columns[1])))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(authorized(patch("/api/tasks/{id}/move", second), responsable)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"columnId":%d,"position":0}
-                                """.formatted(columns[1])))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
-    }
-
-    @Test
     @DisplayName("Un DOCENTE puede leer el tablero pero no tocar las tareas")
     void observerIsReadOnly() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);

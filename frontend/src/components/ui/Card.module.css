@@ -1,0 +1,56 @@
+/*
+ * Una tarjeta por pantalla, borde de 1 px y sin sombra (no flota). Dentro, los
+ * apartados se separan con una linea, no con mas cajas.
+ */
+.group {
+  display: flex; flex-direction: column;
+  background: var(--color-bg);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  padding: 0 var(--space-6);
+}
+
+.card {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: 14px 0;
+}
+.card:not(:first-child) { border-top: 1px solid var(--color-divider); }
+
+.top { display: flex; align-items: center; gap: var(--space-6); }
+
+/* Ancho fijo: los controles de todos los apartados empiezan en la misma vertical. */
+.head { flex: 0 0 380px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.headWide { flex: 1; }
+
+.title { font-size: 14px; font-weight: 650; letter-spacing: -0.01em; }
+.description { font-size: 12.5px; color: var(--color-neutral-600); line-height: 1.45; }
+
+.aside {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3);
+}
+
+.body { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+/* ----------------------------------------------------------------- nota */
+
+.info {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  background: var(--color-neutral-100);
+  border-radius: var(--radius-md);
+  padding: 10px var(--space-3);
+  font-size: 12.5px; line-height: 1.5; color: var(--color-neutral-700);
+}
+.info svg { vertical-align: -2px; }
+.infoIcon { flex: none; margin-top: 1px; color: var(--color-neutral-500); }
+.infoAccent .infoIcon { color: var(--color-accent-600); }
+
+@media (max-width: 900px) {
+  .head { flex-basis: 280px; }
+}
+@media (max-width: 760px) {
+  .group { padding: 0 var(--space-4); }
+  .top { flex-direction: column; align-items: stretch; gap: var(--space-3); }
+  .head { flex: none; }
+  .aside { justify-content: flex-start; flex-wrap: wrap; }
+}

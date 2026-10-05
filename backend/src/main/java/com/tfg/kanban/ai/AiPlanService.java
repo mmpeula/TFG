@@ -109,7 +109,7 @@ public class AiPlanService {
 
         if (project.getBriefing() == null || project.getBriefing().isBlank()) {
             throw new BusinessRuleException(
-                    "El proyecto no tiene guion de la practica: subelo como documento o escribelo en el proyecto");
+                    "El proyecto no tiene guion de la práctica: súbelo como documento o escríbelo en el proyecto");
         }
         return tracked(projectId, () -> plan(project, project.getBriefing(), "guion del proyecto", options, List.of()));
     }
@@ -162,15 +162,15 @@ public class AiPlanService {
     public AiPlanResponse generateFromText(Long projectId, String text, PlanOptions options) {
         Project project = projectService.getProject(projectId);
         if (text == null || text.isBlank()) {
-            throw new BusinessRuleException("Escribe de que va el trabajo para que pueda proponerte tareas");
+            throw new BusinessRuleException("Escribe de qué va el trabajo para que pueda proponerte tareas");
         }
-        return tracked(projectId, () -> plan(project, text.trim(), "descripcion escrita", options, List.of()));
+        return tracked(projectId, () -> plan(project, text.trim(), "descripción escrita", options, List.of()));
     }
 
     private AiPlanResponse plan(Project project, String text, String source, PlanOptions requested,
                                 List<String> documentWarnings) {
         if (!properties.isEnabled()) {
-            throw new AiUnavailableException("El modulo de IA esta desactivado en la configuracion del servidor");
+            throw new AiUnavailableException("El módulo de IA está desactivado en la configuración del servidor");
         }
         progressTracker.advance(project.getId(), ProcessingStage.PLANNING);
         PlanOptions options = requested == null ? PlanOptions.defaults() : requested;
@@ -239,8 +239,8 @@ public class AiPlanService {
             String corregido = deepSeekClient.chatJson(SYSTEM_PROMPT, List.of(
                     new DeepSeekClient.Message("user", userPrompt),
                     new DeepSeekClient.Message("assistant", raw),
-                    new DeepSeekClient.Message("user", "Eso no es un JSON valido: %s Corrigelo y responde solo con "
-                            + "el JSON pedido, sin texto antes ni despues.".formatted(primerError.getMessage()))));
+                    new DeepSeekClient.Message("user", ("Eso no es un JSON valido: %s Corrigelo y responde solo con "
+                            + "el JSON pedido, sin texto antes ni despues.").formatted(primerError.getMessage()))));
             try {
                 return new PlanAttempt(corregido, parse(corregido));
             } catch (InvalidPlanException segundoError) {
@@ -329,7 +329,7 @@ public class AiPlanService {
 
         List<PlanBalanceValidator.Violation> restantes = PlanBalanceValidator.check(tareas, team);
         List<String> avisos = restantes.isEmpty() ? List.of()
-                : List.of("El reparto no ha quedado del todo equilibrado, ni siquiera tras el ajuste automatico: %s"
+                : List.of("El reparto no ha quedado del todo equilibrado, ni siquiera tras el ajuste automático: %s"
                         .formatted(restantes.stream().map(PlanBalanceValidator.Violation::message)
                                 .collect(Collectors.joining(" "))));
         ParsedPlan resultado = new ParsedPlan(tareas, parsed.numSprints(), parsed.goals(), parsed.modelWarnings());
@@ -523,7 +523,7 @@ public class AiPlanService {
                 if (valida) {
                     validas.add(previa.title());
                 } else {
-                    warnings.add("Se ha descartado una dependencia de «%s» hacia «%s»: no es valida (no existe, es ella misma o esta en un sprint posterior)."
+                    warnings.add("Se ha descartado una dependencia de «%s» hacia «%s»: no es válida (no existe, es ella misma o está en un sprint posterior)."
                             .formatted(task.title(), titulo));
                 }
             }

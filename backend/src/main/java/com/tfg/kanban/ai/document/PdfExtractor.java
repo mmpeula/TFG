@@ -84,15 +84,15 @@ class PdfExtractor {
 
         try (PDDocument document = Loader.loadPDF(upload.bytes())) {
             if (document.isEncrypted() && !document.getCurrentAccessPermission().canExtractContent()) {
-                throw new BusinessRuleException("El PDF esta protegido y no permite extraer su contenido");
+                throw new BusinessRuleException("El PDF está protegido y no permite extraer su contenido");
             }
             int total = document.getNumberOfPages();
             if (total == 0) {
-                throw new BusinessRuleException("El PDF no tiene paginas");
+                throw new BusinessRuleException("El PDF no tiene páginas");
             }
             int limit = Math.min(total, config.getMaxPages());
             if (limit < total) {
-                warnings.add("El PDF tiene %d paginas: solo se han leido las %d primeras.".formatted(total, limit));
+                warnings.add("El PDF tiene %d páginas: solo se han leído las %d primeras.".formatted(total, limit));
             }
 
             // PDFBox no avisa de las paginas sin contenido: las que faltan son paginas vacias.
@@ -133,12 +133,12 @@ class PdfExtractor {
                     titleOf(document), TextCleaner.clean(text), tables, visuals, blank, skipped, warnings);
 
         } catch (InvalidPasswordException ex) {
-            throw new BusinessRuleException("El PDF esta protegido con contrasena: quitasela y vuelve a subirlo");
+            throw new BusinessRuleException("El PDF está protegido con contraseña: quítasela y vuelve a subirlo");
         } catch (BusinessRuleException ex) {
             throw ex;
         } catch (IOException | RuntimeException ex) {
             log.warn("No se ha podido leer el PDF {}: {}", upload.filename(), ex.toString());
-            throw new BusinessRuleException("No se ha podido leer el documento: el PDF esta danado o no es valido");
+            throw new BusinessRuleException("No se ha podido leer el documento: el PDF está dañado o no es válido");
         }
     }
 
@@ -287,11 +287,11 @@ class PdfExtractor {
                 visuals.add(preparer.prepare(kind, page, image));
             } catch (IOException | RuntimeException ex) {
                 log.warn("No se ha podido dibujar la pagina {}: {}", page, ex.toString());
-                warnings.add("No se ha podido dibujar la pagina %d para leerla visualmente.".formatted(page));
+                warnings.add("No se ha podido dibujar la página %d para leerla visualmente.".formatted(page));
             }
         }
         if (skipped > 0) {
-            warnings.add("Hay %d paginas que solo se pueden leer visualmente y el limite es %d: el resto se ha omitido."
+            warnings.add("Hay %d páginas que solo se pueden leer visualmente y el límite es %d: el resto se ha omitido."
                     .formatted(wanted.size(), budget));
         }
         return skipped;
@@ -332,7 +332,7 @@ class PdfExtractor {
         }
         int skipped = Math.max(0, refs.size() - attempts);
         if (skipped > 0) {
-            warnings.add("El documento tiene mas imagenes de las que se analizan: se han tomado las %d mas grandes."
+            warnings.add("El documento tiene más imágenes de las que se analizan: se han tomado las %d más grandes."
                     .formatted(config.getMaxImages()));
         }
         return skipped;

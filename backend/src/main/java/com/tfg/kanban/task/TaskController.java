@@ -51,11 +51,10 @@ public class TaskController {
     }
 
     @Operation(summary = "Crear una tarea en una columna",
-            description = "RESPONSABLE o MIEMBRO. Se respeta el limite WIP de la columna.")
+            description = "RESPONSABLE o MIEMBRO.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Tarea creada"),
-            @ApiResponse(responseCode = "403", description = "Los DOCENTE no pueden crear tareas"),
-            @ApiResponse(responseCode = "409", description = "Limite WIP alcanzado")
+            @ApiResponse(responseCode = "403", description = "Los DOCENTE no pueden crear tareas")
     })
     @PreAuthorize("@access.canWriteColumn(#columnId)")
     @PostMapping("/api/columns/{columnId}/tasks")
@@ -75,7 +74,7 @@ public class TaskController {
             description = "Es la llamada que persiste el drag & drop del tablero.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tarea movida"),
-            @ApiResponse(responseCode = "409", description = "Limite WIP de la columna destino o tablero distinto")
+            @ApiResponse(responseCode = "409", description = "La columna destino es de otro tablero")
     })
     @PreAuthorize("@access.canWriteTask(#id)")
     @PatchMapping("/api/tasks/{id}/move")

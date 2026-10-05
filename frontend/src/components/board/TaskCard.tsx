@@ -1,22 +1,55 @@
 import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Check, MessageSquare, MoreHorizontal, Paperclip, Sparkles, Trash2 } from 'lucide-react'
+import {
+  Check, ChevronDown, ChevronsUp, ChevronUp, Equal, MessageSquare, MoreHorizontal, Sparkles, Trash2,
+} from 'lucide-react'
+import { BreakableText } from '@/components/ui/BreakableText'
 import { Avatar } from '@/components/ui/Avatar'
 import { Tag } from '@/components/ui/Tag'
 import { Dropdown, DropdownItem } from '@/components/ui/Controls'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SignalBadge } from './SignalBadge'
+import type { TaskWarning } from '@/lib/signals'
 import styles from './TaskCard.module.css'
 import { formatDate, daysUntil } from '@/lib/format'
 import { PRIORITY_COLOR, PRIORITY_LABELS } from '@/lib/roles'
-import type { ColumnResponse, TaskResponse } from '@/types/api'
+import type { ColumnResponse, TaskPriority, TaskResponse } from '@/types/api'
+
+/*
+ * La prioridad, a la vista: la franja de la izquierda ya la pinta, pero un color
+ * solo no dice cual es. La etiqueta lleva el nombre, una flecha que sube o baja
+ * (se lee aunque no se distingan los colores) y el mismo tono que la franja:
+ * rojo lo critico, ambar lo alto, gris lo que puede esperar.
+ */
+const PRIORITY_ICON = { CRITICA: ChevronsUp, ALTA: ChevronUp, MEDIA: Equal, BAJA: ChevronDown } as const
+const PRIORITY_TONE: Record<TaskPriority, { fg: string; bg: string }> = {
+  CRITICA: { fg: 'var(--color-danger-700)', bg: 'var(--color-danger-100)' },
+  ALTA: { fg: 'var(--color-warning-700)', bg: 'var(--color-warning-100)' },
+  MEDIA: { fg: 'var(--color-neutral-700)', bg: 'var(--color-neutral-200)' },
+  BAJA: { fg: 'var(--color-neutral-600)', bg: 'var(--color-neutral-100)' },
+}
+
+function PriorityTag({ priority }: { priority: TaskPriority }) {
+  const Icon = PRIORITY_ICON[priority]
+  const tone = PRIORITY_TONE[priority]
+  return (
+    <span
+      className={styles.priority}
+      style={{ '--p-fg': tone.fg, '--p-bg': tone.bg } as React.CSSProperties}
+      title={`Prioridad ${PRIORITY_LABELS[priority].toLowerCase()}`}
+    >
+      <Icon size={12} strokeWidth={2.75} aria-hidden="true" />
+      {PRIORITY_LABELS[priority]}
+    </span>
+  )
+}
 
 interface Props {
   task: TaskResponse
   /** Columnas a las que se puede mover desde el menu; sin ellas, el menu solo abre y borra. */
   columns?: ColumnResponse[]
-  badge?: string
+  badge?: TaskWarning
   done?: boolean
   highlighted?: boolean
   canWrite?: boolean
@@ -66,7 +99,6 @@ export function TaskCard({
         ...(overlay ? {} : { transform: CSS.Translate.toString(sortable.transform), transition: sortable.transition }),
       } as React.CSSProperties}
     >
-      {badge && <SignalBadge text={badge} />}
 
       {draggable && canWrite && !overlay && (
         <span
@@ -80,9 +112,12 @@ export function TaskCard({
 
       <div className={styles.content}>
         <header className={styles.head}>
-          <span className={styles.code} title={`Prioridad ${PRIORITY_LABELS[task.priority].toLowerCase()}`}>
+          <span className={styles.code}>
             #{task.id}{task.estimatedHours != null && <span className={styles.codeHours}> · {task.estimatedHours}h</span>}
           </span>
+          {/* Hueco flexible: menu, aviso y estado quedan juntos a la derecha. El menu va antes
+              del aviso porque solo se ve al pasar el raton: asi el aviso queda pegado al borde. */}
+          <span className={styles.headSpacer} />
           {canWrite && (
             <Dropdown
               trigger={({ toggle }) => (
@@ -108,6 +143,7 @@ export function TaskCard({
               )}
             </Dropdown>
           )}
+          {badge && <SignalBadge warning={badge} />}
           {/* Lo ultimo de la cabecera, pegado al borde: el boton de acciones queda a su izquierda. */}
           {status && (
             <span className={styles.status} style={{ '--estado': status.color } as React.CSSProperties}>
@@ -124,17 +160,18 @@ export function TaskCard({
                 <Check size={13} strokeWidth={2.75} />
               </span>
             )}
-            {task.title}
+            <BreakableText>{task.title}</BreakableText>
           </span>
         </button>
 
-        {task.aiGenerated && (
-          <div className={styles.tags}>
+        <div className={styles.tags}>
+          <PriorityTag priority={task.priority} />
+          {task.aiGenerated && (
             <Tag small variant="accent">
               <Sparkles size={10} strokeWidth={2.75} /> IA
             </Tag>
-          </div>
-        )}
+          )}
+        </div>
 
         <footer className={styles.foot}>
           {task.assignees.length === 0
@@ -148,12 +185,6 @@ export function TaskCard({
               {task.commentCount}
             </span>
           )}
-          {task.attachmentCount > 0 && (
-            <span className={styles.stat}>
-              <Paperclip size={12} strokeWidth={2.75} />
-              {task.attachmentCount}
-            </span>
-          )}
           <span className={[styles.due, remaining !== null && remaining <= 0 && styles.dueSoon].filter(Boolean).join(' ')}>
             {task.dueDate ? formatDate(task.dueDate) : ''}
           </span>
@@ -165,7 +196,7 @@ export function TaskCard({
           open={confirmOpen}
           onOpenChange={setConfirmOpen}
           title={`Borrar «${task.title}»`}
-          description="Se borraran tambien sus comentarios y adjuntos."
+          description="Se borrarán también sus comentarios. No se puede deshacer."
           onConfirm={() => onDelete(task)}
         />
       )}

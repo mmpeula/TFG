@@ -46,12 +46,12 @@ public record AiPlanResponse(
 
     private static String message(int propuestas, int sprints, int personas, int duplicadas) {
         if (propuestas == 0 && duplicadas > 0) {
-            return "El modelo ha propuesto %d %s, pero %s trabajo que ya esta en el tablero. Anade o cierra tareas y vuelve a intentarlo."
+            return "El modelo ha propuesto %d %s, pero %s trabajo que ya está en el tablero. Añade o cierra tareas y vuelve a intentarlo."
                     .formatted(duplicadas, duplicadas == 1 ? "tarea" : "tareas",
                             duplicadas == 1 ? "repetia" : "repetian");
         }
         if (propuestas == 0) {
-            return "El modelo no ha propuesto ninguna tarea; prueba con un documento mas detallado.";
+            return "El modelo no ha propuesto ninguna tarea; prueba con un documento más detallado.";
         }
         String base = "%d %s en %d %s, repartidas entre %d %s"
                 .formatted(propuestas, propuestas == 1 ? "tarea" : "tareas",

@@ -80,7 +80,7 @@ public class WorkspaceController {
     }
 
     @Operation(summary = "Borrar un espacio de trabajo",
-            description = "Arrastra tablero, columnas, tareas, comentarios, adjuntos e historial.")
+            description = "Arrastra tablero, columnas, tareas, comentarios e historial.")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@access.canManageProject(#workspaceId)")
     @DeleteMapping("/{workspaceId}")

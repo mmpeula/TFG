@@ -12,7 +12,7 @@ public record InviteRequest(
 
         @Schema(description = "Correo de una cuenta ya registrada: se invita a personas, no a direcciones sueltas")
         @NotBlank(message = "el email es obligatorio")
-        @Email(message = "el email no tiene un formato valido")
+        @Email(message = "el email no tiene un formato válido")
         String email,
 
         @Schema(description = "Como entra: MIEMBRO (trabaja en el equipo) o DOCENTE (lo sigue). Sin indicarlo, el que "

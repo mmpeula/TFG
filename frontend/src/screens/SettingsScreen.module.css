@@ -1,16 +1,16 @@
-.layout { display: flex; flex-direction: column; gap: var(--space-6); max-width: 760px; }
-.pageTitle { font-size: 26px; }
+.layout { display: flex; flex-direction: column; gap: var(--space-3); max-width: 960px; }
+.pageTitle { font-size: 26px; margin-bottom: var(--space-3); }
 
 .profile { display: flex; align-items: center; gap: var(--space-3); }
 .identity { min-width: 0; }
 .name { font-size: 16px; font-weight: 700; }
 .hint { font-size: 12px; color: var(--color-neutral-600); }
 
-.data { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-6); margin-top: var(--space-4); }
+.data { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-6); }
+.measured { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
 .data dt { font-size: 11px; font-weight: 500; color: var(--color-neutral-600); }
 .data dd { font-size: 14px; margin-top: 2px; }
 
-.headerActions { display: flex; align-items: center; gap: var(--space-2); }
 
 /* Formulario de "Editar perfil", mismas clases que WorkspaceFormModal. */
 .form { display: flex; flex-direction: column; gap: var(--space-3); }

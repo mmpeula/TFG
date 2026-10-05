@@ -21,7 +21,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"boardColumn", "assignees", "createdBy", "comments", "attachments"})
+@ToString(exclude = {"boardColumn", "assignees", "createdBy", "comments"})
 @EqualsAndHashCode(of = "id")
 public class Task extends Auditable {
 
@@ -112,9 +112,4 @@ public class Task extends Auditable {
     @OrderBy("createdAt ASC")
     @Builder.Default
     private List<Comment> comments = new ArrayList<>();
-
-    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @OrderBy("createdAt ASC")
-    @Builder.Default
-    private List<Attachment> attachments = new ArrayList<>();
 }

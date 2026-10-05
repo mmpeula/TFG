@@ -1,0 +1,49 @@
+/*
+ * Fila de caras superpuestas. Cada una lleva un borde del color del fondo para
+ * que se separen al solaparse; al pasar por encima sube un poco, y la marcada
+ * lleva un aro azul (el color de la seleccion) y se pone delante de las demas.
+ */
+.stack { display: inline-flex; align-items: center; padding-left: 6px; }
+
+.face {
+  position: relative;
+  display: grid; place-items: center;
+  margin-left: -6px;
+  border-radius: 999px;
+  border: 2px solid var(--color-bg);
+  background: var(--color-bg);
+  padding: 0;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.face:hover { transform: translateY(-2px); z-index: 2; }
+.face:focus-visible { z-index: 3; }
+/* El foco general de la app es un contorno con esquinas de 6 px: aqui, redondo como la cara. */
+.face:focus-visible { outline: 2px solid var(--color-accent-600); outline-offset: 2px; border-radius: 999px; }
+.faceOn { box-shadow: 0 0 0 2px var(--color-accent-600); z-index: 1; }
+.faceOn:focus-visible { outline: none; }
+
+/* Que la cara ocupe exactamente su caja, centrada (sin el hueco de linea de un inline). */
+.face > :first-child { vertical-align: top; }
+.unassigned {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 999px;
+  background: var(--color-neutral-300);
+  color: var(--color-neutral-700);
+}
+
+.more {
+  width: 34px; height: 34px;
+  background: var(--color-neutral-200);
+  font-size: 11px; font-weight: 700; color: var(--color-neutral-700);
+  font-variant-numeric: tabular-nums;
+}
+
+.check {
+  flex: none;
+  display: grid; place-items: center;
+  width: 15px; height: 15px;
+  border-radius: 4px;
+  border: 1.5px solid var(--color-neutral-400);
+  color: #ffffff;
+}
+.checkOn { background: var(--color-neutral-900); border-color: var(--color-neutral-900); }

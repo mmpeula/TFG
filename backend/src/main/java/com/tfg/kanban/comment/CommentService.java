@@ -48,7 +48,7 @@ public class CommentService {
 
         activityService.record(task.getBoardColumn().getBoard().getProject(),
                 ActivityAction.COMENTARIO, "Task", task.getId(),
-                "Comento en la tarea '%s'".formatted(task.getTitle()));
+                "Comentó en la tarea '%s'".formatted(task.getTitle()));
 
         return CommentResponse.from(comment);
     }

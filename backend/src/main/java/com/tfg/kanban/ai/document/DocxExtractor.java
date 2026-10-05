@@ -72,14 +72,14 @@ class DocxExtractor {
         try (TikaInputStream input = TikaInputStream.get(upload.bytes())) {
             parser.parse(input, handler, metadata, context);
         } catch (EncryptedDocumentException ex) {
-            throw new BusinessRuleException("El Word esta protegido con contrasena: quitasela y vuelve a subirlo");
+            throw new BusinessRuleException("El Word está protegido con contraseña: quítasela y vuelve a subirlo");
         } catch (TikaException | SAXException | IOException | RuntimeException ex) {
             // Tika envuelve lo que lanza el manejador: el limite de texto no es un error, es un corte.
             if (!hasCause(ex, StructuredHandler.LimitReached.class)) {
                 log.warn("No se ha podido leer el Word {}: {}", upload.filename(), ex.toString());
                 throw invalidWord();
             }
-            warnings.add("El documento es muy largo: se ha leido solo el principio.");
+            warnings.add("El documento es muy largo: se ha leído solo el principio.");
         }
         // Un .docx es un zip: si Tika lo ha tratado como un zip cualquiera, no es un Word.
         String parsedAs = metadata.get(Metadata.CONTENT_TYPE);
@@ -99,7 +99,7 @@ class DocxExtractor {
     }
 
     private static BusinessRuleException invalidWord() {
-        return new BusinessRuleException("No se ha podido leer el documento: el Word esta danado o no es valido");
+        return new BusinessRuleException("No se ha podido leer el documento: el Word está dañado o no es válido");
     }
 
     private static boolean hasCause(Throwable error, Class<? extends Throwable> type) {
@@ -129,7 +129,7 @@ class DocxExtractor {
         }
         int skipped = decoded.size() - kept;
         if (skipped > 0) {
-            warnings.add("El documento tiene mas imagenes de las que se analizan: se han tomado las %d mas grandes."
+            warnings.add("El documento tiene más imágenes de las que se analizan: se han tomado las %d más grandes."
                     .formatted(config.getMaxImages()));
         }
         return skipped;

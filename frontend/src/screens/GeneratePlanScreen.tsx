@@ -87,7 +87,7 @@ export function GeneratePlanScreen() {
   const apply = useMutation({
     mutationFn: async () => {
       const boardId = boards?.[0]?.id
-      if (!boardId) throw new Error('Este espacio de trabajo no tiene tablero al que anadir las tareas')
+      if (!boardId) throw new Error('Este espacio de trabajo no tiene tablero al que añadir las tareas')
       await saveCalendarOfThePlan()
       const tasks = (plan?.tasks ?? []).filter((_, index) => selected.includes(index))
       return projectsApi.applyAiPlan(workspaceId, boardId, tasks)
@@ -107,7 +107,7 @@ export function GeneratePlanScreen() {
       queryClient.invalidateQueries({ queryKey: keys.workspace(workspaceId) })
       queryClient.invalidateQueries({ queryKey: keys.project(workspaceId) })
       queryClient.invalidateQueries({ queryKey: keys.activity(workspaceId) })
-      pushToast(`${created.length} ${created.length === 1 ? 'tarea anadida' : 'tareas anadidas'} al tablero`)
+      pushToast(`${created.length} ${created.length === 1 ? 'tarea añadida' : 'tareas añadidas'} al tablero`)
     },
     onError: (err) => pushToast(toErrorMessage(err)),
   })
@@ -227,18 +227,13 @@ export function GeneratePlanScreen() {
 
         {!proponiendo && !error && plan && (
           <>
-            <div className={styles.source}>
-              <Tag variant="outline">{plan.source}</Tag>
-              <Tag variant="outline">modelo {plan.model}</Tag>
-            </div>
-
-            <PlanWarnings warnings={plan.warnings ?? []} />
-
             {plan.tasks.length === 0 ? (
-              <p className={styles.nothing}>{plan.message}</p>
+              <>
+                <PlanWarnings warnings={plan.warnings ?? []} />
+                <p className={styles.nothing}>{plan.message}</p>
+              </>
             ) : (
               <>
-                <WorkloadSummary workload={plan.workload} />
                 <ProposalPanel
                   tasks={plan.tasks}
                   sprints={plan.sprints ?? []}
@@ -254,7 +249,13 @@ export function GeneratePlanScreen() {
                   }
                   onApply={() => apply.mutate()}
                   onRegenerate={runGenerate}
-                />
+                >
+                  <div className={styles.source}>
+                    <Tag variant="outline">{plan.source}</Tag>
+                  </div>
+                  <PlanWarnings warnings={plan.warnings ?? []} />
+                  <WorkloadSummary workload={plan.workload} />
+                </ProposalPanel>
               </>
             )}
           </>

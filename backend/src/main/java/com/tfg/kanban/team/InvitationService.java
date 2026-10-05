@@ -59,11 +59,11 @@ public class InvitationService {
                                 + ". Dile que se registre y vuelve a invitarle."));
 
         if (teamMemberRepository.existsByTeam_IdAndUser_Id(teamId, invited.getId())) {
-            throw new BusinessRuleException("Esa persona ya esta en el equipo");
+            throw new BusinessRuleException("Esa persona ya está en el equipo");
         }
         if (invitationRepository.existsByTeam_IdAndInvited_IdAndStatus(
                 teamId, invited.getId(), InvitationStatus.PENDIENTE)) {
-            throw new BusinessRuleException("Ya tiene una invitacion pendiente de responder");
+            throw new BusinessRuleException("Ya tiene una invitación pendiente de responder");
         }
 
         // Quien invita elige solo entre trabajar (alumno) o seguir (docente); sin elegir, entra
@@ -168,7 +168,7 @@ public class InvitationService {
             throw new ResourceNotFoundException("Invitacion", invitationId);
         }
         if (!invitation.isPending()) {
-            throw new BusinessRuleException("Esa invitacion ya esta respondida");
+            throw new BusinessRuleException("Esa invitación ya está respondida");
         }
         resolver(invitation, InvitationStatus.CANCELADA);
     }
@@ -176,15 +176,15 @@ public class InvitationService {
     /** La invitacion del token, si sigue abierta y si es de quien esta respondiendo. */
     private Invitation pendingFor(String token) {
         Invitation invitation = invitationRepository.findByToken(token)
-                .orElseThrow(() -> new ResourceNotFoundException("Esa invitacion no existe o ya no es valida"));
+                .orElseThrow(() -> new ResourceNotFoundException("Esa invitación no existe o ya no es válida"));
 
         if (!invitation.getInvited().getId().equals(SecurityUtils.requireCurrentUserId())) {
             // Mismo mensaje que si no existiera: quien tiene un token ajeno no debe
             // poder averiguar si es valido ni de quien es.
-            throw new ResourceNotFoundException("Esa invitacion no existe o ya no es valida");
+            throw new ResourceNotFoundException("Esa invitación no existe o ya no es válida");
         }
         if (!invitation.isPending()) {
-            throw new BusinessRuleException("Esa invitacion ya esta respondida");
+            throw new BusinessRuleException("Esa invitación ya está respondida");
         }
         return invitation;
     }
@@ -202,11 +202,11 @@ public class InvitationService {
 
                 %s te ha invitado a unirte a «%s» en PlanifIA, como %s.
 
-                Para aceptar o rechazar la invitacion, entra aqui:
+                Para aceptar o rechazar la invitación, entra aquí:
                 %s
 
-                Si no esperabas esta invitacion, puedes ignorar este correo: no entraras
-                en ningun equipo mientras no la aceptes.
+                Si no esperabas esta invitación, puedes ignorar este correo: no entrarás
+                en ningún equipo mientras no la aceptes.
                 """.formatted(
                 invitation.getInvited().getFullName(),
                 quien,

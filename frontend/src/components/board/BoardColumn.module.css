@@ -13,22 +13,6 @@
   color: var(--color-neutral-500);
   font-variant-numeric: tabular-nums;
 }
-.countOver { color: var(--color-danger-600); }
-.add {
-  margin-left: auto;
-  display: grid; place-items: center;
-  width: 24px; height: 24px;
-  border-radius: var(--radius-sm);
-  color: var(--color-neutral-500);
-  opacity: 0;
-}
-/* El «+» de la columna aparece al acercarse: no hace falta verlo siempre. */
-.column:hover .add, .add:focus-visible { opacity: 1; }
-.add:hover { background: var(--color-neutral-200); color: var(--color-text); }
-.warning {
-  font-size: 11px;
-  color: var(--color-danger-600);
-}
 .cards { display: flex; flex-direction: column; gap: var(--space-2); min-height: 40px; }
 .more {
   font-size: 12px;
@@ -39,4 +23,3 @@
 }
 .more:hover { background: var(--color-neutral-200); color: var(--color-text); }
 
-.footer { border-top: 1px solid var(--color-neutral-200); padding-top: var(--space-2); }

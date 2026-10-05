@@ -105,8 +105,8 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
           <button className={styles.profile} onClick={() => navigate(ROUTES.configuracion)} aria-label="Mi cuenta">
             <Avatar user={user} avatarUrl={user?.avatarUrl} size={28} />
           </button>
-          <Tooltip label="Cerrar sesion">
-            <button className={styles.icon} onClick={signOut} aria-label="Cerrar sesion">
+          <Tooltip label="Cerrar sesión">
+            <button className={styles.icon} onClick={signOut} aria-label="Cerrar sesión">
               <LogOut size={16} strokeWidth={2.75} />
             </button>
           </Tooltip>
@@ -134,7 +134,7 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
           <EmptyState
             icon={<PauseCircle size={22} strokeWidth={2.75} />}
             title="Este espacio de trabajo está suspendido"
-            body="Lo ha parado quien administra la plataforma. No se ha perdido nada: el tablero, las tareas y los ficheros siguen ahí y volverán en cuanto lo reactiven."
+            body="Lo ha parado quien administra la plataforma. No se ha perdido nada: el tablero, las tareas y los comentarios siguen ahí y volverán en cuanto lo reactiven."
           />
         ) : (
           children

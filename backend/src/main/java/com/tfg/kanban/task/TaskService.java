@@ -61,10 +61,8 @@ public class TaskService {
     @Transactional
     public TaskResponse create(Long columnId, TaskRequest request) {
         BoardColumn column = boardService.getColumn(columnId);
-        // Cuantas hay ahora: decide si cabe una mas y, si cabe, en que posicion entra
-        // (la ultima). Es el mismo numero, asi que se cuenta una sola vez.
+        // Cuantas hay ahora: la nueva entra la ultima, en esa posicion.
         long tasksInColumn = taskRepository.countByBoardColumn_Id(columnId);
-        checkWipLimit(column, tasksInColumn + 1);
 
         Long userId = SecurityUtils.requireCurrentUserId();
         User creator = userRepository.findById(userId)
@@ -86,7 +84,7 @@ public class TaskService {
 
         Task saved = taskRepository.save(task);
         activityService.record(projectOf(column), ActivityAction.CREACION, "Task", saved.getId(),
-                "Creo la tarea '%s' en '%s'".formatted(saved.getTitle(), column.getName()));
+                "Creó la tarea '%s' en '%s'".formatted(saved.getTitle(), column.getName()));
 
         return taskMapper.toResponse(saved);
     }
@@ -110,7 +108,7 @@ public class TaskService {
 
         Project project = projectOf(task.getBoardColumn());
         activityService.record(project, ActivityAction.ACTUALIZACION, "Task", task.getId(),
-                "Actualizo la tarea '%s'".formatted(task.getTitle()));
+                "Actualizó la tarea '%s'".formatted(task.getTitle()));
 
         Set<Long> newIds = task.getAssignees().stream().map(User::getId).collect(Collectors.toSet());
         if (!previousIds.equals(newIds)) {
@@ -133,9 +131,6 @@ public class TaskService {
         }
 
         boolean changesColumn = !origin.getId().equals(target.getId());
-        if (changesColumn) {
-            checkWipLimit(target, taskRepository.countByBoardColumn_Id(target.getId()) + 1);
-        }
 
         List<Task> targetTasks = new ArrayList<>(
                 taskRepository.findByBoardColumn_IdOrderByPositionAsc(target.getId()));
@@ -152,11 +147,11 @@ public class TaskService {
                     .toList());
 
             activityService.record(projectOf(target), ActivityAction.MOVIMIENTO, "Task", task.getId(),
-                    "Movio la tarea '%s' de '%s' a '%s'"
+                    "Movió la tarea '%s' de '%s' a '%s'"
                             .formatted(task.getTitle(), origin.getName(), target.getName()));
         } else {
             activityService.record(projectOf(target), ActivityAction.MOVIMIENTO, "Task", task.getId(),
-                    "Reordeno la tarea '%s' dentro de '%s'".formatted(task.getTitle(), target.getName()));
+                    "Reordenó la tarea '%s' dentro de '%s'".formatted(task.getTitle(), target.getName()));
         }
 
         return taskMapper.toResponse(task);
@@ -168,7 +163,7 @@ public class TaskService {
         BoardColumn column = task.getBoardColumn();
 
         activityService.record(projectOf(column), ActivityAction.BORRADO, "Task", task.getId(),
-                "Borro la tarea '%s'".formatted(task.getTitle()));
+                "Borró la tarea '%s'".formatted(task.getTitle()));
 
         taskRepository.delete(task);
         taskRepository.flush();
@@ -178,14 +173,6 @@ public class TaskService {
     public Task getTask(Long taskId) {
         return taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tarea", taskId));
-    }
-
-    private void checkWipLimit(BoardColumn column, long tasksAfterChange) {
-        if (column.getWipLimit() != null && tasksAfterChange > column.getWipLimit()) {
-            throw new BusinessRuleException(
-                    "La columna '%s' ha alcanzado su limite WIP (%d)"
-                            .formatted(column.getName(), column.getWipLimit()));
-        }
     }
 
     /** Solo se puede asignar una tarea a gente que pertenezca al equipo del proyecto. */
@@ -210,9 +197,9 @@ public class TaskService {
     private String assignmentMessage(Task task) {
         List<String> nombres = task.getAssignees().stream().map(User::getFullName).toList();
         if (nombres.isEmpty()) {
-            return "Dejo sin asignar la tarea '%s'".formatted(task.getTitle());
+            return "Dejó sin asignar la tarea '%s'".formatted(task.getTitle());
         }
-        return "Asigno la tarea '%s' a %s".formatted(task.getTitle(), String.join(", ", nombres));
+        return "Asignó la tarea '%s' a %s".formatted(task.getTitle(), String.join(", ", nombres));
     }
 
     private Project projectOf(BoardColumn column) {

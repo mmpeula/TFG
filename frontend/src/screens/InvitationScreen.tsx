@@ -26,11 +26,11 @@ export function InvitationScreen() {
   return (
     <HomeShell>
       {isPending ? (
-        <Skeleton label="Buscando la invitacion…" lines={2} />
+        <Skeleton label="Buscando la invitación…" lines={2} />
       ) : !invitacion ? (
         <EmptyState
           icon={<Mail size={22} strokeWidth={2.75} />}
-          title="Esta invitacion ya no esta disponible"
+          title="Esta invitación ya no está disponible"
           body="O la respondiste, o la cancelaron, o es de otra cuenta. Si esperabas entrar en un equipo, pide que te vuelvan a invitar."
           action={<Button onClick={() => navigate(ROUTES.workspaces)}>Ir a mis espacios de trabajo</Button>}
         />
@@ -38,7 +38,7 @@ export function InvitationScreen() {
         <EmptyState
           icon={<Mail size={22} strokeWidth={2.75} />}
           title={`Te han invitado a ${invitacion.teamName}`}
-          body={`${invitacion.invitedByName ?? 'Alguien'} te ha invitado como ${ROLE_LABELS[invitacion.role].toLowerCase()}. Si aceptas, entraras en el equipo y veras su tablero.`}
+          body={`${invitacion.invitedByName ?? 'Alguien'} te ha invitado como ${ROLE_LABELS[invitacion.role].toLowerCase()}. Si aceptas, entrarás en el equipo y verás su tablero.`}
           action={
             <>
               <Button
@@ -52,7 +52,7 @@ export function InvitationScreen() {
                 disabled={accept.isPending}
                 onClick={() => accept.mutateAsync(token).then(() => navigate(ROUTES.workspaces))}
               >
-                {accept.isPending ? 'Entrando…' : 'Aceptar invitacion'}
+                {accept.isPending ? 'Entrando…' : 'Aceptar invitación'}
               </Button>
             </>
           }

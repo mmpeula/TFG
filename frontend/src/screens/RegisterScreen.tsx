@@ -48,7 +48,7 @@ export function RegisterScreen() {
         <div className={styles.card}>
           <h1 className={styles.title}>Crear cuenta</h1>
           <p className={styles.subtitle}>
-            Dentro de cada espacio de trabajo tendras ademas el rol que te asigne su responsable.
+            Dentro de cada espacio de trabajo tendrás además el rol que te asigne su responsable.
           </p>
 
           <form
@@ -82,7 +82,7 @@ export function RegisterScreen() {
               <input
                 id="fullName" required maxLength={150} className={styles.control}
                 value={fullName} onChange={(event) => setFullName(event.target.value)}
-                placeholder="Ana Garcia"
+                placeholder="Ana García"
               />
             </div>
 
@@ -102,7 +102,7 @@ export function RegisterScreen() {
                 className={styles.control}
                 value={password} onChange={(event) => setPassword(event.target.value)}
               />
-              <p className={styles.hint}>Minimo 8 caracteres.</p>
+              <p className={styles.hint}>Mínimo 8 caracteres.</p>
             </div>
 
             <div>
@@ -115,7 +115,7 @@ export function RegisterScreen() {
               />
               {passwordsMismatch
                 ? <p className={styles.fieldError}>Las dos contraseñas no coinciden.</p>
-                : <p className={styles.hint}>Escribela igual que arriba.</p>}
+                : <p className={styles.hint}>Escríbela igual que arriba.</p>}
             </div>
 
             {mutation.isError && <div className={styles.error}>{toErrorMessage(mutation.error)}</div>}
@@ -128,7 +128,7 @@ export function RegisterScreen() {
         </div>
 
         <p className={styles.foot}>
-          ¿Ya tienes cuenta? <Link className={styles.link} to={ROUTES.login}>Inicia sesion</Link>
+          ¿Ya tienes cuenta? <Link className={styles.link} to={ROUTES.login}>Inicia sesión</Link>
         </p>
       </div>
     </div>

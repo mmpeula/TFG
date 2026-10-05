@@ -105,7 +105,7 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
                         .content("{\"role\":\"RESPONSABLE\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message")
-                        .value(org.hamcrest.Matchers.containsString("no esta en el equipo")));
+                        .value(org.hamcrest.Matchers.containsString("no está en el equipo")));
     }
 
     @Test

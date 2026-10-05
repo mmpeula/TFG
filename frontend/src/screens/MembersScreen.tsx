@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Clock3, UserMinus, UserPlus, Users, X } from 'lucide-react'
+import { ChevronDown, UserMinus, UserPlus, Users, X } from 'lucide-react'
 import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
+import { Card, CardGroup, InfoNote } from '@/components/ui/Card'
 import { Tag } from '@/components/ui/Tag'
 import { Dropdown, DropdownItem } from '@/components/ui/Controls'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -21,15 +22,12 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import type { Role } from '@/types/api'
 
 /**
- * A que puede cambiarse el rol de alguien ya en el equipo. Quien esta como docente
- * es por fuerza una cuenta docente, y una cuenta docente puede trabajar en el equipo
- * (alumno) o dirigirlo (responsable) igual que un alumno; por eso se le ofrecen los
- * tres. A quien ya trabaja no se le ofrece docente: la pantalla no sabe si su cuenta
- * lo es, y el servidor lo rechazaria si no.
+ * A que puede cambiarse el rol de alguien que trabaja en el equipo: alumno o
+ * responsable. Docente no entra aqui, ni de ida ni de vuelta: ese papel se elige
+ * al invitar (ver el formulario de invitar) y el servidor no deja cambiarlo
+ * despues. Por eso un docente no tiene menu de rol, solo su etiqueta.
  */
-function rolesDisponiblesPara(actual: Role): Role[] {
-  return actual === 'DOCENTE' ? ['DOCENTE', 'MIEMBRO', 'RESPONSABLE'] : ['MIEMBRO', 'RESPONSABLE']
-}
+const ROLES_DE_TRABAJO: Role[] = ['MIEMBRO', 'RESPONSABLE']
 
 /**
  * Quien trabaja en este workspace y que puede hacer cada uno.
@@ -53,12 +51,23 @@ export function MembersScreen() {
   // Solo se pregunta por la cuenta cuando el correo esta completo y se ha dejado de teclear.
   const correo = useDebouncedValue(email.trim().toLowerCase(), 400)
   const correoValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo) && correo === email.trim().toLowerCase()
-  const { data: candidato } = useInviteCandidate(workspace?.teamId, correoValido ? correo : undefined)
+  const { data: candidato, isFetching: buscandoCuenta } = useInviteCandidate(
+    workspace?.teamId, correoValido ? correo : undefined,
+  )
   // La eleccion (docente o alumno) solo existe si la cuenta admite las dos, es decir, si es de docente.
   const puedeElegir = correoValido && (candidato?.allowedRoles.length ?? 0) > 1
   const [eleccion, setEleccion] = useState<{ correo: string; rol: Role } | null>(null)
-  // Cada correo parte de su rol por defecto: una eleccion hecha para otro correo no se arrastra.
-  const rolElegido = eleccion?.correo === correo ? eleccion.rol : candidato?.defaultRole ?? undefined
+  // Sin rol marcado de antemano: con una cuenta docente hay que elegir a mano, para que
+  // nadie entre como docente (o como alumno) solo por no haber visto la pregunta. Una
+  // eleccion hecha para otro correo tampoco se arrastra.
+  const rolElegido = eleccion?.correo === correo ? eleccion.rol : undefined
+  // Mientras no se sepa que cuenta es (aun tecleando, o esperando al servidor) no se envia:
+  // si no, pegar el correo y pulsar Invitar en el acto mandaba la invitacion antes de que
+  // saliera la pregunta, con el rol por defecto.
+  const correoEscrito = email.trim().toLowerCase()
+  const comprobando = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoEscrito)
+    && (correo !== correoEscrito || buscandoCuenta)
+  const faltaElegir = puedeElegir && !rolElegido
 
   const manageable = canManage(workspace?.myRole)
 
@@ -67,12 +76,13 @@ export function MembersScreen() {
       {isPending ? (
         <Skeleton label="Cargando el equipo…" lines={3} />
       ) : (
-        <div className={styles.layout}>
+        <CardGroup>
           {manageable && (
             <form
-              className={styles.invite}
+              className={styles.inviteForm}
               onSubmit={async (event) => {
                 event.preventDefault()
+                if (comprobando || faltaElegir) return
                 // Invitar, no anadir: no entra en el equipo hasta que acepte. Entra como alumno o
                 // como docente segun su tipo de cuenta, salvo que se pida que una cuenta docente
                 // trabaje aqui como alumno; a responsable se le pasa despues, desde esta pantalla.
@@ -84,23 +94,36 @@ export function MembersScreen() {
                 setEleccion(null)
               }}
             >
-              <div className={styles.inviteField}>
-                <label className={styles.label} htmlFor="invite">
-                  Invitar a alguien
-                </label>
-                <input
-                  id="invite"
-                  type="email"
-                  required
-                  className={styles.control}
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="companero@uni.es"
-                />
+              <Card
+                title="Invitar a alguien"
+                description="Entra en el equipo en cuanto acepte la invitación."
+                aside={
+                  <>
+                    <input
+                      id="invite"
+                      type="email"
+                      required
+                      aria-label="Correo de la persona a invitar"
+                      className={styles.control}
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="companero@uni.es"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={invitaciones.invite.isPending || !email.trim() || comprobando || faltaElegir}
+                    >
+                      <UserPlus size={14} strokeWidth={2.75} />
+                      {invitaciones.invite.isPending ? 'Enviando…' : comprobando ? 'Comprobando…' : 'Invitar'}
+                    </Button>
+                  </>
+                }
+              >
                 {puedeElegir && (
                   <fieldset className={styles.inviteChoice}>
                     <legend className={styles.inviteChoiceLegend}>
                       Esta cuenta es de docente. ¿Cómo entra en este espacio?
+                      {faltaElegir && <span className={styles.inviteChoiceHint}> Elige una opción para poder invitar.</span>}
                     </legend>
                     {candidato?.allowedRoles.map((rol) => (
                       <label key={rol} className={styles.inviteOption}>
@@ -118,103 +141,109 @@ export function MembersScreen() {
                     ))}
                   </fieldset>
                 )}
-              </div>
-
-              <Button type="submit" disabled={invitaciones.invite.isPending || !email.trim()}>
-                <UserPlus size={14} strokeWidth={2.75} />
-                {invitaciones.invite.isPending ? 'Enviando…' : 'Invitar'}
-              </Button>
+              </Card>
             </form>
           )}
 
           {members && members.length === 0 ? (
             <EmptyState
               icon={<Users size={22} strokeWidth={2.75} />}
-              title="Todavia estas solo aqui"
-              body="Invita a tus companeros con su correo para repartiros el trabajo."
+              title="Todavía estás solo aquí"
+              body="Invita a tus compañeros con su correo para repartiros el trabajo."
             />
           ) : (
-            <ul className={styles.members}>
-              {members?.map((member) => {
-                const isMe = member.user.id === user?.id
-                return (
-                  <li key={member.id} className={styles.member}>
-                    <div className={styles.memberRow}>
-                      <Avatar user={member.user} avatarUrl={member.user.avatarUrl} size={34} />
-                      <div className={styles.identity}>
-                        <div className={styles.name}>
-                          {member.user.fullName}
-                          {isMe && <span className={styles.you}> (tu)</span>}
+            <Card
+              title="Equipo"
+              description={`${members?.length ?? 0} ${members?.length === 1 ? 'persona' : 'personas'} en este espacio de trabajo.`}
+            >
+              <ul className={styles.members}>
+                {members?.map((member) => {
+                  const isMe = member.user.id === user?.id
+                  return (
+                    <li key={member.id} className={styles.member}>
+                      <div className={styles.memberRow}>
+                        <Avatar user={member.user} avatarUrl={member.user.avatarUrl} size={34} />
+                        <div className={styles.identity}>
+                          <div className={styles.name}>
+                            {member.user.fullName}
+                            {isMe && <span className={styles.you}> (tu)</span>}
+                          </div>
+                          <div className={styles.mail}>{member.user.email}</div>
                         </div>
-                        <div className={styles.mail}>{member.user.email}</div>
+
+                        {manageable && member.role !== 'DOCENTE' ? (
+                          <Dropdown
+                            trigger={({ toggle }) => (
+                              <button className={styles.roleButton} onClick={toggle}>
+                                {ROLE_LABELS[member.role]}
+                                <ChevronDown size={14} strokeWidth={2.75} aria-hidden="true" />
+                              </button>
+                            )}
+                          >
+                            {(close) => (
+                              <>
+                                {ROLES_DE_TRABAJO.map((item) => (
+                                  <DropdownItem
+                                    key={item}
+                                    active={item === member.role}
+                                    onClick={() => {
+                                      close()
+                                      mutations.updateRole.mutate({ userId: member.user.id, role: item })
+                                    }}
+                                  >
+                                    {ROLE_LABELS[item]}
+                                  </DropdownItem>
+                                ))}
+                              </>
+                            )}
+                          </Dropdown>
+                        ) : (
+                          <Tag variant={member.role === 'RESPONSABLE' ? 'accent' : 'neutral'}>
+                            {ROLE_LABELS[member.role]}
+                          </Tag>
+                        )}
+
+                        <span className={styles.joined}>{relativeTime(member.joinedAt)}</span>
+
+                        {(manageable || isMe) && (
+                          <ConfirmDialog
+                            trigger={
+                              <Button variant="ghost" small aria-label={isMe ? 'Salir del espacio de trabajo' : 'Quitar del espacio de trabajo'}>
+                                <UserMinus size={14} strokeWidth={2.75} />
+                              </Button>
+                            }
+                            title={isMe ? 'Salir del espacio de trabajo' : `Quitar a ${member.user.fullName}`}
+                            description={
+                              isMe
+                                ? 'Dejarás de ver este espacio de trabajo y sus tareas.'
+                                : 'Dejará de ver este espacio de trabajo y sus tareas.'
+                            }
+                            confirmLabel={isMe ? 'Salir' : 'Quitar'}
+                            onConfirm={async () => {
+                              await mutations.removeMember.mutateAsync(member.user.id)
+                              if (isMe) navigate(ROUTES.workspaces)
+                            }}
+                          />
+                        )}
                       </div>
-
-                      {manageable ? (
-                        <Dropdown
-                          trigger={({ toggle }) => (
-                            <button className={styles.roleButton} onClick={toggle}>
-                              {ROLE_LABELS[member.role]}
-                            </button>
-                          )}
-                        >
-                          {(close) => (
-                            <>
-                              {rolesDisponiblesPara(member.role).map((item) => (
-                                <DropdownItem
-                                  key={item}
-                                  active={item === member.role}
-                                  onClick={() => {
-                                    close()
-                                    mutations.updateRole.mutate({ userId: member.user.id, role: item })
-                                  }}
-                                >
-                                  {ROLE_LABELS[item]}
-                                </DropdownItem>
-                              ))}
-                            </>
-                          )}
-                        </Dropdown>
-                      ) : (
-                        <Tag variant={member.role === 'RESPONSABLE' ? 'accent' : 'neutral'}>
-                          {ROLE_LABELS[member.role]}
-                        </Tag>
-                      )}
-
-                      <span className={styles.joined}>{relativeTime(member.joinedAt)}</span>
-
-                      {(manageable || isMe) && (
-                        <ConfirmDialog
-                          trigger={
-                            <Button variant="ghost" small aria-label={isMe ? 'Salir del espacio de trabajo' : 'Quitar del espacio de trabajo'}>
-                              <UserMinus size={14} strokeWidth={2.75} />
-                            </Button>
-                          }
-                          title={isMe ? 'Salir del espacio de trabajo' : `Quitar a ${member.user.fullName}`}
-                          description={
-                            isMe
-                              ? 'Dejaras de ver este espacio de trabajo y sus tareas.'
-                              : 'Dejara de ver este espacio de trabajo y sus tareas.'
-                          }
-                          confirmLabel={isMe ? 'Salir' : 'Quitar'}
-                          onConfirm={async () => {
-                            await mutations.removeMember.mutateAsync(member.user.id)
-                            if (isMe) navigate(ROUTES.workspaces)
-                          }}
-                        />
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+                    </li>
+                  )
+                })}
+              </ul>
+              <InfoNote>
+                <b>Responsable</b> administra el espacio de trabajo y genera el plan con IA. <b>Alumno</b> crea y mueve
+                tareas. <b>Docente</b> solo sigue el progreso, y
+                serlo se elige al invitar: después ya no se cambia. Quien recibe una invitación no entra en el
+                equipo hasta que la acepta.
+              </InfoNote>
+            </Card>
           )}
 
           {pendientes && pendientes.length > 0 && (
-            <section className={styles.pending}>
-              <h2 className={styles.pendingTitle}>
-                <Clock3 size={13} strokeWidth={2.75} />
-                Pendientes de aceptar
-              </h2>
+            <Card
+              title="Pendientes de aceptar"
+              description="Todavía no son del equipo: no ven nada hasta que acepten."
+            >
               <ul className={styles.members}>
                 {pendientes.map((invitacion) => (
                   <li key={invitacion.id} className={styles.member}>
@@ -227,7 +256,7 @@ export function MembersScreen() {
 
                       <Tag variant="neutral">{ROLE_LABELS[invitacion.role]}</Tag>
                       <span className={styles.joined}>
-                        {invitacion.emailSent ? 'Invitacion enviada' : 'Sin avisar por correo'}
+                        {invitacion.emailSent ? 'Invitación enviada' : 'Sin avisar por correo'}
                         {' · '}
                         {relativeTime(invitacion.createdAt)}
                       </span>
@@ -236,7 +265,7 @@ export function MembersScreen() {
                         <Button
                           variant="ghost"
                           small
-                          aria-label={`Cancelar la invitacion de ${invitacion.invited.fullName}`}
+                          aria-label={`Cancelar la invitación de ${invitacion.invited.fullName}`}
                           disabled={invitaciones.cancel.isPending}
                           onClick={() => invitaciones.cancel.mutate(invitacion.id)}
                         >
@@ -247,15 +276,9 @@ export function MembersScreen() {
                   </li>
                 ))}
               </ul>
-            </section>
+            </Card>
           )}
-
-          <p className={styles.help}>
-            <b>Responsable</b> administra el espacio de trabajo y genera el plan con IA. <b>Alumno</b> crea y mueve
-            tareas. <b>Docente</b> solo sigue el progreso. Quien recibe una invitacion no entra en el
-            equipo hasta que la acepta.
-          </p>
-        </div>
+        </CardGroup>
       )}
     </WorkspaceShell>
   )

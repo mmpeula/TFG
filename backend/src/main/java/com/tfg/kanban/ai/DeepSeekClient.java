@@ -94,7 +94,7 @@ public class DeepSeekClient {
     public String chatVision(String systemPrompt, String userText, List<ImagePart> images, int maxTokens) {
         if (properties.getApiKey() == null || properties.getApiKey().isBlank()) {
             throw new AiUnavailableException(
-                    "Falta la API key de DeepSeek (DEEPSEEK_API_KEY): sin ella no se pueden leer las imagenes del documento");
+                    "Falta la API key de DeepSeek (DEEPSEEK_API_KEY): sin ella no se pueden leer las imágenes del documento");
         }
         List<Map<String, Object>> parts = new ArrayList<>();
         parts.add(Map.of("type", "text", "text", userText));
@@ -154,7 +154,7 @@ public class DeepSeekClient {
             if ("length".equals(choice.path("finish_reason").asText())) {
                 log.warn("DeepSeek ha cortado la respuesta al llegar a max_tokens ({})", maxTokens);
                 throw new AiUnavailableException(("La respuesta del modelo se ha cortado al llegar al tope de %,d "
-                        + "tokens. Sube %s o prueba con un documento mas corto.")
+                        + "tokens. Sube %s o prueba con un documento más corto.")
                         .formatted(maxTokens, maxTokensSetting));
             }
             return choice.path("message").path("content").asText();
@@ -166,7 +166,7 @@ public class DeepSeekClient {
         } catch (ResourceAccessException ex) {
             log.warn("No se ha podido contactar con DeepSeek en {}: {}", properties.getBaseUrl(), ex.getMessage());
             throw new AiUnavailableException(
-                    "No se ha podido contactar con DeepSeek en %s. Comprueba la conexion a internet."
+                    "No se ha podido contactar con DeepSeek en %s. Comprueba la conexión a internet."
                             .formatted(properties.getBaseUrl()), ex);
         } catch (HttpStatusCodeException ex) {
             int status = ex.getStatusCode().value();
@@ -204,12 +204,12 @@ public class DeepSeekClient {
         return switch (status) {
             case 401 -> "DeepSeek ha rechazado la API key. Revisa DEEPSEEK_API_KEY" + detalle;
             case 402 -> "La cuenta de DeepSeek se ha quedado sin saldo. Recarga en platform.deepseek.com" + detalle;
-            case 404 -> "El modelo '%s' no existe en DeepSeek o no esta disponible para esta cuenta%s"
+            case 404 -> "El modelo '%s' no existe en DeepSeek o no está disponible para esta cuenta%s"
                     .formatted(properties.getModel(), detalle);
-            case 422 -> "DeepSeek ha rechazado los parametros de la peticion" + detalle;
-            case 429 -> "DeepSeek esta recibiendo demasiadas peticiones" + detalle
+            case 422 -> "DeepSeek ha rechazado los parámetros de la petición" + detalle;
+            case 429 -> "DeepSeek está recibiendo demasiadas peticiones" + detalle
                     + ". Espera un momento y vuelve a generar.";
-            case 500, 503 -> "El servidor de DeepSeek tiene un problema, no es un fallo de esta aplicacion" + detalle;
+            case 500, 503 -> "El servidor de DeepSeek tiene un problema, no es un fallo de esta aplicación" + detalle;
             default -> "DeepSeek ha respondido con un error (%d)%s".formatted(status, detalle);
         };
     }

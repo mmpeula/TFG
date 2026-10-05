@@ -7,13 +7,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
 @Schema(description = "Columna del tablero con sus tareas", example = """
-        {"id":10,"name":"Por hacer","position":0,"wipLimit":null,"taskCount":3,"tasks":[]}
+        {"id":10,"name":"Por hacer","position":0,"taskCount":3,"tasks":[]}
         """)
 public record ColumnResponse(
         Long id,
         String name,
         Integer position,
-        Integer wipLimit,
         int taskCount,
         @Schema(description = "Tareas ordenadas por posicion; null si la respuesta no las incluye")
         List<TaskResponse> tasks
@@ -22,12 +21,12 @@ public record ColumnResponse(
     /** Version ligera, sin cargar las tareas. */
     public static ColumnResponse summary(BoardColumn column, int taskCount) {
         return new ColumnResponse(column.getId(), column.getName(), column.getPosition(),
-                column.getWipLimit(), taskCount, null);
+                taskCount, null);
     }
 
     /** Version completa usada por el tablero Kanban. */
     public static ColumnResponse withTasks(BoardColumn column, List<TaskResponse> tasks) {
         return new ColumnResponse(column.getId(), column.getName(), column.getPosition(),
-                column.getWipLimit(), tasks.size(), tasks);
+                tasks.size(), tasks);
     }
 }

@@ -68,7 +68,7 @@ public class UserService {
         }
         if (!StringUtils.hasText(currentPassword)
                 || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
-            throw new BusinessRuleException("La contrasena actual no es correcta");
+            throw new BusinessRuleException("La contraseña actual no es correcta");
         }
     }
 

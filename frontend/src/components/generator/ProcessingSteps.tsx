@@ -11,7 +11,7 @@ const STAGES: { stage: PlanStage; label: string; note?: string }[] = [
   { stage: 'ANALYZING', label: 'Analizando documento' },
   { stage: 'EXTRACTING', label: 'Extrayendo contenido' },
   { stage: 'VISUAL', label: 'Analizando contenido visual', note: 'solo si hace falta' },
-  { stage: 'PLANNING', label: 'Generando planificacion' },
+  { stage: 'PLANNING', label: 'Generando planificación' },
 ]
 
 const VISUAL_INDEX = STAGES.findIndex(({ stage }) => stage === 'VISUAL')
@@ -62,7 +62,7 @@ export function ProcessingSteps({ workspaceId, sourceLabel }: { workspaceId: num
         })}
         <li className={[styles.step, styles.waiting].join(' ')}>
           <span className={styles.marker} aria-hidden="true" />
-          <span>Planificacion completada</span>
+          <span>Planificación completada</span>
         </li>
       </ol>
     </div>

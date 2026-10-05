@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { DateInput } from '@/components/ui/DateInput'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Segmented } from '@/components/ui/Controls'
@@ -172,11 +173,11 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
         </label>
 
         <label className={styles.label}>
-          Descripcion <span className={styles.optional}>opcional</span>
+          Descripción <span className={styles.optional}>opcional</span>
           <input
             className={styles.input}
             value={description}
-            placeholder="Practica 2 - modelo E/R y consultas"
+            placeholder="Práctica 2 - modelo E/R y consultas"
             onChange={(event) => setDescription(event.target.value)}
           />
         </label>
@@ -216,7 +217,7 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
 
         {!editing && (
           <p className={styles.createHint}>
-            Las fechas y la duracion del sprint se proponen solas al subir el guion al
+            Las fechas y la duración del sprint se proponen solas al subir el guion al
             generar el plan —si el documento las dice— o se ajustan luego a mano desde Ajustes.
           </p>
         )}
@@ -227,34 +228,32 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
             <div className={styles.row}>
               <label className={styles.label}>
                 Empieza <span className={styles.optional}>opcional</span>
-                <input
-                  type="date"
+                <DateInput
                   className={styles.input}
                   value={startDate}
-                  onChange={(event) => setStartDate(event.target.value)}
+                  onChange={setStartDate}
                 />
               </label>
 
               <label className={styles.label}>
                 Se entrega <span className={styles.optional}>opcional</span>
-                <input
-                  type="date"
+                <DateInput
                   className={styles.input}
                   value={deadline}
-                  onChange={(event) => setDeadline(event.target.value)}
+                  onChange={setDeadline}
                 />
               </label>
             </div>
 
             <div className={styles.label}>
-              Duracion de cada sprint
+              Duración de cada sprint
               <Segmented
                 options={SPRINT_DURATIONS}
                 value={sprintDays}
                 onChange={setSprintDays}
-                ariaLabel="Duracion del sprint"
+                ariaLabel="Duración del sprint"
               />
-              <span className={styles.hint}>Vale para todo el plan; se puede cambiar mas tarde en los ajustes.</span>
+              <span className={styles.hint}>Vale para todo el plan; se puede cambiar más tarde en los ajustes.</span>
             </div>
           </>
         )}

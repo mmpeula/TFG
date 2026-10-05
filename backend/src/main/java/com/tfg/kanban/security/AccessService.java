@@ -1,7 +1,6 @@
 package com.tfg.kanban.security;
 
 import com.tfg.kanban.domain.model.Role;
-import com.tfg.kanban.domain.repository.AttachmentRepository;
 import com.tfg.kanban.domain.repository.CommentRepository;
 import com.tfg.kanban.domain.repository.TeamMemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +21,7 @@ import java.util.Set;
  *
  * <ul>
  *   <li><b>Leer</b>: cualquier miembro del equipo (los tres roles).</li>
- *   <li><b>Escribir</b> (tareas, columnas, comentarios, adjuntos): RESPONSABLE y MIEMBRO.</li>
+ *   <li><b>Escribir</b> (tareas y comentarios): RESPONSABLE y MIEMBRO.</li>
  *   <li><b>Administrar</b> (equipo, proyecto, tableros, miembros): solo RESPONSABLE.</li>
  * </ul>
  */
@@ -35,7 +34,6 @@ public class AccessService {
 
     private final TeamMemberRepository teamMemberRepository;
     private final CommentRepository commentRepository;
-    private final AttachmentRepository attachmentRepository;
 
     /**
      * Rol en el equipo, vacio si el workspace esta suspendido.
@@ -90,16 +88,8 @@ public class AccessService {
         return roleInBoard(boardId).isPresent();
     }
 
-    public boolean canManageBoard(Long boardId) {
-        return roleInBoard(boardId).filter(Role.RESPONSABLE::equals).isPresent();
-    }
-
     public boolean canWriteColumn(Long columnId) {
         return roleInColumn(columnId).filter(WRITERS::contains).isPresent();
-    }
-
-    public boolean canManageColumn(Long columnId) {
-        return roleInColumn(columnId).filter(Role.RESPONSABLE::equals).isPresent();
     }
 
     public boolean canReadTask(Long taskId) {
@@ -119,24 +109,6 @@ public class AccessService {
         return commentRepository.findById(commentId)
                 .map(comment -> comment.getAuthor().getId().equals(userId)
                         || roleInTask(comment.getTask().getId()).filter(Role.RESPONSABLE::equals).isPresent())
-                .orElse(false);
-    }
-
-    public boolean canReadAttachment(Long attachmentId) {
-        return attachmentRepository.findById(attachmentId)
-                .map(attachment -> canReadTask(attachment.getTask().getId()))
-                .orElse(false);
-    }
-
-    /** Quien lo subio puede borrarlo; el RESPONSABLE del equipo, cualquiera. */
-    public boolean canDeleteAttachment(Long attachmentId) {
-        Long userId = SecurityUtils.currentUserId().orElse(null);
-        if (userId == null) {
-            return false;
-        }
-        return attachmentRepository.findById(attachmentId)
-                .map(attachment -> attachment.getUploadedBy().getId().equals(userId)
-                        || roleInTask(attachment.getTask().getId()).filter(Role.RESPONSABLE::equals).isPresent())
                 .orElse(false);
     }
 

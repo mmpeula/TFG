@@ -9,11 +9,14 @@
   padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) + var(--gutter-width) + 2px);
   /* La franja de prioridad como el gutter de un diff: color con trabajo, no decoracion. Es
      una sombra interior y no un elemento aparte porque asi sigue siempre la curva de las
-     esquinas, sin necesitar overflow:hidden, que recortaria el aviso (SignalBadge) que sale
-     por encima del borde. */
+     esquinas, sin necesitar overflow:hidden (que recortaria los menus desplegables). */
   --franja: inset var(--gutter-width) 0 0 var(--prioridad, var(--color-neutral-300));
   box-shadow: var(--franja);
   transition: var(--transition);
+  /* Un titulo con una «palabra» larga sin espacios salta primero tras sus flechas o
+     barras (ver BreakableText); solo si aun asi no cabe, se parte la palabra. */
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 .card:hover { border-color: var(--color-neutral-500); }
 .flagged { border-color: var(--color-neutral-500); }
@@ -29,7 +32,8 @@
 }
 
 
-.head { display: flex; align-items: center; gap: var(--space-2); }
+.head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; row-gap: 4px; }
+.headSpacer { flex: 1; }
 .code {
   font-family: var(--font-mono);
   font-size: 11px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums;
@@ -37,13 +41,11 @@
 .codeHours { color: var(--color-neutral-400); }
 /* El estado, solo en el plan: a la derecha de la cabecera, con su color y su texto. */
 .status {
-  margin-left: auto;
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 11px; font-weight: 600; color: var(--estado);
 }
 .statusDot { width: 6px; height: 6px; border-radius: 999px; background: var(--estado); flex: none; }
 .menu {
-  margin-left: auto;
   display: grid; place-items: center;
   width: 22px; height: 22px; border-radius: var(--radius-sm);
   color: var(--color-neutral-500);
@@ -56,7 +58,18 @@
 .doneTitle { text-decoration: line-through; text-decoration-color: var(--color-neutral-400); color: var(--color-neutral-500); }
 .check { display: inline-grid; place-items: center; color: var(--color-accent-2-500); margin-right: 5px; vertical-align: -2px; }
 
-.tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: var(--space-2); }
+.tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: var(--space-2); }
+/* Etiqueta de prioridad: nombre, flecha y el color de la franja. */
+.priority {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-weight: 600; line-height: 1.5;
+  padding: 1px 7px 1px 4px;
+  border-radius: 999px;
+  color: var(--p-fg);
+  background: var(--p-bg);
+}
+/* En lo terminado la prioridad ya no apremia: se apaga con el resto de la tarjeta. */
+.done .priority { opacity: .55; }
 .foot {
   display: flex;
   align-items: center;

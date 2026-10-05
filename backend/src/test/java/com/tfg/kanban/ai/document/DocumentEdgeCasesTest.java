@@ -133,7 +133,7 @@ class DocumentEdgeCasesTest {
 
         verify(deepSeek, times(1)).chatVision(anyString(), anyString(),
                 ArgumentMatchers.argThat(images -> images.size() == 1), anyInt());
-        assertThat(document.warnings()).anyMatch(w -> w.contains("mas imagenes de las que se analizan"));
+        assertThat(document.warnings()).anyMatch(w -> w.contains("más imágenes de las que se analizan"));
     }
 
     @Test
@@ -157,7 +157,7 @@ class DocumentEdgeCasesTest {
 
         verify(deepSeek, times(1)).chatVision(anyString(), anyString(),
                 ArgumentMatchers.argThat(images -> images.size() == 1), anyInt());
-        assertThat(document.warnings()).anyMatch(w -> w.contains("mas imagenes de las que se analizan"));
+        assertThat(document.warnings()).anyMatch(w -> w.contains("más imágenes de las que se analizan"));
     }
 
     // ----------------------------------------------------------------------- Word

@@ -36,7 +36,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Tests unitarios de la logica de tablero: limite WIP, reordenacion y asignaciones. */
+/** Tests unitarios de la logica de tablero: reordenacion y asignaciones. */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class TaskServiceTest {
@@ -81,20 +81,6 @@ class TaskServiceTest {
 
     private Task task(Long id, String title, BoardColumn column, int position) {
         return Task.builder().id(id).title(title).boardColumn(column).position(position).build();
-    }
-
-    @Test
-    @DisplayName("Crear una tarea en una columna con el limite WIP lleno falla")
-    void createFailsWhenWipLimitReached() {
-        doing.setWipLimit(2);
-        when(boardService.getColumn(11L)).thenReturn(doing);
-        when(taskRepository.countByBoardColumn_Id(11L)).thenReturn(2L);
-
-        TaskRequest request = new TaskRequest("Nueva tarea", null, null, null, null, null, null, null);
-
-        assertThatThrownBy(() -> taskService.create(11L, request))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("limite WIP");
     }
 
     @Test
@@ -153,9 +139,8 @@ class TaskServiceTest {
     }
 
     @Test
-    @DisplayName("Reordenar dentro de la misma columna no comprueba el limite WIP")
-    void reorderInsideSameColumnIgnoresWipLimit() {
-        todo.setWipLimit(2);
+    @DisplayName("Reordenar dentro de la misma columna recoloca las posiciones")
+    void reorderInsideSameColumn() {
         Task moved = task(1L, "Tarea 1", todo, 0);
         Task other = task(2L, "Tarea 2", todo, 1);
 

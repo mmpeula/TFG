@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DateInput } from '@/components/ui/DateInput'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { AssigneePicker } from '@/components/task/AssigneePicker'
@@ -75,7 +76,7 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
     >
       <div className={styles.form}>
         <label className={styles.label}>
-          Titulo
+          Título
           <input
             className={styles.input}
             value={title}
@@ -107,24 +108,23 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
         </div>
 
         <label className={styles.label}>
-          Descripcion <span className={styles.optional}>opcional</span>
+          Descripción <span className={styles.optional}>opcional</span>
           <textarea
             className={[styles.input, styles.area].join(' ')}
             rows={3}
             value={description}
-            placeholder="Que hay que hacer exactamente"
+            placeholder="Qué hay que hacer exactamente"
             onChange={(event) => setDescription(event.target.value)}
           />
         </label>
 
         <div className={styles.row}>
           <label className={styles.label}>
-            Fecha limite <span className={styles.optional}>opcional</span>
-            <input
-              type="date"
+            Fecha límite <span className={styles.optional}>opcional</span>
+            <DateInput
               className={styles.input}
               value={dueDate}
-              onChange={(event) => setDueDate(event.target.value)}
+              onChange={setDueDate}
             />
           </label>
 

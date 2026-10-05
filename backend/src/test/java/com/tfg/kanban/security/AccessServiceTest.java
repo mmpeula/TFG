@@ -2,7 +2,6 @@ package com.tfg.kanban.security;
 
 import com.tfg.kanban.TestSecurity;
 import com.tfg.kanban.domain.model.*;
-import com.tfg.kanban.domain.repository.AttachmentRepository;
 import com.tfg.kanban.domain.repository.CommentRepository;
 import com.tfg.kanban.domain.repository.TeamMemberRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -33,8 +32,6 @@ class AccessServiceTest {
     private TeamMemberRepository teamMemberRepository;
     @Mock
     private CommentRepository commentRepository;
-    @Mock
-    private AttachmentRepository attachmentRepository;
 
     @InjectMocks
     private AccessService accessService;
@@ -100,7 +97,7 @@ class AccessServiceTest {
         assertThat(accessService.canManageProject(7L)).isTrue();
     }
 
-    // ------------------------------------------------ comentarios y adjuntos
+    // ------------------------------------------------------------ comentarios
 
     private Task taskInTeam() {
         Team team = Team.builder().id(3L).name("Equipo").build();
@@ -139,38 +136,19 @@ class AccessServiceTest {
     }
 
     @Test
-    @DisplayName("Un comentario o adjunto inexistente no da permisos")
+    @DisplayName("Un comentario inexistente no da permisos")
     void missingResourcesDenyAccess() {
         when(commentRepository.findById(99L)).thenReturn(Optional.empty());
-        when(attachmentRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThat(accessService.canModifyComment(99L)).isFalse();
-        assertThat(accessService.canReadAttachment(99L)).isFalse();
-        assertThat(accessService.canDeleteAttachment(99L)).isFalse();
     }
 
     @Test
-    @DisplayName("Quien subio el adjunto puede borrarlo; otro miembro no")
-    void uploaderCanDeleteAttachment() {
-        Task task = taskInTeam();
-        when(attachmentRepository.findById(30L)).thenReturn(Optional.of(
-                Attachment.builder().id(30L).uploadedBy(User.builder().id(1L).build()).task(task).build()));
-        when(attachmentRepository.findById(31L)).thenReturn(Optional.of(
-                Attachment.builder().id(31L).uploadedBy(User.builder().id(2L).build()).task(task).build()));
-        when(teamMemberRepository.findRoleByTask(11L, 1L)).thenReturn(Optional.of(Role.MIEMBRO));
-
-        assertThat(accessService.canDeleteAttachment(30L)).isTrue();
-        assertThat(accessService.canDeleteAttachment(31L)).isFalse();
-        assertThat(accessService.canReadAttachment(30L)).isTrue();
-    }
-
-    @Test
-    @DisplayName("Sin usuario autenticado no hay permiso sobre comentarios ni adjuntos")
+    @DisplayName("Sin usuario autenticado no hay permiso sobre comentarios ni equipos")
     void anonymousHasNoAccess() {
         TestSecurity.clear();
 
         assertThat(accessService.canModifyComment(10L)).isFalse();
-        assertThat(accessService.canDeleteAttachment(30L)).isFalse();
         assertThat(accessService.roleInTeam(3L)).isEmpty();
     }
 
@@ -182,10 +160,8 @@ class AccessServiceTest {
         when(teamMemberRepository.findRoleByTask(11L, 1L)).thenReturn(Optional.of(Role.RESPONSABLE));
 
         assertThat(accessService.canReadBoard(2L)).isTrue();
-        assertThat(accessService.canManageBoard(2L)).isFalse();
 
         assertThat(accessService.canWriteColumn(5L)).isFalse();
-        assertThat(accessService.canManageColumn(5L)).isFalse();
 
         assertThat(accessService.canReadTask(11L)).isTrue();
         assertThat(accessService.canWriteTask(11L)).isTrue();

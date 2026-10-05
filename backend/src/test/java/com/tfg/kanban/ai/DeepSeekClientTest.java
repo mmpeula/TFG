@@ -262,7 +262,7 @@ class DeepSeekClientTest {
 
         assertThatThrownBy(() -> client.chatJson("s", "u"))
                 .isInstanceOf(AiUnavailableException.class)
-                .hasMessageContaining("parametros");
+                .hasMessageContaining("parámetros");
     }
 
     @Test

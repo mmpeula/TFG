@@ -74,7 +74,7 @@ class HealthControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody().status()).isEqualTo("DOWN");
         assertThat(response.getBody().database().status()).isEqualTo("DOWN");
-        assertThat(response.getBody().database().error()).contains("no es valida");
+        assertThat(response.getBody().database().error()).contains("no es válida");
     }
 
     @Test
