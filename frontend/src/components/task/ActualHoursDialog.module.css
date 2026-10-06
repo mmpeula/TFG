@@ -1,0 +1,18 @@
+/* Una pregunta y un campo: nada mas, para que apuntarlo no cueste. */
+.body {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  font-size: 14px; color: var(--color-text);
+}
+.field { display: flex; align-items: center; gap: var(--space-2); }
+.unit { font-size: 14px; color: var(--color-neutral-600); }
+.input {
+  flex: 1; min-width: 0;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: 15px; color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+}
+.input:focus { outline: none; border-color: var(--color-neutral-900); }
+.error { font-size: 12px; color: var(--color-neutral-600); }

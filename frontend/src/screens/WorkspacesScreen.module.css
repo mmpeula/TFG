@@ -9,7 +9,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--space-4);
   /* Cada tarjeta mide lo que mide su contenido: estirarlas dejaba huecos raros
      entre una con descripcion y otra sin ella. */

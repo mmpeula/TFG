@@ -32,10 +32,13 @@ export const ROUTES = {
 } as const
 
 /**
- * El destino inicial depende del rol global de la cuenta. Un docente aterriza en
- * lo mismo que un alumno: sus espacios (los que crea, donde es responsable) y, si
- * le han anadido a alguno como docente, la tarjeta del panel docente.
+ * El destino inicial depende del rol global de la cuenta: el administrador entra
+ * en su panel, el docente en el panel docente (lo que sigue, que es lo suyo) y el
+ * alumno en sus espacios de trabajo. El docente tiene sus propios espacios a una
+ * pestana, en «Mis espacios de trabajo» (ver HomeTabs).
  */
 export function homeForRole(role: 'ADMIN' | 'DOCENTE' | 'MIEMBRO' | 'RESPONSABLE'): string {
-  return role === 'ADMIN' ? ROUTES.administracion : ROUTES.workspaces
+  if (role === 'ADMIN') return ROUTES.administracion
+  if (role === 'DOCENTE') return ROUTES.docente
+  return ROUTES.workspaces
 }

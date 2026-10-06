@@ -13,6 +13,7 @@ import { SignalBadge } from './SignalBadge'
 import type { TaskWarning } from '@/lib/signals'
 import styles from './TaskCard.module.css'
 import { formatDate, daysUntil } from '@/lib/format'
+import { formatHours } from '@/lib/hours'
 import { PRIORITY_COLOR, PRIORITY_LABELS } from '@/lib/roles'
 import type { ColumnResponse, TaskPriority, TaskResponse } from '@/types/api'
 
@@ -105,6 +106,10 @@ export function TaskCard({
           className={styles.grip}
           {...sortable.attributes}
           {...sortable.listeners}
+          // Un clic sin mover la tarjeta la abre, se pulse donde se pulse: si solo abriera el
+          // titulo, una tarea con un titulo corto apenas tendria donde pulsar. Tras arrastrar,
+          // dnd-kit se come el clic, asi que soltarla no la abre.
+          onClick={() => onOpen(task)}
           role="button"
           aria-label={`Arrastrar ${task.title}`}
         />
@@ -113,7 +118,7 @@ export function TaskCard({
       <div className={styles.content}>
         <header className={styles.head}>
           <span className={styles.code}>
-            #{task.id}{task.estimatedHours != null && <span className={styles.codeHours}> · {task.estimatedHours}h</span>}
+            #{task.id}{task.estimatedHours != null && <span className={styles.codeHours}> · {formatHours(task.estimatedHours)}</span>}
           </span>
           {/* Hueco flexible: menu, aviso y estado quedan juntos a la derecha. El menu va antes
               del aviso porque solo se ve al pasar el raton: asi el aviso queda pegado al borde. */}

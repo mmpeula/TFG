@@ -38,17 +38,20 @@ export function Chip({
   active,
   onClick,
   title,
+  danger,
 }: {
   children: ReactNode
   active?: boolean
   onClick?: () => void
   /** Explicacion al pasar el raton, si la etiqueta sola no basta. */
   title?: string
+  /** En rojo: para los avisos, que en toda la app van en ese color. */
+  danger?: boolean
 }) {
   return (
     <button
       type="button"
-      className={[styles.chip, active && styles.chipActive].filter(Boolean).join(' ')}
+      className={[styles.chip, danger && styles.chipDanger, active && styles.chipActive].filter(Boolean).join(' ')}
       onClick={onClick}
       aria-pressed={active}
       title={title}

@@ -1,86 +1,75 @@
-/* KPI ---------------------------------------------------------------------- */
-.kpi {
-  background: var(--color-neutral-100);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  transition: var(--transition);
-}
-.kpi:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
-.kpiAlert { border-color: var(--color-accent-300); }
-.kpiLabel { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--color-neutral-600); }
-.kpiValue { font-family: var(--font-heading); font-size: 30px; line-height: 1.1; }
-.kpiDelta { font-size: 12px; font-weight: 700; }
-.better { color: var(--color-accent-2-700); }
-.worse { color: var(--color-danger-600); }
-.kpiUnit { font-size: 11px; color: var(--color-neutral-600); }
-
-/* Grafico de barras -------------------------------------------------------- */
-.chart {
-  background: var(--color-neutral-100);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-}
-.chartHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
-.legend { display: flex; gap: var(--space-3); font-size: 11px; color: var(--color-neutral-600); }
-.legendItem { display: inline-flex; align-items: center; gap: 5px; }
-.swatch { width: 9px; height: 9px; border-radius: 3px; }
-.grid {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: var(--space-2);
-  align-items: end;
-  height: 190px;
-  margin-top: var(--space-4);
-}
-.col { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); height: 100%; }
-.bars { display: flex; align-items: flex-end; justify-content: center; gap: 3px; width: 100%; height: 100%; }
-.bar { width: 11px; height: 100%; border-radius: 6px 6px 0 0; transform-origin: bottom; transition: transform .3s ease; }
-.current { opacity: .55; }
-.week { font-size: 10px; color: var(--color-neutral-600); }
-
-/* Distribuciones ----------------------------------------------------------- */
-.panel {
-  background: var(--color-neutral-100);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.panelTitle { font-family: var(--font-body); font-size: 15px; font-weight: 700; }
-.distRow { display: grid; grid-template-columns: 1fr auto; gap: 4px var(--space-3); align-items: center; }
-.distLabel { font-size: 12px; color: var(--color-neutral-700); }
-.distValue { font-size: 12px; font-weight: 700; }
-.distBar { grid-column: 1 / -1; }
-
-/* Prioridades -------------------------------------------------------------- */
-.segments { display: flex; height: 14px; border-radius: 999px; overflow: hidden; }
-.segment { height: 100%; }
-.priorityLegend { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-top: var(--space-3); }
-.priorityItem { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-neutral-700); }
-.priorityDot { width: 9px; height: 9px; border-radius: 999px; }
-
 /* Insights ----------------------------------------------------------------- */
-.insight { border-radius: var(--radius-lg); padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-2); }
-/* Riesgo es la mitad "mala" del diff: rojo, nunca azul. Bloqueado pide
-   atencion, no es grave todavia: ambar. Va bien: verde, como en todos lados. */
-.risk { background: var(--color-danger-700); }
-.block { background: var(--color-neutral-100); border: 1px solid var(--color-warning-300); }
-.flow { background: var(--color-accent-2-200); }
-.insightKicker { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; }
-.risk .insightKicker { color: var(--color-danger-200); }
-.block .insightKicker { color: var(--color-warning-700); }
-.flow .insightKicker { color: var(--color-accent-2-700); }
-.insightTitle { font-size: 19px; line-height: 1.3; }
-.risk .insightTitle { color: var(--color-danger-100); }
-.insightBody { font-size: 14px; line-height: 1.6; }
-.risk .insightBody { color: var(--color-danger-200); }
-.block .insightBody { color: var(--color-neutral-700); }
-.flow .insightBody { color: var(--color-accent-2-900); }
-.insightActions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+/*
+ * Tarjeta a todo lo ancho, blanca y con el mismo borde que el resto de tarjetas del
+ * panel (cifras, graficos): el color no va en el fondo sino donde informa, como en
+ * las tarjetas de cifra: el icono, la etiqueta y, si urge, el boton. Rojo si no se
+ * llega a la entrega, ambar los avisos, verde si el ritmo va bien.
+ */
+.insight {
+  --tone: var(--color-neutral-500);
+  --tone-soft: var(--color-neutral-200);
+  display: grid; grid-template-columns: 48px minmax(0, 1fr) minmax(220px, 300px);
+  gap: var(--space-4) var(--space-6);
+  padding: 22px 24px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgb(24 24 27 / .04);
+}
+.risk { --tone: var(--color-danger-600); --tone-soft: var(--color-danger-100); }
+.block { --tone: var(--color-warning-600); --tone-soft: var(--color-warning-100); }
+.ok { --tone: var(--color-accent-2-600); --tone-soft: var(--color-accent-2-100); }
+
+.icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: grid; place-items: center;
+  background: var(--tone-soft); color: var(--tone);
+}
+.icon svg { width: 24px; height: 24px; stroke-width: 2; }
+
+.main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.kicker { font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--tone); }
+.risk .kicker { color: var(--color-danger-700); }
+.block .kicker { color: var(--color-warning-700); }
+.title { font-size: 19px; font-weight: 700; line-height: 1.3; letter-spacing: -0.015em; }
+.body { font-size: 14px; line-height: 1.6; color: var(--color-neutral-700); max-width: 70ch; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.actions button { padding: 10px 16px; font-size: 13.5px; font-weight: 600; }
+
+/* Lo de la derecha, separado por una linea. */
+.side {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding-left: var(--space-6);
+  border-left: 1px solid var(--color-divider);
+  align-self: stretch;
+}
+.recommended {
+  position: absolute; top: -8px; right: -8px;
+  font-size: 12px; font-weight: 500;
+  color: var(--color-danger-700); background: var(--color-danger-100);
+  border-radius: 999px; padding: 3px 10px;
+}
+.sideTitle { font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-600); margin-top: var(--space-4); }
+.facts, .tasks { display: flex; flex-direction: column; gap: var(--space-3); }
+.facts li { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--color-neutral-800); }
+.facts li svg { color: var(--color-neutral-500); flex: none; }
+.facts b { font-weight: 700; color: var(--color-text); }
+.facts b.bad { color: var(--color-danger-600); }
+
+.tasks li { display: flex; align-items: center; gap: 12px; }
+.taskIcon { width: 32px; height: 32px; border-radius: 8px; flex: none; display: grid; place-items: center; }
+.task_fecha { background: var(--color-danger-100); color: var(--color-danger-600); }
+.task_parada { background: var(--color-warning-100); color: var(--color-warning-700); }
+.task_sin-responsable { background: var(--color-warning-100); color: var(--color-warning-700); }
+.taskText { display: flex; flex-direction: column; min-width: 0; }
+.taskTitle { font-size: 13.5px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.taskDetail { font-size: 12.5px; color: var(--color-neutral-600); }
+.more { font-size: 12.5px; color: var(--color-neutral-600); padding-left: 44px; }
+
+@media (max-width: 900px) {
+  .insight { grid-template-columns: 40px minmax(0, 1fr); }
+  .icon { width: 40px; height: 40px; }
+  .side { grid-column: 1 / -1; padding-left: 0; border-left: none; border-top: 1px solid var(--color-divider); padding-top: var(--space-3); }
+  .recommended { position: static; align-self: flex-start; }
+}

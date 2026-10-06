@@ -9,14 +9,27 @@ import { DateInput } from '@/components/ui/DateInput'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import styles from './TaskPanel.module.css'
 import { useCommentMutations, useComments, useTaskMutations } from '@/hooks/useData'
+import { useFinishPrompt } from '@/hooks/useFinishPrompt'
+import { taskPayload } from '@/lib/tasks'
+import type { TaskPayload } from '@/api/endpoints'
 import { useAuth } from '@/state/context'
 import { canManage, canWrite as canWriteRole, PRIORITY_LABELS } from '@/lib/roles'
 import { TASK_TYPES, TASK_TYPE_IDS, typeOf } from '@/lib/taskTypes'
 import { taskWarning, type TaskWarningKind } from '@/lib/signals'
 import { formatDate, formatDateTime, relativeTime } from '@/lib/format'
+import { formatHours, hoursNumber, parseHours } from '@/lib/hours'
 import type { ColumnResponse, Role, TaskPriority, TaskResponse, TeamMemberResponse } from '@/types/api'
 
 const PRIORITIES: TaskPriority[] = ['BAJA', 'MEDIA', 'ALTA', 'CRITICA']
+
+/**
+ * Horas escritas en un campo («1,5» es hora y media): null si se ha vaciado,
+ * undefined si no son un numero valido, para no mandar algo que no vale.
+ */
+function readHours(raw: string): number | null | undefined {
+  if (raw.trim() === '') return null
+  return parseHours(raw) ?? undefined
+}
 
 /** Titular del aviso de la tarea, segun su motivo. */
 const WARNING_TITLES: Record<TaskWarningKind, string> = {
@@ -42,6 +55,7 @@ interface Props {
 export function TaskPanel({ task, columns, members, role, boardId, projectId, onClose }: Props) {
   const { user } = useAuth()
   const taskMutations = useTaskMutations(boardId, projectId)
+  const finish = useFinishPrompt(boardId, projectId)
   const [comment, setComment] = useState('')
 
   const taskId = task?.id
@@ -51,11 +65,12 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
   useEffect(() => {
     if (!task) return
     function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
+      // Con la pregunta de las horas abierta, Esc cierra solo esa, no el panel entero.
+      if (event.key === 'Escape' && !finish.open) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [task, onClose])
+  }, [task, onClose, finish.open])
 
   if (!task) return null
 
@@ -70,28 +85,15 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
   // Diferencia entre lo real y lo estimado, igual que un diff: por debajo es
   // verde, por encima es rojo. Sin las dos cifras no hay nada que comparar.
   const delta = task.actualHours != null && task.estimatedHours != null
-    ? Math.round((task.actualHours - task.estimatedHours) * 10) / 10
+    ? Math.round((task.actualHours - task.estimatedHours) * 100) / 100
     : null
   const deltaClass = delta == null ? undefined : delta <= 0 ? styles.deltaGood : styles.deltaOver
+  const deltaText = delta == null ? '' : delta === 0
+    ? 'justo lo estimado'
+    : `${delta < 0 ? '↓' : '↑'} ${formatHours(Math.abs(delta))} vs. estimado`
 
-  function patch(values: Partial<Pick<TaskResponse, 'title' | 'description' | 'type' | 'priority' | 'columnId'>> & {
-    assigneeIds?: number[]
-    actualHours?: number | null
-    dueDate?: string | null
-  }) {
-    taskMutations.update.mutate({
-      taskId: task!.id,
-      payload: {
-        title: values.title ?? task!.title,
-        description: values.description ?? task!.description,
-        type: values.type ?? task!.type,
-        priority: values.priority ?? task!.priority,
-        dueDate: 'dueDate' in values ? (values.dueDate ?? null) : (task!.dueDate ?? null),
-        estimatedHours: task!.estimatedHours ?? null,
-        actualHours: 'actualHours' in values ? (values.actualHours ?? null) : (task!.actualHours ?? null),
-        assigneeIds: values.assigneeIds ?? task!.assignees.map((assignee) => assignee.id),
-      },
-    })
+  function patch(changes: Partial<TaskPayload>) {
+    taskMutations.update.mutate({ taskId: task!.id, payload: taskPayload(task!, changes) })
   }
 
   return (
@@ -131,10 +133,10 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
 
         <div className={styles.body}>
           {warning && (
-            // Por que esta tarea sale en «Avisos» y que hacer para que deje de salir. Rojo si va
-            // tarde, ambar si solo pide atencion (parada o sin responsable): el color tiene ese trabajo.
+            // Por que esta tarea sale en «Avisos» y que hacer para que deje de salir. En rojo, como
+            // todos los avisos de la app.
             <div
-              className={[styles.warning, warning.kind === 'fecha' ? styles.warningLate : styles.warningAttention].join(' ')}
+              className={styles.warning}
               role="status"
             >
               <AlertTriangle size={15} strokeWidth={2.5} aria-hidden="true" />
@@ -201,7 +203,11 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                         active={column.id === task.columnId}
                         onClick={() => {
                           close()
-                          taskMutations.move.mutate({ taskId: task.id, columnId: column.id, position: 0 })
+                          const terminada = column.id === columns[columns.length - 1]?.id && column.id !== task.columnId
+                          taskMutations.move.mutate(
+                            { taskId: task.id, columnId: column.id, position: 0 },
+                            { onSuccess: () => { if (terminada) finish.ask(task) } },
+                          )
                         }}
                       >
                         {column.name}
@@ -294,10 +300,31 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
               <span className={[styles.propValue, styles.measured].join(' ')}>{formatDate(task.dueDate)}</span>
             )}
 
+            {/* La estimacion es la mitad de lo que la IA necesita para aprender el ritmo de cada
+                persona (la otra son las horas reales al terminar): sin ella, la tarea no cuenta. */}
             <span className={styles.propLabel}>Estimación</span>
-            <span className={[styles.propValue, styles.measured].join(' ')}>
-              {task.estimatedHours != null ? `${task.estimatedHours} h` : '—'}
-            </span>
+            {writable ? (
+              <span className={styles.measuredInput}>
+                <input
+                  key={`estimated-${task.id}-${task.estimatedHours ?? ''}`}
+                  className={[styles.propInput, styles.measured].join(' ')}
+                  defaultValue={task.estimatedHours != null ? hoursNumber(task.estimatedHours) : ''}
+                  inputMode="decimal"
+                  placeholder="Horas, por ejemplo 1,5"
+                  aria-label="Horas estimadas de esta tarea"
+                  onBlur={(event) => {
+                    const value = readHours(event.target.value)
+                    if (value === undefined) {
+                      event.target.value = task.estimatedHours != null ? hoursNumber(task.estimatedHours) : ''
+                    } else if (value !== (task.estimatedHours ?? null)) patch({ estimatedHours: value })
+                  }}
+                />
+              </span>
+            ) : (
+              <span className={[styles.propValue, styles.measured].join(' ')}>
+                {task.estimatedHours != null ? formatHours(task.estimatedHours) : '—'}
+              </span>
+            )}
 
             {done && (
               <>
@@ -305,22 +332,24 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                 {writable ? (
                   <span className={styles.measuredInput}>
                     <input
-                      type="number"
-                      min={0}
-                      step={0.5}
+                      // Con la clave, el campo se pone al dia si las horas se apuntan desde
+                      // la pregunta que sale al terminar la tarea (ActualHoursDialog).
+                      key={`actual-${task.id}-${task.actualHours ?? ''}`}
                       className={[styles.propInput, styles.measured].join(' ')}
-                      defaultValue={task.actualHours ?? ''}
-                      placeholder="Cuánto ha costado de verdad"
+                      defaultValue={task.actualHours != null ? hoursNumber(task.actualHours) : ''}
+                      inputMode="decimal"
+                  placeholder="Horas, por ejemplo 1,5"
                       aria-label="Horas reales dedicadas a esta tarea"
                       onBlur={(event) => {
-                        const raw = event.target.value.trim()
-                        const value = raw === '' ? null : Number(raw)
-                        if (value !== (task.actualHours ?? null)) patch({ actualHours: value })
+                        const value = readHours(event.target.value)
+                        if (value === undefined) {
+                          event.target.value = task.actualHours != null ? hoursNumber(task.actualHours) : ''
+                        } else if (value !== (task.actualHours ?? null)) patch({ actualHours: value })
                       }}
                     />
                     {delta != null && (
                       <span className={[styles.deltaNote, deltaClass].filter(Boolean).join(' ')}>
-                        {delta <= 0 ? '↓' : '↑'} {Math.abs(delta)} h vs. estimado
+                        {deltaText}
                       </span>
                     )}
                   </span>
@@ -328,10 +357,10 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                   <span
                     className={[styles.propValue, styles.measured, deltaClass].filter(Boolean).join(' ')}
                   >
-                    {task.actualHours != null ? `${task.actualHours} h` : '—'}
+                    {task.actualHours != null ? formatHours(task.actualHours) : '—'}
                     {delta != null && (
                       <span className={styles.deltaNote}>
-                        {delta <= 0 ? '↓' : '↑'} {Math.abs(delta)} h vs. estimado
+                        {deltaText}
                       </span>
                     )}
                   </span>
@@ -438,6 +467,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
           </section>
         </div>
       </aside>
+      {finish.dialog}
     </>
   )
 }

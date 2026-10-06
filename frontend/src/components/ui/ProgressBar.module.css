@@ -5,9 +5,8 @@
   overflow: hidden;
 }
 .fill {
-  width: 100%;
   height: 100%;
   border-radius: 999px;
-  transform-origin: left;
-  transition: transform .3s ease, background .15s ease;
+  /* Por ancho y no con scaleX: escalar deformaba el extremo redondeado de la barra. */
+  transition: width .3s ease, background .15s ease;
 }

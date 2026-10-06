@@ -1,185 +1,104 @@
-import { Sparkles } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CalendarDays, Clock3, PauseCircle, TrendingUp, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { ProgressBar } from '@/components/ui/ProgressBar'
 import styles from './Pulse.module.css'
+import type { Insight, InsightAction, InsightTask } from '@/lib/metrics'
 
-/** Tarjeta de KPI: cifra grande, variacion y borde de alerta opcional. */
-export function KpiCard({
-  label,
-  value,
-  delta,
-  better,
-  unit,
-  alert,
-}: {
-  label: string
-  value: string
-  delta?: string
-  better?: boolean
-  unit?: string
-  alert?: boolean
-}) {
-  return (
-    <article className={[styles.kpi, alert && styles.kpiAlert].filter(Boolean).join(' ')}>
-      <span className={styles.kpiLabel}>{label}</span>
-      <span className={styles.kpiValue}>{value}</span>
-      {delta && (
-        <span className={[styles.kpiDelta, better ? styles.better : styles.worse].join(' ')}>{delta}</span>
-      )}
-      {unit && <span className={styles.kpiUnit}>{unit}</span>}
-    </article>
-  )
+/** Icono de cada motivo de aviso en la lista de tareas afectadas. */
+const TASK_ICON: Record<InsightTask['kind'], typeof Clock3> = {
+  fecha: Clock3,
+  parada: PauseCircle,
+  'sin-responsable': UserRound,
 }
 
-interface Serie {
-  week: string
-  done: number
-  created: number
-  current?: boolean
-}
-
-export function BarChart({ series, title }: { series: Serie[]; title: string }) {
-  const max = Math.max(...series.flatMap((item) => [item.done, item.created]))
-
-  return (
-    <div className={styles.chart}>
-      <header className={styles.chartHead}>
-        <h3 className={styles.panelTitle}>{title}</h3>
-        <div className={styles.legend}>
-          <span className={styles.legendItem}>
-            <span className={styles.swatch} style={{ background: 'var(--color-accent-500)' }} />
-            Completadas
-          </span>
-          <span className={styles.legendItem}>
-            <span className={styles.swatch} style={{ background: 'var(--color-accent-2-400)' }} />
-            Creadas
-          </span>
-        </div>
-      </header>
-
-      <div className={styles.grid}>
-        {series.map((item) => (
-          <div key={item.week} className={[styles.col, item.current && styles.current].filter(Boolean).join(' ')}>
-            <div className={styles.bars}>
-              <span
-                className={styles.bar}
-                style={{ transform: `scaleY(${item.done / max})`, background: 'var(--color-accent-500)' }}
-                title={`${item.done} completadas en ${item.week}`}
-              />
-              <span
-                className={styles.bar}
-                style={{ transform: `scaleY(${item.created / max})`, background: 'var(--color-accent-2-400)' }}
-                title={`${item.created} creadas en ${item.week}`}
-              />
-            </div>
-            <span className={styles.week}>{item.week}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-export function DistributionBars({
-  title,
-  rows,
-}: {
-  title: string
-  rows: { label: string; value: number; max: number }[]
-}) {
-  return (
-    <div className={styles.panel}>
-      <h3 className={styles.panelTitle}>{title}</h3>
-      {rows.map((row) => (
-        <div key={row.label} className={styles.distRow}>
-          <span className={styles.distLabel}>{row.label}</span>
-          <span className={styles.distValue}>{row.value}</span>
-          <span className={styles.distBar}>
-            <ProgressBar value={(row.value / row.max) * 100} height={6} />
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-export function PriorityBar({
-  title,
-  segments,
-}: {
-  title: string
-  segments: { label: string; value: number; color: string }[]
-}) {
-  const total = segments.reduce((sum, segment) => sum + segment.value, 0)
-
-  return (
-    <div className={styles.panel}>
-      <h3 className={styles.panelTitle}>{title}</h3>
-      <div className={styles.segments}>
-        {segments.map((segment) => (
-          <span
-            key={segment.label}
-            className={styles.segment}
-            style={{ width: `${(segment.value / total) * 100}%`, background: segment.color }}
-            title={`${segment.label}: ${segment.value}`}
-          />
-        ))}
-      </div>
-      <div className={styles.priorityLegend}>
-        {segments.map((segment) => (
-          <span key={segment.label} className={styles.priorityItem}>
-            <span className={styles.priorityDot} style={{ background: segment.color }} />
-            {segment.label} · {segment.value}
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
+/**
+ * Un insight a todo lo ancho: a la izquierda el icono, que pasa, por que y el
+ * boton para ir a resolverlo; a la derecha, separado por una linea, el resumen en
+ * cifras (riesgo de entrega) o las tareas a las que se refiere (avisos).
+ *
+ * Blanco como el resto de tarjetas del panel; el color va en el icono, la etiqueta
+ * y el boton: rojo si no se llega a la entrega, ambar los avisos, verde si el ritmo
+ * llega a tiempo.
+ */
 export function InsightCard({
-  variant,
-  kicker,
-  title,
-  body,
-  actions,
+  insight,
   onAction,
 }: {
-  variant: 'risk' | 'block' | 'flow'
-  kicker: string
-  title: string
-  body: string
-  actions: { label: string; primary: boolean }[]
-  onAction?: (label: string) => void
+  insight: Insight
+  onAction?: (action: InsightAction) => void
 }) {
+  const { variant } = insight
   return (
     <article className={[styles.insight, styles[variant]].join(' ')}>
-      <span className={styles.insightKicker}>
-        <Sparkles size={12} strokeWidth={2.75} />
-        {kicker}
+      <span className={styles.icon} aria-hidden="true">
+        {variant === 'ok' ? <TrendingUp /> : <AlertTriangle />}
       </span>
-      <h3 className={styles.insightTitle}>{title}</h3>
-      <p className={styles.insightBody}>{body}</p>
-      <div className={styles.insightActions}>
-        {actions.map((action) => (
-          <Button
-            key={action.label}
-            small
-            onClick={() => onAction?.(action.label)}
-            variant={
-              variant === 'risk'
-                ? action.primary
-                  ? 'onDark'
-                  : 'onDarkGhost'
-                : action.primary
-                  ? 'primary'
-                  : 'secondary'
-            }
-          >
-            {action.label}
-          </Button>
-        ))}
+
+      <div className={styles.main}>
+        <span className={styles.kicker}>{insight.kicker}</span>
+        <h3 className={styles.title}>{insight.title}</h3>
+        <p className={styles.body}>{insight.body}</p>
+        <div className={styles.actions}>
+          {insight.actions.map((action) => (
+            <Button
+              key={action.label}
+              variant={variant === 'risk' && action.primary ? 'destructive' : 'secondary'}
+              onClick={() => onAction?.(action)}
+            >
+              {action.label}
+              <ArrowRight size={15} strokeWidth={2.25} aria-hidden="true" />
+            </Button>
+          ))}
+        </div>
       </div>
+
+      {(insight.facts || insight.tasks) && (
+        <aside className={styles.side}>
+          {insight.recommended && <span className={styles.recommended}>Acción recomendada</span>}
+
+          {insight.facts && (
+            <>
+              <span className={styles.sideTitle}>Resumen</span>
+              <ul className={styles.facts}>
+                {insight.facts.map((fact) => {
+                  const Icon = fact.icon === 'calendar' ? CalendarDays : TrendingUp
+                  return (
+                    <li key={fact.text}>
+                      <Icon size={17} strokeWidth={2} aria-hidden="true" />
+                      <span>
+                        {fact.text}{' '}
+                        <b className={fact.bad ? styles.bad : undefined}>{fact.value}</b>
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
+
+          {insight.tasks && (
+            <>
+              <span className={styles.sideTitle}>Tareas afectadas</span>
+              <ul className={styles.tasks}>
+                {insight.tasks.map((task) => {
+                  const Icon = TASK_ICON[task.kind]
+                  return (
+                    <li key={task.taskId}>
+                      <span className={[styles.taskIcon, styles[`task_${task.kind}`]].join(' ')} aria-hidden="true">
+                        <Icon size={16} strokeWidth={2.25} />
+                      </span>
+                      <span className={styles.taskText}>
+                        <span className={styles.taskTitle}>{task.title}</span>
+                        <span className={styles.taskDetail}>{task.detail}</span>
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+              {(insight.moreTasks ?? 0) > 0 && <span className={styles.more}>y {insight.moreTasks} más</span>}
+            </>
+          )}
+        </aside>
+      )}
     </article>
   )
 }

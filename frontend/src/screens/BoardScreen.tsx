@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCorners, useSensor, useSensors,
   type DragEndEvent, type DragOverEvent, type DragStartEvent,
@@ -22,6 +22,7 @@ import {
 } from '@/hooks/useData'
 import { useAssistant, useAuth, useUi } from '@/state/context'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { useFinishPrompt } from '@/hooks/useFinishPrompt'
 import { canWrite } from '@/lib/roles'
 import { deriveSignals, taskBadge } from '@/lib/signals'
 import { dropPosition, matchesBoardFilters } from '@/lib/board'
@@ -32,7 +33,8 @@ export function BoardScreen() {
   const { workspaceId: workspaceIdParam } = useParams()
   const projectId = Number(workspaceIdParam)
   const navigate = useNavigate()
-  const { highlighted, pushToast } = useUi()
+  const location = useLocation()
+  const { highlighted, highlight, pushToast } = useUi()
   const { setActiveTask } = useAssistant()
 
   const { data: workspace } = useWorkspace(projectId)
@@ -43,9 +45,14 @@ export function BoardScreen() {
   const { data: members } = useTeamMembers(workspace?.teamId)
 
   const taskMutations = useTaskMutations(board?.id, projectId)
+  // Al terminar una tarea se pregunta cuanto ha costado: es lo que la IA usa para aprender el ritmo.
+  const finish = useFinishPrompt(board?.id, projectId)
 
   const { user } = useAuth()
-  const [onlySignals, setOnlySignals] = useState(false)
+  // Se puede llegar con el filtro «Avisos» ya puesto (desde el insight de Pulso).
+  const [onlySignals, setOnlySignals] = useState(
+    () => Boolean((location.state as { onlyWarnings?: boolean } | null)?.onlyWarnings),
+  )
   // Filtros de encima del tablero: buscar por titulo o numero, y por persona.
   const [search, setSearch] = useState('')
   const [people, setPeople] = useState<number[]>([])
@@ -70,6 +77,23 @@ export function BoardScreen() {
   )
 
   const columns = useMemo(() => detail?.columns ?? [], [detail])
+
+  // Llegar con una tarea concreta (desde «Abrir la tarea» de Pulso): se abre su panel en
+  // cuanto el tablero esta cargado. Se decide durante el render, sin efecto; el efecto de
+  // abajo solo resalta la tarjeta y limpia el estado de la navegacion, para que recargar o
+  // volver atras no la abra otra vez.
+  const openTaskId = (location.state as { openTaskId?: number } | null)?.openTaskId ?? null
+  const [taskFromLink, setTaskFromLink] = useState<number | null>(null)
+  if (openTaskId !== null && openTaskId !== taskFromLink && columns.length > 0) {
+    setTaskFromLink(openTaskId)
+    const target = columns.flatMap((column) => column.tasks ?? []).find((task) => task.id === openTaskId)
+    if (target) setOpenTask(target)
+  }
+  useEffect(() => {
+    if (taskFromLink === null) return
+    highlight(taskFromLink)
+    navigate(location.pathname, { replace: true, state: null })
+  }, [taskFromLink, highlight, navigate, location.pathname])
   const role = detail?.myRole ?? null
   const writable = canWrite(role)
 
@@ -110,6 +134,7 @@ export function BoardScreen() {
       { taskId: task.id, columnId, position },
       {
         onSuccess: () => {
+          if (task.columnId !== columnId && columnId === columns[columns.length - 1]?.id) finish.ask(task)
           if (task.columnId !== columnId) {
             pushToast(`Movida a ${target?.name ?? 'otra columna'}`, {
               label: 'Deshacer',
@@ -215,6 +240,7 @@ export function BoardScreen() {
               {/* Filtra el tablero a las tareas que llevan un aviso en la tarjeta («venció hace…»,
                   «… sin avance», «sin responsable»). Cuantas hay se ve al pasar el raton. */}
               <Chip
+                danger
                 active={onlySignals}
                 onClick={() => setOnlySignals((value) => !value)}
                 title={`Ver solo las tareas con aviso: vencidas, paradas o sin responsable (${signalCount})`}
@@ -301,6 +327,9 @@ export function BoardScreen() {
                   onOpenTask={setOpenTask}
                   onMoveTask={(task, columnId) => move(task, columnId, dropPosition(allTasksOf(columnId), task.id))}
                   onDeleteTask={(task) => taskMutations.remove.mutateAsync(task.id)}
+                  onQuickCreate={(columnId, title) =>
+                    taskMutations.create.mutate({ columnId, payload: { title, priority: 'MEDIA' } })
+                  }
                 />
               ))}
             </div>
@@ -353,6 +382,7 @@ export function BoardScreen() {
         onClose={() => setNewTaskOpen(false)}
         onSubmit={(columnId, payload) => taskMutations.create.mutateAsync({ columnId, payload })}
       />
+      {finish.dialog}
     </WorkspaceShell>
   )
 }

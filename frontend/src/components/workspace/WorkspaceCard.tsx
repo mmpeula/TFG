@@ -4,7 +4,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Tag } from '@/components/ui/Tag'
 import { WorkspaceBadge } from './WorkspaceBadge'
 import styles from './WorkspaceCard.module.css'
-import { colorOf, lastActivityLabel } from '@/lib/workspace'
+import { lastActivityLabel } from '@/lib/workspace'
 import type { WorkspaceResponse } from '@/types/api'
 
 /**
@@ -27,7 +27,6 @@ export function WorkspaceCard({
   alert?: ReactNode
   actions?: ReactNode
 }) {
-  const color = colorOf(workspace)
   const vacio = workspace.totalTasks === 0
   const terminado = !vacio && workspace.pendingTasks === 0
 
@@ -39,8 +38,6 @@ export function WorkspaceCard({
         onClick={() => onOpen(workspace)}
         disabled={workspace.enabled === false}
       >
-        <span className={styles.rail} style={{ background: color }} aria-hidden="true" />
-
         <div className={styles.head}>
           <WorkspaceBadge workspace={workspace} className={styles.badge} />
           <span className={styles.title}>{workspace.name}</span>
@@ -74,15 +71,20 @@ export function WorkspaceCard({
           {!vacio && <span className={styles.percent}>{workspace.progress}%</span>}
         </div>
 
-        <ProgressBar value={workspace.progress} height={6} color={color} label={`Progreso de ${workspace.name}`} />
+        <ProgressBar
+          value={workspace.progress}
+          height={6}
+          label={`Progreso de ${workspace.name}`}
+        />
 
         <div className={styles.foot}>
-          <span className={styles.meta}>
-            <Users size={12} strokeWidth={2.75} />
+          <span className={styles.meta} title="Personas en el equipo">
+            <Users size={14} strokeWidth={2} />
             {workspace.memberCount}
           </span>
-          <span className={styles.meta}>
-            <Clock size={12} strokeWidth={2.75} />
+          <span className={styles.metaDivider} aria-hidden="true" />
+          <span className={styles.meta} title="Última actividad">
+            <Clock size={14} strokeWidth={2} />
             {lastActivityLabel(workspace.lastActivityAt)}
           </span>
           {alert && <span className={styles.footAlert}>{alert}</span>}

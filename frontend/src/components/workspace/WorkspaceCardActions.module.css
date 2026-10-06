@@ -1,9 +1,9 @@
+/* «⋯» sin caja, como un icono mas de la tarjeta; el fondo solo aparece al pasar por encima. */
 .trigger {
-  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
   display: grid; place-items: center;
-  color: var(--color-neutral-500);
-  background: var(--color-bg);
-  border: 1px solid var(--color-neutral-300);
+  color: var(--color-neutral-600);
+  background: transparent;
   transition: var(--transition);
 }
-.trigger:hover { color: var(--color-text); border-color: var(--color-neutral-500); }
+.trigger:hover { color: var(--color-text); background: var(--color-neutral-200); }

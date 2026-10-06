@@ -14,3 +14,14 @@ export const STATE_COLORS: Record<TaskState, { label: string; color: string }> =
   'en-curso': { label: 'En curso', color: 'var(--color-warning-600)' },
   terminada: { label: 'Terminada', color: 'var(--color-accent-2-600)' },
 }
+
+/**
+ * Colores del estado en los paneles (la rueda «Estado de las tareas»): gris lo que no ha
+ * empezado, azul lo que esta en marcha, verde lo terminado. Distintos de los de la
+ * insignia de cada tarjeta del plan, que ordenan por atencion.
+ */
+export const PROGRESS_STATE_COLORS = {
+  todo: 'var(--color-neutral-400)',
+  doing: 'var(--color-accent-500)',
+  done: 'var(--color-accent-2-500)',
+} as const

@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import styles from './WorkspacesScreen.module.css'
 import { useBoard, useWorkspaces } from '@/hooks/useData'
-import { deriveSignals } from '@/lib/signals'
+import { taskWarning } from '@/lib/signals'
 import { isTeacher } from '@/lib/roles'
 import { ROUTES } from '@/app/routes'
 import { useAuth } from '@/state/context'
@@ -39,7 +39,8 @@ export function TeacherScreen() {
   if (user?.role !== 'DOCENTE') return <Navigate to={ROUTES.home} replace />
 
   function open(workspace: WorkspaceResponse) {
-    navigate(ROUTES.pulsoById(workspace.id))
+    // Se entra por el plan, que para el docente es el panel de progreso del equipo.
+    navigate(ROUTES.planById(workspace.id))
   }
 
   return (
@@ -73,17 +74,21 @@ export function TeacherScreen() {
 
 function TeacherCard({ workspace, onOpen }: { workspace: WorkspaceResponse; onOpen: (workspace: WorkspaceResponse) => void }) {
   const { data: board } = useBoard(workspace.boardId)
-  const signals = useMemo(() => deriveSignals(board), [board])
+  // Tareas con aviso, contadas igual que el filtro «Avisos» del tablero (una por tarea).
+  const avisos = useMemo(() => {
+    const columns = board?.columns ?? []
+    return columns.flatMap((column) => column.tasks ?? []).filter((task) => taskWarning(task, columns)).length
+  }, [board])
 
   return (
     <WorkspaceCard
       workspace={workspace}
       onOpen={onOpen}
       alert={
-        signals.length > 0 && (
-          <Tag variant="neutral" small>
+        avisos > 0 && (
+          <Tag variant="danger" small title="Tareas vencidas, paradas o sin responsable">
             <AlertTriangle size={11} strokeWidth={2.75} />
-            {signals.length === 1 ? '1 alerta' : `${signals.length} alertas`}
+            {avisos === 1 ? '1 aviso' : `${avisos} avisos`}
           </Tag>
         )
       }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { DateInput } from '@/components/ui/DateInput'
+import { parseHours } from '@/lib/hours'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { AssigneePicker } from '@/components/task/AssigneePicker'
@@ -41,10 +42,14 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
   const [type, setType] = useState<TaskType>('TAREA')
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState('')
+  const [estimated, setEstimated] = useState('')
   const [assigneeIds, setAssigneeIds] = useState<number[]>([])
   const [columnId, setColumnId] = useState(String(columns[0]?.id ?? ''))
 
-  const valido = title.trim().length > 0 && columnId !== ''
+  // Siempre en horas: «1,5» es hora y media. Vacio, sin estimacion.
+  const horas = estimated.trim() === '' ? null : parseHours(estimated)
+  const horasValidas = estimated.trim() === '' || horas !== null
+  const valido = title.trim().length > 0 && columnId !== '' && horasValidas
 
   async function submit() {
     if (!valido || isPending) return
@@ -53,6 +58,7 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
       type,
       description: description.trim() || undefined,
       dueDate: dueDate || null,
+      estimatedHours: horas,
       assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined,
     })
     onClose()
@@ -127,6 +133,23 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
               onChange={setDueDate}
             />
           </label>
+
+          {/* Sin estimacion la tarea no le sirve a la IA para aprender el ritmo de nadie:
+              al terminarla, sus horas reales no tendrian con que compararse. */}
+          <label className={styles.label}>
+            Horas estimadas <span className={styles.optional}>opcional</span>
+            <input
+              className={styles.input}
+              value={estimated}
+              inputMode="decimal"
+              placeholder="Por ejemplo: 1,5"
+              onChange={(event) => setEstimated(event.target.value)}
+            />
+            {!horasValidas && <span className={styles.optional}>Escribe las horas con un número, por ejemplo 1,5.</span>}
+          </label>
+        </div>
+
+        <div className={styles.row}>
 
           <label className={styles.label}>
             Responsables <span className={styles.optional}>opcional</span>

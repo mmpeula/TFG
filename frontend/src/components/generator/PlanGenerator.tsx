@@ -15,6 +15,7 @@ import type { PlanTeamDraft } from '@/state/context'
 import { PRIORITY_LABELS } from '@/lib/roles'
 import { typeOf } from '@/lib/taskTypes'
 import { formatDate } from '@/lib/format'
+import { formatHours } from '@/lib/hours'
 
 /** Que sale de la app al generar: la misma nota con «i» que el resto, en azul porque es de la IA. */
 export function PrivacyNote() {
@@ -449,7 +450,7 @@ export function WorkloadSummary({ workload }: { workload: MemberWorkload[] }) {
               <span className={styles.workloadFill} style={{ width: `${uso * 100}%` }} />
             </span>
             <span className={styles.workloadValue}>
-              {item.tasks} {item.tasks === 1 ? 'tarea' : 'tareas'} · {item.hours} h
+              {item.tasks} {item.tasks === 1 ? 'tarea' : 'tareas'} · {formatHours(item.hours)}
             </span>
           </div>
         )
@@ -501,7 +502,7 @@ function ProposedTaskRow({
         </Tag>
       ))}
       <span className={styles.estimate}>
-        {task.estimatedHours ? `${task.estimatedHours} h` : ''}
+        {task.estimatedHours ? formatHours(task.estimatedHours) : ''}
         {task.priority ? ` · ${PRIORITY_LABELS[task.priority].toLowerCase()}` : ''}
         {task.dueDate && (
           <span className={styles.rowDue}>

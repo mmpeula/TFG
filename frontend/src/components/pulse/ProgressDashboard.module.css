@@ -1,0 +1,127 @@
+/* Panel de progreso: tarjetas blancas con borde suave; las cifras en monoespacio. */
+.dashboard { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.kpisTop { display: grid; grid-template-columns: minmax(280px, 1.35fr) repeat(3, minmax(0, 1fr)); gap: var(--space-4); align-items: stretch; }
+.kpisTopThree { grid-template-columns: minmax(280px, 1.35fr) repeat(2, minmax(0, 1fr)); }
+
+.kpi, .panel {
+  background: var(--color-bg);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgb(24 24 27 / .04);
+}
+
+.kpi {
+  display: grid; grid-template-columns: 1fr auto; align-items: start;
+  gap: var(--space-2) var(--space-3);
+  padding: 18px 20px;
+}
+.kpiMain { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kpiLabel { font-size: 13px; font-weight: 600; color: var(--color-neutral-800); }
+.kpiValue {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15;
+}
+.kpiUnit { font-size: 12.5px; color: var(--color-neutral-600); }
+.kpiExtra { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
+
+/* Icono de cada cifra, en un circulo de su color. */
+.kpiIcon {
+  display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 999px;
+}
+.kpiIcon svg { width: 19px; height: 19px; stroke-width: 2; }
+.blue { background: var(--color-accent-100); color: var(--color-accent-600); }
+.green { background: var(--color-accent-2-100); color: var(--color-accent-2-600); }
+.amber { background: var(--color-warning-100); color: var(--color-warning-600); }
+.red { background: var(--color-danger-100); color: var(--color-danger-600); }
+.grey { background: var(--color-neutral-200); color: var(--color-neutral-600); }
+
+/* Variacion frente a la semana anterior, abajo a la derecha. */
+.delta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.deltaValue {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.good { color: var(--color-accent-2-600); }
+.bad { color: var(--color-danger-600); }
+.deltaLabel, .deltaFlat { font-size: 12px; color: var(--color-neutral-500); }
+
+/* Rueda del estado de las tareas, en su panel */
+.wheelPanel { gap: var(--space-3); }
+.wheel { display: flex; align-items: center; gap: var(--space-4); }
+.wheelSvg { width: 96px; height: 96px; flex: none; }
+.wheelValue { font-family: var(--font-mono); font-size: 17px; font-weight: 600; fill: var(--color-text); }
+.wheelCaption { font-size: 8px; fill: var(--color-neutral-500); }
+.legend { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.legend li { display: flex; align-items: center; gap: var(--space-2); font-size: 12.5px; }
+.legendDot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.legendLabel { flex: 1; color: var(--color-neutral-700); }
+.legendValue { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--color-text); }
+.legendTotal { border-top: 1px solid var(--color-divider); padding-top: 5px; margin-top: 2px; }
+.legendTotal .legendLabel { color: var(--color-neutral-500); padding-left: 17px; }
+
+
+/* Paneles de abajo */
+.panel { padding: 18px 22px; display: flex; flex-direction: column; gap: var(--space-4); }
+.panelHead { display: flex; flex-direction: column; gap: 2px; }
+.panelTitle { font-size: 15px; font-weight: 650; }
+.panelSubtitle { font-size: 12.5px; color: var(--color-neutral-600); }
+
+.chartHead { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.chartTools { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.range {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--color-neutral-800);
+  border: 1px solid var(--color-neutral-300); border-radius: var(--radius-sm);
+  padding: 6px 10px; background: var(--color-bg);
+}
+.range:hover { border-color: var(--color-neutral-500); }
+.range svg { color: var(--color-neutral-500); }
+.legendItem { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--color-neutral-600); }
+.dot { width: 9px; height: 9px; border-radius: 999px; flex: none; display: inline-block; }
+
+/* Grafico de barras: eje a la izquierda y lineas de guia detras de las barras. */
+.chart { display: grid; grid-template-columns: 28px 1fr; gap: var(--space-2); height: 180px; }
+.axis {
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding-bottom: 22px; /* el hueco de las etiquetas de semana */
+  font-family: var(--font-mono); font-size: 11px; color: var(--color-neutral-500); text-align: right;
+  line-height: 0;
+}
+.plot { position: relative; min-width: 0; }
+.gridLines {
+  position: absolute; inset: 0 0 22px 0;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.gridLines span { border-top: 1px dashed var(--color-neutral-300); }
+.gridLines span:last-child { border-top-style: solid; }
+.columns { position: relative; height: 100%; display: flex; gap: var(--space-2); }
+.column { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.bars { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 4px; }
+.bar { width: 26%; max-width: 26px; min-height: 2px; border-radius: 4px 4px 0 0; transition: height .3s ease; }
+.week { height: 22px; display: flex; align-items: flex-end; font-size: 11.5px; color: var(--color-neutral-600); }
+.weekNow { font-weight: 700; color: var(--color-text); }
+
+@media (max-width: 900px) {
+  .kpisTop, .kpisTopThree { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Insights, debajo del panel: uno por fila, a todo lo ancho. */
+.insightsSection { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-4); }
+.insightsHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.insightsTitle { display: inline-flex; align-items: center; gap: 6px; }
+.insightsTitle h3 { font-size: 19px; font-weight: 700; letter-spacing: -0.015em; }
+.insightsInfo {
+  display: inline-grid; place-items: center;
+  width: 26px; height: 26px; border-radius: 999px;
+  color: var(--color-neutral-500);
+}
+.insightsInfo:hover, .insightsInfo[aria-expanded="true"] { background: var(--color-neutral-200); color: var(--color-text); }
+.insightsHelp {
+  width: 320px; padding: var(--space-2) var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-2);
+  font-size: 12.5px; font-weight: 400; line-height: 1.5; letter-spacing: 0; color: var(--color-neutral-700);
+}
+.insightsHelp b { color: var(--color-text); font-weight: 600; }
+.insights { display: flex; flex-direction: column; gap: var(--space-4); }

@@ -218,7 +218,7 @@
 
 /* Reparto ------------------------------------------------------------------ */
 .workload {
-  background: var(--color-accent-2-100);
+  background: var(--color-neutral-100);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   display: flex;
@@ -227,14 +227,14 @@
 }
 .workloadTitle {
   font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
-  font-weight: 700; color: var(--color-accent-2-700);
+  font-weight: 700; color: var(--color-neutral-600);
 }
 .workloadRow { display: grid; grid-template-columns: 140px 1fr auto; align-items: center; gap: var(--space-3); }
 .workloadName { font-size: 13px; font-weight: 600; }
-.workloadBar { height: 8px; background: var(--color-accent-2-200); border-radius: 999px; overflow: hidden; }
-.workloadFill { display: block; height: 100%; background: var(--color-accent-2-500); border-radius: 999px; }
-.workloadValue { font-size: 12px; color: var(--color-accent-2-800); white-space: nowrap; }
-.workloadNote { font-size: 12px; color: var(--color-accent-2-800); font-style: italic; }
+.workloadBar { height: 6px; background: var(--color-neutral-200); border-radius: 999px; overflow: hidden; }
+.workloadFill { display: block; height: 100%; background: var(--color-accent-600); border-radius: 999px; }
+.workloadValue { font-size: 12px; color: var(--color-neutral-700); white-space: nowrap; }
+.workloadNote { font-size: 12px; color: var(--color-neutral-600); font-style: italic; }
 @media (max-width: 767px) {
   .workloadRow { grid-template-columns: 1fr auto; }
   .workloadBar { display: none; }

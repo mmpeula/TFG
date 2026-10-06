@@ -1,43 +1,12 @@
 /* Resumen del equipo: cifras arriba, una fila por persona debajo. Todo lo medible en monoespacio. */
-.dashboard { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-4); }
+.dashboard { display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-4); }
 
-.kpis { display: grid; grid-template-columns: minmax(300px, 1.6fr) repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
-.kpi {
-  display: flex; flex-direction: column; gap: 6px;
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius-lg);
-  padding: 14px var(--space-4);
-}
-.kpiLabel { font-size: 12px; color: var(--color-neutral-600); }
-.kpiValue {
-  font-family: var(--font-mono); font-size: 22px; font-weight: 600;
-  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
-}
-.kpiDetail { font-size: 12px; color: var(--color-neutral-500); }
+/* Arriba, el estado de las tareas y las tres cifras en una fila, todas de la misma altura
+   (mismas tarjetas que el panel del docente, ver DashboardParts). */
+.top { display: grid; grid-template-columns: minmax(280px, 1.35fr) repeat(3, minmax(0, 1fr)); gap: var(--space-4); align-items: stretch; }
+.kpiNote { font-size: 12.5px; color: var(--color-neutral-600); }
 
-.good { color: var(--color-accent-2-700); }
-
-/* Rueda del estado de las tareas */
-.wheelCard { gap: var(--space-2); }
-.wheel { display: flex; align-items: center; gap: var(--space-4); }
-.wheelSvg { width: 112px; height: 112px; flex: none; }
-.wheelValue { font-family: var(--font-mono); font-size: 17px; font-weight: 600; fill: var(--color-text); }
-.wheelCaption { font-size: 8px; fill: var(--color-neutral-500); }
-.legend { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.legend li { display: flex; align-items: center; gap: var(--space-2); font-size: 12.5px; }
-.legendDot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
-.legendLabel { flex: 1; color: var(--color-neutral-700); }
-.legendValue { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--color-text); }
-.legendTotal { border-top: 1px solid var(--color-divider); padding-top: 5px; margin-top: 2px; }
-.legendTotal .legendLabel { color: var(--color-neutral-500); padding-left: 17px; }
-.bad { color: var(--color-danger-600); font-weight: 600; }
-.warn { color: var(--color-warning-700); }
-
-.people {
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius-lg);
-  padding: var(--space-2) var(--space-4);
-}
+.people { display: flex; flex-direction: column; }
 .peopleHead, .row {
   display: grid;
   grid-template-columns: minmax(150px, 1.4fr) minmax(120px, 1.6fr) repeat(4, 72px);
@@ -63,12 +32,11 @@
 .num.bad { color: var(--color-danger-600); font-weight: 600; }
 .none { font-size: 12px; color: var(--color-neutral-400); }
 
-@media (max-width: 1023px) {
-  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .wheelCard { grid-column: 1 / -1; }
+@media (max-width: 1100px) {
+  .top { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 600px) {
-  .kpis { grid-template-columns: 1fr; }
+@media (max-width: 640px) {
+  .top { grid-template-columns: 1fr; }
 }
 /* En movil cada persona es una ficha: nombre y avance arriba, cifras debajo con su etiqueta. */
 @media (max-width: 767px) {

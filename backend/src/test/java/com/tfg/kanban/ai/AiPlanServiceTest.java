@@ -893,7 +893,36 @@ class AiPlanServiceTest {
         assertThat(mensajes.get(2).role()).isEqualTo("user");
         assertThat(mensajes.get(2).content())
                 .contains("no es un JSON valido")
-                .contains("Corrigelo");
+                .contains("Corrigelo")
+                // El motivo concreto, no el hueco del formato sin rellenar.
+                .doesNotContain("%s");
+    }
+
+    @Test
+    @DisplayName("El ritmo real de cada persona (horas reales frente a estimadas) llega al prompt, "
+            + "solo si tiene al menos tres tareas cerradas con las dos cifras")
+    void historicalPaceReachesThePrompt() {
+        // Ana: 10 h estimadas y 8 h reales en tres tareas -> termina en el 80 % de lo estimado.
+        when(taskRepository.findWithActualsByAssignee(1L)).thenReturn(List.of(
+                tareaHecha(4, 3), tareaHecha(4, 3.5), tareaHecha(2, 1.5)));
+        // Luis: solo dos tareas con horas reales, todavia no es un ritmo.
+        when(taskRepository.findWithActualsByAssignee(2L)).thenReturn(List.of(
+                tareaHecha(3, 6), tareaHecha(3, 6)));
+        when(deepSeekClient.chatJson(eq(AiPlanService.SYSTEM_PROMPT), anyString())).thenReturn(PLAN_VALIDO);
+
+        service.generate(7L, null);
+
+        ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
+        verify(deepSeekClient).chatJson(eq(AiPlanService.SYSTEM_PROMPT), prompt.capture());
+        String ana = prompt.getValue().lines().filter(line -> line.contains("Ana García")).findFirst().orElseThrow();
+        String luis = prompt.getValue().lines().filter(line -> line.contains("Luis Perez")).findFirst().orElseThrow();
+        assertThat(ana).contains("ritmo historico: termina sus tareas en el 80 % de las horas estimadas");
+        assertThat(luis).doesNotContain("ritmo historico");
+    }
+
+    private static Task tareaHecha(double estimadas, double reales) {
+        return Task.builder().title("hecha")
+                .estimatedHours(BigDecimal.valueOf(estimadas)).actualHours(BigDecimal.valueOf(reales)).build();
     }
 
     @Test

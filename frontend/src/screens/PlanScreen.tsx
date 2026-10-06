@@ -5,13 +5,14 @@ import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
 import { TaskCard } from '@/components/board/TaskCard'
 import { TaskPanel } from '@/components/task/TaskPanel'
 import { TeamDashboard } from '@/components/plan/TeamDashboard'
+import { ProjectPulse } from '@/components/pulse/ProjectPulse'
 import { Button } from '@/components/ui/Button'
 import { Segmented } from '@/components/ui/Controls'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Skeleton } from '@/components/ui/Skeleton'
 import styles from './PlanScreen.module.css'
-import { useBoard, useProjectBoards, useTaskMutations, useTeamMembers, useWorkspace } from '@/hooks/useData'
+import { useBoard, useProject, useProjectBoards, useTaskMutations, useTeamMembers, useWorkspace } from '@/hooks/useData'
 import { buildPlan, DEFAULT_SPRINT_DAYS, isoDate, sprintRange, type Sprint } from '@/lib/sprints'
 import { STATE_COLORS } from '@/lib/planStatus'
 import { canManage, canWrite, isTeacher } from '@/lib/roles'
@@ -57,7 +58,8 @@ function guardar(clave: string, valor: string) {
  * nada que elegir: es la pregunta que se hace de verdad al abrir esto. Quien es
  * responsable elige entre lo suyo y «Todo el equipo», que cambia los sprints
  * por un resumen de como va el equipo y cada persona (ver TeamDashboard). Un
- * docente, que solo observa, ve siempre ese resumen.
+ * docente, que solo observa, ve el panel de progreso del proyecto (el mismo de
+ * Pulso, ver ProjectPulse).
  *
  * La duracion del sprint no se elige aqui: se fija una vez al crear el
  * workspace (y se puede cambiar en sus ajustes), para que todos los sprints
@@ -74,6 +76,7 @@ export function PlanScreen() {
   const { data: boards, isPending: loadingBoards } = useProjectBoards(workspaceId)
   const { data: detail, isPending } = useBoard(boards?.[0]?.id)
   const { data: members } = useTeamMembers(workspace?.teamId)
+  const { data: project } = useProject(workspaceId)
   const taskMutations = useTaskMutations(boards?.[0]?.id, workspaceId)
 
   // El alcance elegido se recuerda: nadie quiere volver a fijarlo cada vez.
@@ -177,7 +180,11 @@ export function PlanScreen() {
             </div>
           </header>
 
-          {scope === 'team' && (
+          {/* El docente entra a ver como va el equipo: el panel de progreso (el mismo de Pulso, sin el
+              tiempo medio por tarea). El responsable, en «Todo el equipo», tiene su resumen propio. */}
+          {soloObserva ? (
+            <ProjectPulse projectId={workspaceId} board={detail} project={project} hideCycleTime />
+          ) : scope === 'team' && (
             <TeamDashboard tasks={tasks} columns={columns} members={members ?? []} sprints={plan.sprints} />
           )}
 
@@ -298,7 +305,6 @@ function SprintColumn({
         <ProgressBar
           value={sprint.progress}
           height={2}
-          color={sprint.progress === 100 ? 'var(--color-accent-2-500)' : 'var(--color-neutral-700)'}
           label={`Avance del sprint ${sprint.number}: ${sprint.terminadas.length} de ${sprint.tasks.length} completadas`}
         />
       </header>

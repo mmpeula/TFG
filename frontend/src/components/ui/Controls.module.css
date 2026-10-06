@@ -35,6 +35,11 @@
   color: #ffffff;
 }
 .chipActive:hover { background: var(--color-neutral-800); color: #ffffff; }
+/* Avisos: siempre en rojo, el color que la app reserva para lo que va mal o tarde. */
+.chipDanger { border-color: var(--color-danger-300); color: var(--color-danger-700); background: var(--color-danger-100); }
+.chipDanger:hover { border-color: var(--color-danger-500); color: var(--color-danger-700); }
+.chipDanger.chipActive { background: var(--color-danger-600); border-color: var(--color-danger-600); color: #ffffff; }
+.chipDanger.chipActive:hover { background: var(--color-danger-700); }
 
 /* Dropdown ---------------------------------------------------------------- */
 .dropdown { position: relative; }

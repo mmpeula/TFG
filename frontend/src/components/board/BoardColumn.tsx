@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Plus } from 'lucide-react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { ProgressBar } from '@/components/ui/ProgressBar'
@@ -22,22 +23,34 @@ interface Props {
   onOpenTask: (task: TaskResponse) => void
   onMoveTask: (task: TaskResponse, columnId: number) => void
   onDeleteTask: (task: TaskResponse) => void | Promise<unknown>
+  /** Crear una tarea rapida en esta columna: solo el titulo, sin responsable y prioridad media. */
+  onQuickCreate: (columnId: number, title: string) => void
 }
 
 /**
  * Una columna muestra presion, no solo tarjetas: contador y barra de presion.
  *
  * Las columnas son fijas (Por hacer, En progreso, Hecho): no tienen menu para
- * renombrarlas ni borrarlas, y el servidor tampoco lo permite. Tampoco crean
- * tareas: eso se hace solo desde el boton «Añadir tarea» de arriba, un unico
- * sitio con todos los campos (columna, responsables, fecha…).
+ * renombrarlas ni borrarlas, y el servidor tampoco lo permite.
+ *
+ * El «+ Añadir tarea» del pie de cada columna crea una tarea rapida en ella: solo el titulo, sin
+ * responsable y con prioridad media. Lo demas se completa abriendola, o se usa el
+ * boton «Añadir tarea» de arriba, que pide todos los campos.
  */
 export function BoardColumn({
   column, columns, tasks, isOver, isLast, highlighted, canWrite,
-  draggable = true, onOpenTask, onMoveTask, onDeleteTask,
+  draggable = true, onOpenTask, onMoveTask, onDeleteTask, onQuickCreate,
 }: Props) {
   const { setNodeRef } = useDroppable({ id: `column-${column.id}`, data: { columnId: column.id } })
   const [expanded, setExpanded] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [title, setTitle] = useState('')
+
+  function create() {
+    if (!title.trim()) return
+    onQuickCreate(column.id, title.trim())
+    setTitle('')
+  }
 
   // Cuanto se ha llenado la columna, a ojo: cada tarea suma un quinto de la barra.
   const pressure = Math.min(100, tasks.length * 20)
@@ -93,6 +106,34 @@ export function BoardColumn({
       {expanded && tasks.length > VISIBLE && (
         <button className={styles.more} onClick={() => setExpanded(false)}>Ver menos</button>
       )}
+      {canWrite && (creating ? (
+        <div className={styles.quick}>
+          <textarea
+            className={styles.quickInput}
+            rows={2}
+            value={title}
+            autoFocus
+            placeholder="Título de la tarea"
+            aria-label={`Título de la nueva tarea en ${column.name}`}
+            onChange={(event) => setTitle(event.target.value)}
+            onBlur={() => { if (!title.trim()) setCreating(false) }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); create() }
+              if (event.key === 'Escape') { setTitle(''); setCreating(false) }
+            }}
+          />
+          <span className={styles.quickHint}>Enter crea · Esc cancela · sin responsable, prioridad media</span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={styles.add}
+          onClick={() => setCreating(true)}
+          title="Sin responsable y con prioridad media"
+        >
+          <Plus size={14} strokeWidth={2.5} /> Añadir tarea
+        </button>
+      ))}
     </section>
   )
 }

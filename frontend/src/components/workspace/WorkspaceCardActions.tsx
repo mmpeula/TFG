@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogOut, MoreVertical, Trash2 } from 'lucide-react'
+import { LogOut, MoreHorizontal, Trash2 } from 'lucide-react'
 import { Dropdown, DropdownItem } from '@/components/ui/Controls'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import styles from './WorkspaceCardActions.module.css'
@@ -33,7 +33,7 @@ export function WorkspaceCardActions({ workspace }: { workspace: WorkspaceRespon
             onClick={toggle}
             aria-label={`Acciones de ${workspace.name}`}
           >
-            <MoreVertical size={15} strokeWidth={2.75} />
+            <MoreHorizontal size={18} strokeWidth={2.5} />
           </button>
         )}
       >
