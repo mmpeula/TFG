@@ -25,8 +25,7 @@ package com.tfg.kanban.domain.model;
  *       que es una cuenta de estudiante y el valor por defecto al registrarse.</li>
  * </ul>
  *
- * Spring Security espera autoridades con prefijo {@code ROLE_}; la conversion se hace
- * en {@code UserDetails} (ver {@code AppUserDetailsService}).
+ * Spring Security espera autoridades con prefijo {@code ROLE_}: lo pone {@link #authority()}.
  */
 public enum Role {
     RESPONSABLE,
@@ -36,5 +35,19 @@ public enum Role {
 
     public String authority() {
         return "ROLE_" + name();
+    }
+
+    /**
+     * Como se llama el rol en la interfaz, en minusculas, para los textos que se leen
+     * fuera de ella (el correo de invitacion, el historial, el contexto del asistente).
+     * MIEMBRO es «alumno»: el identificador interno no cambia, pero nadie lo ve escrito asi.
+     */
+    public String label() {
+        return switch (this) {
+            case RESPONSABLE -> "responsable";
+            case MIEMBRO -> "alumno";
+            case DOCENTE -> "docente";
+            case ADMIN -> "administrador";
+        };
     }
 }

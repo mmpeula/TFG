@@ -9,12 +9,11 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { ActivityFeed } from '@/components/home/ActivityFeed'
-import { Section } from './Section'
 import styles from './WorkspaceSettingsScreen.module.css'
 import { useActivity, useWorkspace, useWorkspaceMutations } from '@/hooks/useData'
 import { canManage } from '@/lib/roles'
 import { formatDate } from '@/lib/format'
-import { DEFAULT_SPRINT_DAYS } from '@/lib/sprints'
+import { DEFAULT_SPRINT_DAYS, SPRINT_DURATIONS } from '@/lib/sprints'
 import { ROUTES } from '@/app/routes'
 
 /**
@@ -36,6 +35,8 @@ export function WorkspaceSettingsScreen() {
   const [editOpen, setEditOpen] = useState(false)
 
   const manageable = canManage(workspace?.myRole)
+  const dias = workspace?.sprintDays ?? DEFAULT_SPRINT_DAYS
+  const duracion = SPRINT_DURATIONS.find((option) => option.value === String(dias))?.label ?? `${dias} días`
 
   return (
     <WorkspaceShell workspace={workspace} workspaceId={workspaceId}>
@@ -43,10 +44,10 @@ export function WorkspaceSettingsScreen() {
         <Skeleton label="Cargando los ajustes…" lines={3} />
       ) : (
         <CardGroup>
-          <Section
+          <Card
             title="Datos del espacio de trabajo"
-            subtitle="Nombre, fechas y duración de los sprints."
-            action={
+            description="Nombre, fechas y duración de los sprints."
+            aside={
               manageable && (
                 <Button variant="secondary" onClick={() => setEditOpen(true)}>
                   <Pencil size={14} strokeWidth={2.5} />
@@ -74,7 +75,7 @@ export function WorkspaceSettingsScreen() {
               </div>
               <div>
                 <dt>Duración del sprint</dt>
-                <dd className={styles.measured}>{(workspace.sprintDays ?? DEFAULT_SPRINT_DAYS) / 7} semanas</dd>
+                <dd className={styles.measured}>{duracion}</dd>
               </div>
               <div>
                 <dt>Tareas</dt>
@@ -83,15 +84,15 @@ export function WorkspaceSettingsScreen() {
                 </dd>
               </div>
             </dl>
-          </Section>
+          </Card>
 
-          <Section title="Actividad reciente" subtitle="Los últimos cambios del equipo en el tablero.">
+          <Card title="Actividad reciente" description="Los últimos cambios del equipo en el tablero.">
             {activity && activity.content.length > 0 ? (
               <ActivityFeed items={activity.content.slice(0, 8)} />
             ) : (
               <EmptyState title="Sin actividad" body="Aquí aparecerán los cambios del grupo." />
             )}
-          </Section>
+          </Card>
 
           {manageable && (
             <Card

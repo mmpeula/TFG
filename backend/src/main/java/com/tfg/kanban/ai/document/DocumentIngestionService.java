@@ -99,7 +99,8 @@ public class DocumentIngestionService {
         List<VisualCandidate> optional = raw.visuals().stream()
                 .filter(visual -> visual.kind() != VisualCandidate.Kind.SCANNED_PAGE).toList();
 
-        if (!properties.getDocument().isVisionEnabled()) {
+        // Con todo el modulo de IA apagado tampoco se mira ninguna imagen: seria una llamada a DeepSeek.
+        if (!properties.isEnabled() || !properties.getDocument().isVisionEnabled()) {
             if (!scanned.isEmpty()) {
                 throw new BusinessRuleException(("El documento tiene %d páginas sin texto (escaneadas) y el análisis "
                         + "visual está desactivado en el servidor. Sube una versión con texto.").formatted(scanned.size()));

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { AlertTriangle, ChevronDown, MessageSquare, Send, Trash2, X } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
@@ -9,16 +9,18 @@ import { DateInput } from '@/components/ui/DateInput'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import styles from './TaskPanel.module.css'
 import { useCommentMutations, useComments, useTaskMutations } from '@/hooks/useData'
+import { useEscape } from '@/hooks/useEscape'
 import { useFinishPrompt } from '@/hooks/useFinishPrompt'
 import { taskPayload } from '@/lib/tasks'
+import { dropPosition } from '@/lib/board'
 import type { TaskPayload } from '@/api/endpoints'
 import { useAuth } from '@/state/context'
 import { canManage, canWrite as canWriteRole, PRIORITY_LABELS } from '@/lib/roles'
-import { TASK_TYPES, TASK_TYPE_IDS, typeOf } from '@/lib/taskTypes'
+import { TASK_TYPE_IDS, typeOf } from '@/lib/taskTypes'
 import { taskWarning, type TaskWarningKind } from '@/lib/signals'
 import { formatDate, formatDateTime, relativeTime } from '@/lib/format'
 import { formatHours, hoursNumber, parseHours } from '@/lib/hours'
-import type { ColumnResponse, Role, TaskPriority, TaskResponse, TeamMemberResponse } from '@/types/api'
+import type { ColumnResponse, CommentResponse, Role, TaskPriority, TaskResponse, TaskType, TeamMemberResponse } from '@/types/api'
 
 const PRIORITIES: TaskPriority[] = ['BAJA', 'MEDIA', 'ALTA', 'CRITICA']
 
@@ -36,6 +38,63 @@ const WARNING_TITLES: Record<TaskWarningKind, string> = {
   fecha: 'Esta tarea va tarde',
   parada: 'Esta tarea está parada',
   'sin-responsable': 'Esta tarea no tiene responsable',
+}
+
+/** El punto de color y el nombre de un tipo de tarea, como se ve en el panel y en su menu. */
+function TypeLabel({ type }: { type: TaskType }) {
+  const { label, color } = typeOf(type)
+  return (
+    <>
+      <span className={styles.typeDot} style={{ background: color }} />
+      {label}
+    </>
+  )
+}
+
+/**
+ * Una propiedad del panel que se elige de una lista (estado, tipo, prioridad): el valor
+ * actual y, si se puede editar, su menu. Las tres se ven y se comportan igual.
+ */
+function PropertyMenu<T extends string | number>({
+  value,
+  options,
+  onSelect,
+  readOnly,
+}: {
+  value: ReactNode
+  options: { id: T; label: ReactNode; active: boolean }[]
+  onSelect: (id: T) => void
+  readOnly: boolean
+}) {
+  if (readOnly) return <span className={styles.propValue}>{value}</span>
+  return (
+    <Dropdown
+      align="left"
+      trigger={({ toggle }) => (
+        <button className={styles.propValue} onClick={toggle}>
+          {value}
+          <ChevronDown size={14} strokeWidth={2.75} aria-hidden="true" />
+        </button>
+      )}
+    >
+      {(close) => (
+        <>
+          {options.map((option) => (
+            <DropdownItem
+              key={option.id}
+              active={option.active}
+              onClick={() => {
+                close()
+                onSelect(option.id)
+              }}
+            >
+              {option.label}
+            </DropdownItem>
+          ))}
+        </>
+      )}
+    </Dropdown>
+  )
 }
 
 interface Props {
@@ -57,20 +116,15 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
   const taskMutations = useTaskMutations(boardId, projectId)
   const finish = useFinishPrompt(boardId, projectId)
   const [comment, setComment] = useState('')
+  const [borrando, setBorrando] = useState<CommentResponse | null>(null)
 
   const taskId = task?.id
   const { data: comments, isPending: loadingComments } = useComments(taskId)
-  const commentMutations = useCommentMutations(taskId ?? 0)
+  const commentMutations = useCommentMutations(taskId ?? 0, boardId, projectId)
 
-  useEffect(() => {
-    if (!task) return
-    function onKey(event: KeyboardEvent) {
-      // Con la pregunta de las horas abierta, Esc cierra solo esa, no el panel entero.
-      if (event.key === 'Escape' && !finish.open) onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [task, onClose, finish.open])
+  // Esc cierra el panel; si hay algo abierto encima (un menu, una confirmacion, la
+  // pregunta de las horas), cierra eso primero.
+  useEscape(onClose, task !== null)
 
   if (!task) return null
 
@@ -94,6 +148,24 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
 
   function patch(changes: Partial<TaskPayload>) {
     taskMutations.update.mutate({ taskId: task!.id, payload: taskPayload(task!, changes) })
+  }
+
+  /** Al final de la columna de destino, como el «Mover a» de la tarjeta. */
+  function moveTo(columnId: number) {
+    const current = task!
+    if (columnId === current.columnId) return
+    const terminada = columnId === columns[columns.length - 1]?.id
+    const destino = columns.find((column) => column.id === columnId)?.tasks ?? []
+    taskMutations.move.mutate(
+      { taskId: current.id, columnId, position: dropPosition(destino, current.id) },
+      { onSuccess: () => { if (terminada) finish.ask(current) } },
+    )
+  }
+
+  function comentar() {
+    if (!comment.trim() || commentMutations.create.isPending) return
+    commentMutations.create.mutate(comment.trim())
+    setComment('')
   }
 
   return (
@@ -122,7 +194,10 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                 node.style.height = `${node.scrollHeight}px`
               }}
               onBlur={(event) => {
-                if (writable && event.target.value !== task.title) patch({ title: event.target.value })
+                const title = event.target.value.trim()
+                // Un titulo vacio no se guarda: el servidor lo rechazaria. Se vuelve al que habia.
+                if (!title) event.target.value = task.title
+                else if (writable && title !== task.title) patch({ title })
               }}
             />
           </div>
@@ -135,10 +210,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
           {warning && (
             // Por que esta tarea sale en «Avisos» y que hacer para que deje de salir. En rojo, como
             // todos los avisos de la app.
-            <div
-              className={styles.warning}
-              role="status"
-            >
+            <div className={styles.warning} role="status">
               <AlertTriangle size={15} strokeWidth={2.5} aria-hidden="true" />
               <div>
                 <p className={styles.warningTitle}>{WARNING_TITLES[warning.kind]}</p>
@@ -185,103 +257,30 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
             )}
 
             <span className={styles.propLabel}>Estado</span>
-            {writable ? (
-              <Dropdown
-                align="left"
-                trigger={({ toggle }) => (
-                  <button className={styles.propValue} onClick={toggle}>
-                    {task.columnName}
-                    <ChevronDown size={14} strokeWidth={2.75} aria-hidden="true" />
-                  </button>
-                )}
-              >
-                {(close) => (
-                  <>
-                    {columns.map((column) => (
-                      <DropdownItem
-                        key={column.id}
-                        active={column.id === task.columnId}
-                        onClick={() => {
-                          close()
-                          const terminada = column.id === columns[columns.length - 1]?.id && column.id !== task.columnId
-                          taskMutations.move.mutate(
-                            { taskId: task.id, columnId: column.id, position: 0 },
-                            { onSuccess: () => { if (terminada) finish.ask(task) } },
-                          )
-                        }}
-                      >
-                        {column.name}
-                      </DropdownItem>
-                    ))}
-                  </>
-                )}
-              </Dropdown>
-            ) : (
-              <span className={styles.propValue}>{task.columnName}</span>
-            )}
+            <PropertyMenu
+              readOnly={!writable}
+              value={task.columnName}
+              options={columns.map((column) => ({ id: column.id, label: column.name, active: column.id === task.columnId }))}
+              onSelect={moveTo}
+            />
 
             <span className={styles.propLabel}>Tipo</span>
-            {writable ? (
-              <Dropdown
-                align="left"
-                trigger={({ toggle }) => (
-                  <button className={styles.propValue} onClick={toggle}>
-                    <span className={styles.typeDot} style={{ background: typeOf(task.type).color }} />
-                    {typeOf(task.type).label}
-                    <ChevronDown size={14} strokeWidth={2.75} aria-hidden="true" />
-                  </button>
-                )}
-              >
-                {(close) => (
-                  <>
-                    {TASK_TYPE_IDS.map((id) => (
-                      <DropdownItem
-                        key={id}
-                        active={id === task.type}
-                        onClick={() => { close(); patch({ type: id }) }}
-                      >
-                        <span className={styles.typeDot} style={{ background: TASK_TYPES[id].color }} />
-                        {TASK_TYPES[id].label}
-                      </DropdownItem>
-                    ))}
-                  </>
-                )}
-              </Dropdown>
-            ) : (
-              <span className={styles.propValue}>
-                <span className={styles.typeDot} style={{ background: typeOf(task.type).color }} />
-                {typeOf(task.type).label}
-              </span>
-            )}
+            <PropertyMenu
+              readOnly={!writable}
+              value={<TypeLabel type={task.type} />}
+              options={TASK_TYPE_IDS.map((id) => ({ id, label: <TypeLabel type={id} />, active: id === task.type }))}
+              onSelect={(type) => patch({ type })}
+            />
 
             <span className={styles.propLabel}>Prioridad</span>
-            {writable ? (
-              <Dropdown
-                align="left"
-                trigger={({ toggle }) => (
-                  <button className={styles.propValue} onClick={toggle}>
-                    {PRIORITY_LABELS[task.priority]}
-                    <ChevronDown size={14} strokeWidth={2.75} aria-hidden="true" />
-                  </button>
-                )}
-              >
-                {(close) => (
-                  <>
-                    {PRIORITIES.map((priority) => (
-                      <DropdownItem
-                        key={priority}
-                        active={priority === task.priority}
-                        onClick={() => { close(); patch({ priority }) }}
-                      >
-                        {PRIORITY_LABELS[priority]}
-                      </DropdownItem>
-                    ))}
-                  </>
-                )}
-              </Dropdown>
-            ) : (
-              <span className={styles.propValue}>{PRIORITY_LABELS[task.priority]}</span>
-            )}
+            <PropertyMenu
+              readOnly={!writable}
+              value={PRIORITY_LABELS[task.priority]}
+              options={PRIORITIES.map((priority) => ({
+                id: priority, label: PRIORITY_LABELS[priority], active: priority === task.priority,
+              }))}
+              onSelect={(priority) => patch({ priority })}
+            />
 
             {/* La fecha limite decide en que sprint cae la tarea en el plan: cambiarla es
                 tambien la forma de moverla de sprint, o de sacarla de «Sin fecha». */}
@@ -338,7 +337,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                       className={[styles.propInput, styles.measured].join(' ')}
                       defaultValue={task.actualHours != null ? hoursNumber(task.actualHours) : ''}
                       inputMode="decimal"
-                  placeholder="Horas, por ejemplo 1,5"
+                      placeholder="Horas, por ejemplo 1,5"
                       aria-label="Horas reales dedicadas a esta tarea"
                       onBlur={(event) => {
                         const value = readHours(event.target.value)
@@ -408,13 +407,9 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                       {relativeTime(item.createdAt)}
                       {item.edited && ' · editado'}
                     </span>
-                    {(item.author.id === user?.id || responsable) && (
+                    {writable && (item.author.id === user?.id || responsable) && (
                       <div>
-                        <Button
-                          variant="ghost"
-                          small
-                          onClick={() => commentMutations.remove.mutate(item.id)}
-                        >
+                        <Button variant="ghost" small onClick={() => setBorrando(item)}>
                           Borrar
                         </Button>
                       </div>
@@ -432,23 +427,15 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                   placeholder="Escribe un comentario…"
                   onChange={(event) => setComment(event.target.value)}
                   onKeyDown={(event) => {
-                    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && comment.trim()) {
+                    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
                       event.preventDefault()
-                      commentMutations.create.mutate(comment.trim())
-                      setComment('')
+                      comentar()
                     }
                   }}
                 />
                 <div className={styles.composerFoot}>
                   <span className={styles.hint}>⌘+Enter envía</span>
-                  <Button
-                    small
-                    disabled={!comment.trim() || commentMutations.create.isPending}
-                    onClick={() => {
-                      commentMutations.create.mutate(comment.trim())
-                      setComment('')
-                    }}
-                  >
+                  <Button small disabled={!comment.trim() || commentMutations.create.isPending} onClick={comentar}>
                     <Send size={13} strokeWidth={2.75} />
                     Comentar
                   </Button>
@@ -467,6 +454,17 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
           </section>
         </div>
       </aside>
+
+      <ConfirmDialog
+        open={borrando !== null}
+        onOpenChange={(abierto) => { if (!abierto) setBorrando(null) }}
+        title="Borrar el comentario"
+        description="No se puede deshacer."
+        isPending={commentMutations.remove.isPending}
+        onConfirm={async () => {
+          if (borrando) await commentMutations.remove.mutateAsync(borrando.id)
+        }}
+      />
       {finish.dialog}
     </>
   )

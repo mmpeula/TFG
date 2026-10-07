@@ -1,17 +1,13 @@
 import type { TaskType } from '@/types/api'
 
 /**
- * El tipo de tarea es el color de la propia tarjeta: la franja del borde y el
- * punto junto a su nombre. Es lo unico que se colorea ahi.
+ * El tipo de tarea, con su punto de color: se ve en el panel de la tarea, al crearla y
+ * en la propuesta de Generar plan. La franja de la tarjeta no es el tipo sino la
+ * prioridad (ver TaskCard), y el estado lleva su propia insignia (ver planStatus.ts):
+ * son tres preguntas distintas y cada una tiene su sitio.
  *
- * El estado tiene su propio semaforo (ver planStatus.ts), pero vive en la
- * cabecera de cada banda del plan, nunca en la tarjeta: son dos preguntas
- * distintas y cada una tiene su sitio. Si el estado tambien coloreara la
- * tarjeta, una terminada y una sin empezar del mismo tipo competirian por el
- * mismo canal y no se entenderia ninguna de las dos.
- *
- * Los tonos de tipo son apagados a proposito: tienen que poder convivir cinco
- * en la misma banda sin que la pantalla parezca un semaforo.
+ * Los tonos de tipo son apagados a proposito: tienen que poder convivir cinco en la
+ * misma lista sin que la pantalla parezca un semaforo.
  */
 export const TASK_TYPES = {
   EPICA: { label: 'Épica', color: '#6b52a8' },

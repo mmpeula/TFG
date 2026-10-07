@@ -34,7 +34,8 @@ final class DocumentDateDetector {
     private static final Pattern LONG_DATE = Pattern.compile(
             "(?i)(\\d{1,2})\\s+de\\s+(\\p{L}+)\\s+de\\s+(\\d{4})");
 
-    private static final Map<String, Integer> MESES = Map.ofEntries(
+    /** Los meses en espanol, como se escriben en un guion. Tambien los usa {@link IterationDeliveryDetector}. */
+    static final Map<String, Integer> MESES = Map.ofEntries(
             Map.entry("enero", 1), Map.entry("febrero", 2), Map.entry("marzo", 3), Map.entry("abril", 4),
             Map.entry("mayo", 5), Map.entry("junio", 6), Map.entry("julio", 7), Map.entry("agosto", 8),
             Map.entry("septiembre", 9), Map.entry("setiembre", 9), Map.entry("octubre", 10),

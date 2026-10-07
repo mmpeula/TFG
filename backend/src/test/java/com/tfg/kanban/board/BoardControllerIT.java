@@ -17,7 +17,6 @@ class BoardControllerIT extends AbstractApiIT {
     void boardIsCreatedWithDefaultColumns() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         Workspace workspace = createWorkspace(responsable, "Equipo tablero");
-        Long teamId = workspace.teamId();
         Long boardId = workspace.boardId();
 
         mockMvc.perform(authorized(get("/api/boards/{id}", boardId), responsable))

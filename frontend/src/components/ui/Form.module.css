@@ -1,0 +1,21 @@
+/*
+ * Los campos de los formularios en dialogo (nueva tarea, espacio de trabajo), definidos una
+ * sola vez. Cada formulario los hereda con `composes` y solo anade lo suyo.
+ */
+.form { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.label {
+  display: flex; flex-direction: column; gap: 5px;
+  font-size: 12px; font-weight: 500; color: var(--color-neutral-700);
+}
+.optional { font-weight: 500; color: var(--color-neutral-500); text-transform: none; }
+
+.input {
+  font-family: inherit; font-size: 14px; font-weight: 400; color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  transition: var(--transition);
+}
+.input:focus { outline: none; border-color: var(--color-neutral-900); }

@@ -31,6 +31,9 @@ const PRIORITY_TONE: Record<TaskPriority, { fg: string; bg: string }> = {
   BAJA: { fg: 'var(--color-neutral-600)', bg: 'var(--color-neutral-100)' },
 }
 
+/** Sin columnas no hay a donde mover: el menu solo abre y borra. Una sola lista para todas las tarjetas. */
+const SIN_COLUMNAS: ColumnResponse[] = []
+
 function PriorityTag({ priority }: { priority: TaskPriority }) {
   const Icon = PRIORITY_ICON[priority]
   const tone = PRIORITY_TONE[priority]
@@ -71,7 +74,7 @@ interface Props {
  * igual este donde este. En el plan no se arrastra (draggable={false}) y lleva su estado.
  */
 export function TaskCard({
-  task, columns = [], badge, done, highlighted, canWrite = true, status,
+  task, columns = SIN_COLUMNAS, badge, done, highlighted, canWrite = true, status,
   onOpen, onMove, onDelete, draggable = true, overlay,
 }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false)

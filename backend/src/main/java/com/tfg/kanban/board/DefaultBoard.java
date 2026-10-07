@@ -9,12 +9,9 @@ import java.util.List;
 /**
  * Con que columnas nace un tablero.
  *
- * <p>Vive aparte porque hay dos caminos que crean tableros —el workspace nuevo,
- * que trae el suyo hecho, y anadir otro tablero a un proyecto que ya existe— y
- * los dos tienen que dar exactamente el mismo resultado. Separados, bastaba con
- * tocar uno para que un tablero naciera con columnas distintas segun por donde
- * se hubiera creado, y el progreso del workspace (que lee la ultima columna
- * como «hecho») dejaba de significar lo mismo en los dos casos.</p>
+ * <p>Solo se crea uno por workspace, al crearlo, y sus tres columnas son fijas:
+ * todo lo demas (el progreso del workspace, el plan, los avisos) lee la primera
+ * como «por hacer» y la ultima como «hecho».</p>
  */
 public final class DefaultBoard {
 

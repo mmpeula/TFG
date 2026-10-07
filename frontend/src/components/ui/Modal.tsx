@@ -1,6 +1,7 @@
-import { useEffect, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
 import styles from './Modal.module.css'
+import { useEscape } from '@/hooks/useEscape'
 
 interface Props {
   open: boolean
@@ -11,14 +12,7 @@ interface Props {
 }
 
 export function Modal({ open, title, onClose, children, footer }: Props) {
-  useEffect(() => {
-    if (!open) return
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  useEscape(onClose, open)
 
   if (!open) return null
 

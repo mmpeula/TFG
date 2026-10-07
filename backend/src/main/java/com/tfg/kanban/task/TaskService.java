@@ -29,8 +29,9 @@ import java.util.stream.Collectors;
  * Tareas del tablero.
  *
  * El orden dentro de cada columna se guarda en {@code position} y se reindexa
- * (0..n-1) despues de cada alta, baja o movimiento, de forma que el drag &amp; drop
- * del frontend siempre recibe posiciones consecutivas y sin huecos.
+ * (0..n-1) despues de cada baja o movimiento, de forma que el drag &amp; drop
+ * del frontend siempre recibe posiciones consecutivas y sin huecos. Las altas
+ * entran al final, asi que no desplazan a nadie.
  */
 @Service
 @RequiredArgsConstructor
@@ -139,12 +140,12 @@ public class TaskService {
         int position = Math.min(Math.max(request.position(), 0), targetTasks.size());
         task.setBoardColumn(target);
         targetTasks.add(position, task);
-        reindex(targetTasks);
+        reindex(targetTasks, task);
 
         if (changesColumn) {
             reindex(taskRepository.findByBoardColumn_IdOrderByPositionAsc(origin.getId()).stream()
                     .filter(candidate -> !candidate.getId().equals(taskId))
-                    .toList());
+                    .toList(), null);
 
             activityService.record(projectOf(target), ActivityAction.MOVIMIENTO, "Task", task.getId(),
                     "Movió la tarea '%s' de '%s' a '%s'"
@@ -167,7 +168,7 @@ public class TaskService {
 
         taskRepository.delete(task);
         taskRepository.flush();
-        reindex(taskRepository.findByBoardColumn_IdOrderByPositionAsc(column.getId()));
+        reindex(taskRepository.findByBoardColumn_IdOrderByPositionAsc(column.getId()), null);
     }
 
     public Task getTask(Long taskId) {
@@ -206,9 +207,22 @@ public class TaskService {
         return column.getBoard().getProject();
     }
 
-    private void reindex(List<Task> tasks) {
+    /**
+     * Deja la columna con posiciones 0..n-1, sin huecos.
+     *
+     * <p>Solo la tarea que se mueve ({@code moved}, si la hay) se cambia como entidad:
+     * su ultima modificacion es ahora. Las demas solo se desplazan, asi que se
+     * recolocan sin tocar su {@code updatedAt} (ver {@link TaskRepository#updatePosition}),
+     * y solo las que de verdad cambian de sitio.</p>
+     */
+    private void reindex(List<Task> tasks, Task moved) {
         for (int i = 0; i < tasks.size(); i++) {
-            tasks.get(i).setPosition(i);
+            Task task = tasks.get(i);
+            if (task.equals(moved)) {
+                task.setPosition(i);
+            } else if (task.getPosition() == null || task.getPosition() != i) {
+                taskRepository.updatePosition(task.getId(), i);
+            }
         }
     }
 

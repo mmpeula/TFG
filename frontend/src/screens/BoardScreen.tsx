@@ -23,8 +23,8 @@ import {
 import { useAssistant, useAuth, useUi } from '@/state/context'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useFinishPrompt } from '@/hooks/useFinishPrompt'
-import { canWrite } from '@/lib/roles'
-import { deriveSignals, taskBadge } from '@/lib/signals'
+import { canManage, canWrite } from '@/lib/roles'
+import { boardWarningText, taskWarning } from '@/lib/signals'
 import { dropPosition, matchesBoardFilters } from '@/lib/board'
 import { ROUTES } from '@/app/routes'
 import type { TaskResponse } from '@/types/api'
@@ -39,8 +39,8 @@ export function BoardScreen() {
 
   const { data: workspace } = useWorkspace(projectId)
   const { data: boards, isPending: loadingBoards } = useProjectBoards(projectId)
-  const [boardIndex, setBoardIndex] = useState(0)
-  const board = boards?.[boardIndex]
+  // Cada workspace tiene un unico tablero: nace con el y no se crean otros.
+  const board = boards?.[0]
   const { data: detail, isPending } = useBoard(board?.id)
   const { data: members } = useTeamMembers(workspace?.teamId)
 
@@ -96,15 +96,13 @@ export function BoardScreen() {
   }, [taskFromLink, highlight, navigate, location.pathname])
   const role = detail?.myRole ?? null
   const writable = canWrite(role)
+  const openNewTask = writable && columns.length > 0 ? () => setNewTaskOpen(true) : undefined
 
   const signalCount = useMemo(
-    () => {
-      const all = detail?.columns ?? []
-      return all.flatMap((column) => column.tasks ?? []).filter((task) => taskBadge(task, all)).length
-    },
-    [detail],
+    () => columns.flatMap((column) => column.tasks ?? []).filter((task) => taskWarning(task, columns)).length,
+    [columns],
   )
-  const boardSignals = useMemo(() => deriveSignals(detail), [detail])
+  const boardWarning = useMemo(() => boardWarningText(columns), [columns])
 
   /** Todas las tareas de la columna. Es la lista con la que se calculan posiciones. */
   function allTasksOf(columnId: number): TaskResponse[] {
@@ -120,7 +118,7 @@ export function BoardScreen() {
     () => new Map(columns.map((column) => [
       column.id,
       (column.tasks ?? []).filter((task) =>
-        (!onlySignals || taskBadge(task, columns)) && matchesBoardFilters(task, search, people)),
+        (!onlySignals || taskWarning(task, columns)) && matchesBoardFilters(task, search, people)),
     ])),
     [columns, onlySignals, search, people],
   )
@@ -188,9 +186,10 @@ export function BoardScreen() {
     <WorkspaceShell
       workspace={workspace}
       workspaceId={projectId}
+      onNewTask={openNewTask}
       action={
-        writable && columns.length > 0 ? (
-          <Button onClick={() => setNewTaskOpen(true)}>
+        openNewTask ? (
+          <Button onClick={openNewTask}>
             <Plus size={15} strokeWidth={2.75} />
             Añadir tarea
           </Button>
@@ -207,15 +206,6 @@ export function BoardScreen() {
       ) : (
         <>
           <div className={styles.toolbar}>
-            {boards && boards.length > 1 ? (
-              <Segmented
-                options={boards.map((item, index) => ({ value: String(index), label: item.name }))}
-                value={String(boardIndex)}
-                onChange={(value) => setBoardIndex(Number(value))}
-                ariaLabel="Tablero"
-              />
-            ) : null}
-
             <label className={styles.search}>
               <Search size={14} strokeWidth={2.5} aria-hidden="true" />
               <input
@@ -267,9 +257,11 @@ export function BoardScreen() {
               icon={<Columns3 size={22} strokeWidth={2.75} />}
               title="Este espacio de trabajo está vacío"
               body={
-                writable
-                  ? 'Empieza creando tu primera tarea. También puedes generar el plan con IA a partir del enunciado.'
-                  : 'Todavía no hay ninguna tarea que ver.'
+                !writable
+                  ? 'Todavía no hay ninguna tarea que ver.'
+                  : canManage(role)
+                    ? 'Empieza creando tu primera tarea. También puedes generar el plan con IA a partir del enunciado.'
+                    : 'Empieza creando tu primera tarea.'
               }
               action={
                 writable ? (
@@ -278,10 +270,13 @@ export function BoardScreen() {
                       <Plus size={15} strokeWidth={2.75} />
                       Crear tarea
                     </Button>
-                    <Button variant="secondary" onClick={() => navigate(ROUTES.generarPlanById(projectId))}>
-                      <Bot size={15} strokeWidth={2.75} />
-                      Generar plan
-                    </Button>
+                    {/* Generar el plan es cosa de quien administra el espacio: un alumno no tiene esa pestaña. */}
+                    {canManage(role) && (
+                      <Button variant="secondary" onClick={() => navigate(ROUTES.generarPlanById(projectId))}>
+                        <Bot size={15} strokeWidth={2.75} />
+                        Generar plan
+                      </Button>
+                    )}
                   </div>
                 ) : undefined
               }
@@ -349,13 +344,13 @@ export function BoardScreen() {
             </DragOverlay>
           </DndContext>
 
-          {boardSignals.length > 0 && (
+          {boardWarning && (
             <div className={styles.boardSignal}>
               <span className={styles.boardSignalKicker}>
                 <AlertTriangle size={12} strokeWidth={2.75} />
                 Aviso del tablero
               </span>
-              <p className={styles.boardSignalText}>{boardSignals[0].text}</p>
+              <p className={styles.boardSignalText}>{boardWarning}</p>
               <Button variant="ghost" small onClick={() => navigate(ROUTES.pulsoById(projectId))}>
                 Ver el detalle
               </Button>

@@ -21,7 +21,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @ToString(exclude = {"team", "user"})
-@EqualsAndHashCode(of = "id")
+@EqualsAndHashCode(of = "id", callSuper = false)
 public class TeamMember extends Auditable {
 
     @Id

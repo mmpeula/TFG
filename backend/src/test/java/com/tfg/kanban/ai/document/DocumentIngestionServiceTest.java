@@ -234,6 +234,17 @@ class DocumentIngestionServiceTest {
         assertThat(document.warnings()).anyMatch(w -> w.contains("desactivado"));
     }
 
+    @Test
+    @DisplayName("Con todo el modulo de IA apagado tampoco se mira ninguna imagen, aunque la vision siga activa")
+    void imagesAreSkippedWhenAiIsOff() throws Exception {
+        properties.setEnabled(false);
+
+        ProcessedDocument document = ingestDocx(TestDocuments.docxWithImages("Arquitectura del sistema"));
+
+        verifyNoInteractions(deepSeek);
+        assertThat(document.text()).contains("Arquitectura del sistema");
+    }
+
     // -------------------------------------------------------------- escaneados
 
     @Test

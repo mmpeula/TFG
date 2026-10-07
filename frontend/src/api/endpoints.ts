@@ -13,6 +13,15 @@ import type {
  */
 const PLAN_TIMEOUT = 600_000
 
+/**
+ * Una foto protegida (de perfil o de un espacio): pasa por axios para que lleve el token, y
+ * se entrega como URL temporal que se puede poner en un {@code <img>}.
+ */
+async function imageBlob(url: string): Promise<string> {
+  const response = await apiClient.get<Blob>(url.replace(/^\/api/, ''), { responseType: 'blob' })
+  return URL.createObjectURL(response.data)
+}
+
 export const auth = {
   login: (payload: { email: string; password: string }) =>
     apiClient.post<AuthResponse>('/auth/login', payload).then((r) => r.data),
@@ -55,7 +64,7 @@ export const workspaces = {
   ask: (workspaceId: number, message: string, history: ChatTurn[], taskId?: number | null) =>
     apiClient
       .post<ChatResponse>(`/workspaces/${workspaceId}/ai/chat`, { message, history, taskId }, {
-        // Generar un plan tarda; el resto de llamadas no deberian esperar tanto.
+        // El modelo puede tardar en contestar, aunque mucho menos que en generar un plan.
         timeout: 240000,
       })
       .then((r) => r.data),
@@ -78,11 +87,7 @@ export const workspaces = {
       .then((r) => r.data)
   },
   removePhoto: (workspaceId: number) => apiClient.delete<void>(`/workspaces/${workspaceId}/photo`),
-  /** La foto pasa por axios para que lleve el token; se entrega como URL temporal. */
-  photoBlob: async (coverUrl: string) => {
-    const response = await apiClient.get<Blob>(coverUrl.replace(/^\/api/, ''), { responseType: 'blob' })
-    return URL.createObjectURL(response.data)
-  },
+  photoBlob: imageBlob,
 }
 
 /**
@@ -260,9 +265,5 @@ export const users = {
       .then((r) => r.data)
   },
   removeAvatar: (userId: number) => apiClient.delete<void>(`/users/${userId}/avatar`),
-  /** La foto pasa por axios para que lleve el token; se entrega como URL temporal. */
-  avatarBlob: async (avatarUrl: string) => {
-    const response = await apiClient.get<Blob>(avatarUrl.replace(/^\/api/, ''), { responseType: 'blob' })
-    return URL.createObjectURL(response.data)
-  },
+  avatarBlob: imageBlob,
 }

@@ -7,6 +7,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -56,6 +58,34 @@ class FileStorageServiceTest {
         assertThat(stored.contentType()).isEqualTo("image/png");
         assertThat(stored.storedName()).endsWith(".png").doesNotContain("foto");
         assertThat(tempDir.resolve(stored.storedName())).exists();
+    }
+
+    @Test
+    @DisplayName("Dentro de una transaccion, la foto sustituida se borra al confirmarla, no antes")
+    void deleteAfterCommitWaitsForTheCommit() {
+        String stored = storage.storeImage(image("foto.png", "image/png", PNG)).storedName();
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            storage.deleteAfterCommit(stored);
+            // Si la transaccion se deshiciera ahora, la foto tiene que seguir ahi.
+            assertThat(tempDir.resolve(stored)).exists();
+
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+            assertThat(tempDir.resolve(stored)).doesNotExist();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("Fuera de una transaccion, deleteAfterCommit borra en el acto")
+    void deleteAfterCommitWithoutTransactionDeletesNow() {
+        String stored = storage.storeImage(image("foto.png", "image/png", PNG)).storedName();
+
+        storage.deleteAfterCommit(stored);
+
+        assertThat(tempDir.resolve(stored)).doesNotExist();
     }
 
     @Test

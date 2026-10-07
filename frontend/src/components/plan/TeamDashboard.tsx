@@ -8,6 +8,20 @@ import { isoDate, type Sprint } from '@/lib/sprints'
 import { overdueDays, stalledDays, unassignedInProgress } from '@/lib/signals'
 import type { ColumnResponse, TaskResponse, TeamMemberResponse, UserSummary } from '@/types/api'
 
+/**
+ * Como se cuenta cada tarea, escrito una vez para las cifras de arriba y para la tabla por
+ * persona. «Tarde» es lo ya vencido, con la misma regla que el aviso de la tarjeta (lib/signals).
+ */
+function reglas(columns: ColumnResponse[]) {
+  const primera = columns[0]?.id
+  const ultima = columns[columns.length - 1]?.id
+  return {
+    porHacer: (task: TaskResponse) => task.columnId === primera,
+    hecha: (task: TaskResponse) => task.columnId === ultima,
+    atrasada: (task: TaskResponse) => (overdueDays(task, columns) ?? 0) < 0,
+  }
+}
+
 interface PersonStats {
   user: UserSummary | null
   total: number
@@ -42,18 +56,14 @@ export function TeamDashboard({
   members: TeamMemberResponse[]
   sprints: Sprint[]
 }) {
-  const ultima = columns[columns.length - 1]?.id
-  const primera = columns[0]?.id
-  const hecha = (task: TaskResponse) => task.columnId === ultima
-  // Las mismas reglas que los avisos de las tarjetas (lib/signals). «Tarde» es lo ya vencido;
-  // «Atascada» se mira aparte, asi que una tarea vencida y ademas parada cuenta en las dos.
-  const atrasada = (task: TaskResponse) => (overdueDays(task, columns) ?? 0) < 0
+  const { porHacer: sinEmpezar, hecha, atrasada } = reglas(columns)
+  // «Atascada» se mira aparte de «tarde», asi que una tarea vencida y ademas parada cuenta en las dos.
   const atascada = (task: TaskResponse) =>
     stalledDays(task, columns) !== null || unassignedInProgress(task, columns)
 
   const total = tasks.length
   const hechas = tasks.filter(hecha).length
-  const porHacer = tasks.filter((task) => task.columnId === primera).length
+  const porHacer = tasks.filter(sinEmpezar).length
   const enProgreso = total - hechas - porHacer
   const atrasadas = tasks.filter(atrasada).length
   const atascadas = tasks.filter(atascada).length
@@ -118,17 +128,14 @@ function TeamPeopleTable({
   columns: ColumnResponse[]
   members: TeamMemberResponse[]
 }) {
-  const ultima = columns[columns.length - 1]?.id
-  const primera = columns[0]?.id
-  const hecha = (task: TaskResponse) => task.columnId === ultima
-  const atrasada = (task: TaskResponse) => (overdueDays(task, columns) ?? 0) < 0
+  const { porHacer, hecha, atrasada } = reglas(columns)
 
   function statsOf(user: UserSummary | null, suyas: TaskResponse[]): PersonStats {
     return {
       user,
       total: suyas.length,
-      pendientes: suyas.filter((task) => task.columnId === primera).length,
-      enCurso: suyas.filter((task) => task.columnId !== primera && !hecha(task)).length,
+      pendientes: suyas.filter(porHacer).length,
+      enCurso: suyas.filter((task) => !porHacer(task) && !hecha(task)).length,
       hechas: suyas.filter(hecha).length,
       atrasadas: suyas.filter(atrasada).length,
     }

@@ -288,6 +288,8 @@ function TeamEditor({
     setGuardandoId(userId)
     try {
       await onSaveNotes(userId, preferences.trim())
+    } catch {
+      // El aviso de la mutacion ya cuenta por que; lo escrito sigue ahi para volver a intentarlo.
     } finally {
       setGuardandoId(null)
     }
@@ -522,7 +524,7 @@ function sprintDates(sprint: PlannedSprint) {
 
 /**
  * Propuesta completa, agrupada por sprint: nada llega al tablero hasta que se
- * pulsa «Anadir». Cada tarea conserva su indice en la lista original, que es con
+ * pulsa «Añadir al tablero». Cada tarea conserva su indice en la lista original, que es con
  * lo que se marca y se desmarca, asi que agrupar no cambia la seleccion.
  */
 export function ProposalPanel({

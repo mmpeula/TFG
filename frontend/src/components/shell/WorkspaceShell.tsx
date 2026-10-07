@@ -62,7 +62,6 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
         generatePlan: puedeAutomatizar ? () => navigate(ROUTES.generarPlanById(workspaceId)) : undefined,
         pulse: () => navigate(ROUTES.pulsoById(workspaceId)),
         help: () => setHelpOpen(true),
-        escape: () => setHelpOpen(false),
       }),
       [puedeAutomatizar, navigate, onNewTask, workspaceId],
     ),
@@ -146,7 +145,12 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
           docente no lo ve: observa el trabajo, no lo hace. */}
       {workspace && !soloObserva && <Assistant workspaceId={workspaceId} />}
 
-      <ShortcutsDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <ShortcutsDialog
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        canCreateTask={Boolean(onNewTask)}
+        canGeneratePlan={puedeAutomatizar}
+      />
     </div>
   )
 }

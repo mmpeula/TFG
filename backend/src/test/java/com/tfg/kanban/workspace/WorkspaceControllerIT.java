@@ -215,6 +215,22 @@ class WorkspaceControllerIT extends AbstractApiIT {
     }
 
     @Test
+    @DisplayName("Lo borre quien lo borre, el equipo se va con el workspace: no quedan equipos huerfanos")
+    void deleteByAnotherResponsableAlsoRemovesTheTeam() throws Exception {
+        TestUser owner = registerUser(Role.MIEMBRO);
+        TestUser otro = registerUser(Role.MIEMBRO);
+        Workspace workspace = createWorkspace(owner, "Dos responsables");
+        addMember(owner, workspace.teamId(), otro, Role.RESPONSABLE);
+
+        mockMvc.perform(authorized(delete("/api/workspaces/{id}", workspace.id()), otro))
+                .andExpect(status().isNoContent());
+
+        // Del equipo no queda nada: tampoco para quien lo creo.
+        mockMvc.perform(authorized(get("/api/teams/{id}/members", workspace.teamId()), owner))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("Borrar el workspace se lleva por delante su tablero")
     void deleteRemovesTheBoard() throws Exception {
         TestUser user = registerUser(Role.MIEMBRO);

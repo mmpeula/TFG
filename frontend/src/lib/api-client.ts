@@ -1,4 +1,4 @@
-import axios, { type AxiosError, type AxiosInstance } from 'axios'
+import { create, isAxiosError, type AxiosError, type AxiosInstance } from 'axios'
 import type { ApiError } from '@/types/api'
 
 /**
@@ -8,7 +8,7 @@ import type { ApiError } from '@/types/api'
  */
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
-export const apiClient: AxiosInstance = axios.create({
+export const apiClient: AxiosInstance = create({
   baseURL: API_BASE_URL,
   timeout: 20000,
   headers: { 'Content-Type': 'application/json' },
@@ -54,15 +54,21 @@ apiClient.interceptors.response.use(
   },
 )
 
-/** Mensaje legible a partir de un error de axios. */
+/**
+ * Mensaje legible a partir de un error de axios.
+ *
+ * De los errores de validacion se ensena solo el mensaje de cada campo («el titulo es
+ * obligatorio»): el nombre interno del campo («title») no le dice nada a quien lo lee.
+ */
 export function toErrorMessage(error: unknown): string {
-  if (axios.isAxiosError<ApiError>(error)) {
+  if (isAxiosError<ApiError>(error)) {
     const data = error.response?.data
     if (data?.fieldErrors?.length) {
-      return data.fieldErrors.map((field) => `${field.field}: ${field.message}`).join(' · ')
+      return [...new Set(data.fieldErrors.map((field) => field.message))].join(' · ')
     }
     if (data?.message) return data.message
     if (error.code === 'ECONNABORTED') return 'El servidor ha tardado demasiado en responder'
+    if (!error.response) return 'No se ha podido conectar con el servidor. Comprueba la conexión.'
     return error.message
   }
   return error instanceof Error ? error.message : 'Error desconocido'

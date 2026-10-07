@@ -13,6 +13,7 @@ export const keys = {
   members: (id: number) => ['teams', id, 'members'] as const,
   invitations: (id: number) => ['teams', id, 'invitations'] as const,
   myInvitations: ['invitations', 'mine'] as const,
+  inviteCandidate: (teamId: number, email: string) => ['teams', teamId, 'invite-candidate', email] as const,
   project: (id: number) => ['projects', 'detalle', id] as const,
   activity: (id: number) => ['projects', 'detalle', id, 'activity'] as const,
   boards: (projectId: number) => ['projects', 'detalle', projectId, 'boards'] as const,
@@ -22,7 +23,8 @@ export const keys = {
   adminWorkspaces: ['admin', 'workspaces'] as const,
 }
 
-const enabled = (id?: number) => typeof id === 'number' && Number.isFinite(id)
+/** Si hay un id con el que preguntar: mientras no lo hay (cargando lo de antes), la consulta espera. */
+const hasId = (id?: number) => typeof id === 'number' && Number.isFinite(id)
 
 export const useWorkspaces = () => useQuery({ queryKey: keys.workspaces, queryFn: workspaces.list })
 
@@ -30,18 +32,18 @@ export const useWorkspace = (workspaceId?: number) =>
   useQuery({
     queryKey: keys.workspace(workspaceId!),
     queryFn: () => workspaces.get(workspaceId!),
-    enabled: enabled(workspaceId),
+    enabled: hasId(workspaceId),
   })
 
 export const useTeamMembers = (teamId?: number) =>
-  useQuery({ queryKey: keys.members(teamId!), queryFn: () => teams.members(teamId!), enabled: enabled(teamId) })
+  useQuery({ queryKey: keys.members(teamId!), queryFn: () => teams.members(teamId!), enabled: hasId(teamId) })
 
 /** Quien esta invitado y todavia no ha contestado, para la pantalla de miembros. */
 export const useTeamInvitations = (teamId?: number) =>
   useQuery({
     queryKey: keys.invitations(teamId!),
     queryFn: () => teams.invitations(teamId!),
-    enabled: enabled(teamId),
+    enabled: hasId(teamId),
   })
 
 /**
@@ -51,9 +53,9 @@ export const useTeamInvitations = (teamId?: number) =>
  */
 export const useInviteCandidate = (teamId?: number, email?: string) =>
   useQuery({
-    queryKey: ['teams', teamId, 'invite-candidate', email] as const,
+    queryKey: keys.inviteCandidate(teamId!, email!),
     queryFn: () => teams.inviteCandidate(teamId!, email!),
-    enabled: enabled(teamId) && !!email,
+    enabled: hasId(teamId) && !!email,
     retry: false,
     staleTime: 30_000,
   })
@@ -63,19 +65,19 @@ export const useMyInvitations = () =>
   useQuery({ queryKey: keys.myInvitations, queryFn: invitations.mine })
 
 export const useProject = (projectId?: number) =>
-  useQuery({ queryKey: keys.project(projectId!), queryFn: () => projects.get(projectId!), enabled: enabled(projectId) })
+  useQuery({ queryKey: keys.project(projectId!), queryFn: () => projects.get(projectId!), enabled: hasId(projectId) })
 
 export const useActivity = (projectId?: number) =>
-  useQuery({ queryKey: keys.activity(projectId!), queryFn: () => projects.activity(projectId!), enabled: enabled(projectId) })
+  useQuery({ queryKey: keys.activity(projectId!), queryFn: () => projects.activity(projectId!), enabled: hasId(projectId) })
 
 export const useProjectBoards = (projectId?: number) =>
-  useQuery({ queryKey: keys.boards(projectId!), queryFn: () => boards.byProject(projectId!), enabled: enabled(projectId) })
+  useQuery({ queryKey: keys.boards(projectId!), queryFn: () => boards.byProject(projectId!), enabled: hasId(projectId) })
 
 export const useBoard = (boardId?: number) =>
-  useQuery({ queryKey: keys.board(boardId!), queryFn: () => boards.get(boardId!), enabled: enabled(boardId) })
+  useQuery({ queryKey: keys.board(boardId!), queryFn: () => boards.get(boardId!), enabled: hasId(boardId) })
 
 export const useComments = (taskId?: number) =>
-  useQuery({ queryKey: keys.comments(taskId!), queryFn: () => comments.byTask(taskId!), enabled: enabled(taskId) })
+  useQuery({ queryKey: keys.comments(taskId!), queryFn: () => comments.byTask(taskId!), enabled: hasId(taskId) })
 
 /** Toda mutacion avisa con un toast y refresca lo que toca. */
 function useOnError() {
@@ -226,11 +228,11 @@ export function useAdminWorkspaceMutations() {
     setEnabled: useMutation({
       mutationFn: ({ workspaceId, enabled }: { workspaceId: number; enabled: boolean }) =>
         adminWorkspaces.setEnabled(workspaceId, enabled),
-      onSuccess: (_data, { enabled }) => {
+      onSuccess: (_data, variables) => {
         invalidate()
         // La lista del equipo tambien cambia: el workspace pasa a verse suspendido.
         queryClient.invalidateQueries({ queryKey: keys.workspaces })
-        pushToast(enabled ? 'Espacio de trabajo reactivado' : 'Espacio de trabajo suspendido')
+        pushToast(variables.enabled ? 'Espacio de trabajo reactivado' : 'Espacio de trabajo suspendido')
       },
       onError,
     }),
@@ -278,7 +280,7 @@ export function useMemberMutations(teamId?: number) {
   }
 }
 
-/** Editar el propio perfil: nombre siempre, contraseña solo si se rellena. */
+/** Editar el propio perfil: nombre siempre; foto y contraseña, cada una con lo suyo. */
 export function useUserMutations(userId?: number) {
   const queryClient = useQueryClient()
   const { pushToast } = useUi()
@@ -298,21 +300,13 @@ export function useUserMutations(userId?: number) {
   }
 
   return {
+    /** El nombre, y la contraseña si se manda: es la misma llamada, solo cambia el aviso. */
     update: useMutation({
       mutationFn: (payload: { fullName: string; currentPassword?: string; password?: string }) =>
         users.update(userId!, payload),
-      onSuccess: () => {
+      onSuccess: (_user, payload) => {
         onProfileChanged()
-        pushToast('Perfil actualizado')
-      },
-      onError,
-    }),
-    changePassword: useMutation({
-      mutationFn: (payload: { currentPassword: string; password: string; fullName: string }) =>
-        users.update(userId!, payload),
-      onSuccess: () => {
-        onProfileChanged()
-        pushToast('Contraseña actualizada')
+        pushToast(payload.password ? 'Contraseña actualizada' : 'Perfil actualizado')
       },
       onError,
     }),
@@ -389,6 +383,8 @@ export function useTaskMutations(boardId?: number, projectId?: number) {
     if (boardId) queryClient.invalidateQueries({ queryKey: keys.board(boardId) })
     if (projectId) queryClient.invalidateQueries({ queryKey: keys.activity(projectId) })
     queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    // El progreso y las pendientes de la tarjeta del workspace salen de sus tareas.
+    queryClient.invalidateQueries({ queryKey: keys.workspaces })
   }
 
   return {
@@ -418,13 +414,18 @@ export function useTaskMutations(boardId?: number, projectId?: number) {
   }
 }
 
-export function useCommentMutations(taskId: number, onChanged?: () => void) {
+/**
+ * Comentar y borrar comentarios. Refresca tambien el tablero (la tarjeta cuenta los
+ * comentarios de su tarea) y la actividad del espacio, donde queda anotado.
+ */
+export function useCommentMutations(taskId: number, boardId?: number, projectId?: number) {
   const queryClient = useQueryClient()
   const { pushToast } = useUi()
   const onError = useOnError()
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: keys.comments(taskId) })
-    onChanged?.()
+    if (boardId) queryClient.invalidateQueries({ queryKey: keys.board(boardId) })
+    if (projectId) queryClient.invalidateQueries({ queryKey: keys.activity(projectId) })
   }
 
   return {

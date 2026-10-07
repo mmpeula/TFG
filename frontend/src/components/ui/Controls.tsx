@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import styles from './Controls.module.css'
+import { useEscape } from '@/hooks/useEscape'
 
 /** Control segmentado (Tablero / Lista / Calendario, pestanas de estado en movil…). */
 export function Segmented<T extends string>({
@@ -72,21 +73,16 @@ export function Dropdown({
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  // Esc cierra el menu y nada mas: no el panel o el dialogo que lo contiene.
+  useEscape(() => setOpen(false), open)
 
   useEffect(() => {
     if (!open) return
     function onDown(event: MouseEvent) {
       if (!ref.current?.contains(event.target as Node)) setOpen(false)
     }
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false)
-    }
     document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
+    return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
   return (

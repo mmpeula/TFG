@@ -1,3 +1,4 @@
+import { toDate } from '@/lib/format'
 import type { ColumnResponse, TaskResponse } from '@/types/api'
 
 /**
@@ -62,8 +63,9 @@ export function isoDate(date: Date): string {
   return `${date.getFullYear()}-${mes}-${dia}`
 }
 
+/** El dia, a medianoche local. Una fecha que no se entiende cuenta como hoy. */
 function soloFecha(value: string | Date): Date {
-  const d = typeof value === 'string' ? new Date(`${value}T00:00:00`) : new Date(value)
+  const d = typeof value === 'string' ? toDate(value) ?? new Date() : new Date(value)
   d.setHours(0, 0, 0, 0)
   return d
 }

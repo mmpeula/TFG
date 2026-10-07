@@ -11,13 +11,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -47,7 +47,7 @@ class AssistantChatServiceTest {
     @Mock private TaskRepository taskRepository;
     @Mock private CommentRepository commentRepository;
 
-    @InjectMocks private AssistantChatService service;
+    private AssistantChatService service;
 
     private Project project;
     private Board board;
@@ -57,6 +57,9 @@ class AssistantChatServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Sin base de datos: lo que va dentro de una transaccion se ejecuta tal cual.
+        service = new AssistantChatService(properties, deepSeekClient, workspaceService, taskRepository,
+                commentRepository, TransactionOperations.withoutTransaction());
         when(properties.isEnabled()).thenReturn(true);
         when(properties.getModel()).thenReturn("deepseek-flash");
 

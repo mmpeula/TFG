@@ -125,6 +125,31 @@ class AccessServiceTest {
     }
 
     @Test
+    @DisplayName("Quien ya no esta en el equipo no puede tocar ni sus propios comentarios")
+    void authorOutsideTheTeamCannotModify() {
+        Task task = taskInTeam();
+        when(commentRepository.findById(10L)).thenReturn(Optional.of(
+                Comment.builder().id(10L).author(User.builder().id(1L).build()).task(task).build()));
+        // Se fue del equipo (o el espacio esta suspendido): ya no tiene rol en la tarea.
+        when(teamMemberRepository.findRoleByTask(11L, 1L)).thenReturn(Optional.empty());
+
+        assertThat(accessService.canModifyComment(10L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Trabajar en el proyecto (y preguntar al asistente) es de RESPONSABLE y MIEMBRO, no del docente")
+    void onlyWritersWorkOnTheProject() {
+        withProjectRole(Role.MIEMBRO);
+        assertThat(accessService.canWriteProject(7L)).isTrue();
+
+        withProjectRole(Role.DOCENTE);
+        assertThat(accessService.canWriteProject(7L)).isFalse();
+
+        withProjectRole(null);
+        assertThat(accessService.canWriteProject(7L)).isFalse();
+    }
+
+    @Test
     @DisplayName("El RESPONSABLE del equipo puede modificar el comentario de cualquiera")
     void responsableCanModifyAnyComment() {
         Task task = taskInTeam();

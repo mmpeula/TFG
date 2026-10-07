@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronRight, LayoutGrid, PauseCircle, PlayCircle, Search, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, LayoutGrid, PauseCircle, PlayCircle, Trash2 } from 'lucide-react'
+import { AdminSearch } from './AdminSearch'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Tag } from '@/components/ui/Tag'
@@ -10,15 +11,12 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import styles from './AdminPanel.module.css'
 import { useAdminWorkspaceMutations, useAdminWorkspaces } from '@/hooks/useData'
 import { ROLE_LABELS } from '@/lib/roles'
-import { formatDate, relativeTime } from '@/lib/format'
+import { formatDate, matchesSearch, relativeTime } from '@/lib/format'
 import type { AdminWorkspaceResponse, Role } from '@/types/api'
 
+/** Por nombre del espacio, por quien lo creo o por el correo de cualquiera de su equipo. */
 function matches(workspace: AdminWorkspaceResponse, term: string): boolean {
-  const q = term.trim().toLowerCase()
-  if (!q) return true
-  return workspace.name.toLowerCase().includes(q)
-    || (workspace.ownerName ?? '').toLowerCase().includes(q)
-    || workspace.members.some((m) => m.email.toLowerCase().includes(q))
+  return matchesSearch(term, workspace.name, workspace.ownerName, ...workspace.members.map((m) => m.email))
 }
 
 /**
@@ -58,16 +56,12 @@ export function AdminWorkspacesPanel() {
   return (
     <div className={styles.panel}>
       <div className={styles.toolbar}>
-        <div className={styles.searchBox}>
-          <Search size={14} strokeWidth={2.75} aria-hidden="true" />
-          <input
-            className={styles.searchInput}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por espacio de trabajo, creador o correo"
-            aria-label="Buscar espacios de trabajo"
-          />
-        </div>
+        <AdminSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Buscar por espacio de trabajo, creador o correo"
+          label="Buscar espacios de trabajo"
+        />
 
         <div className={styles.filters}>
           <Chip active={filtro === 'todos'} onClick={() => setFiltro('todos')}>
@@ -153,17 +147,12 @@ function WorkspaceDetail({
   const responsablesActivos = workspace.members.filter((m) => m.role === 'RESPONSABLE' && m.enabled)
 
   /**
-   * Los roles que se le pueden dar a esta persona.
-   *
-   * Quien esta como docente es una cuenta docente, y esa puede seguir el equipo o
-   * trabajar en el (alumno o responsable); a quien ya trabaja no se le ofrece docente,
-   * porque aqui no se sabe si su cuenta lo es y el servidor lo rechazaria si no. Y al
-   * ultimo responsable no se le deja bajar, porque el equipo se quedaria sin nadie que
-   * pueda administrarlo (eso tambien lo rechaza el servidor; esto solo evita
-   * ofrecer algo que va a fallar).
+   * Los roles que se le pueden dar a quien trabaja en el equipo: alumno o responsable.
+   * Docente no, ni hacia el ni desde el: ese papel se elige al invitar y no se cambia
+   * despues (un docente ni siquiera tiene menu, ver abajo). Y al ultimo responsable no se
+   * le deja bajar, porque el equipo se quedaria sin nadie que pueda administrarlo; el
+   * servidor tambien lo rechaza, esto solo evita ofrecer algo que va a fallar.
    */
-  // Sin docente: ese papel se elige al invitar y no se cambia desde dentro, ni hacia el ni
-  // desde el (el servidor lo rechaza). Un docente ni siquiera tiene menu, ver abajo.
   function rolesPara(member: AdminWorkspaceResponse['members'][number]): Role[] {
     const esUltimoResponsable = member.role === 'RESPONSABLE' && responsablesActivos.length === 1
     return esUltimoResponsable ? ['RESPONSABLE'] : ['RESPONSABLE', 'MIEMBRO']

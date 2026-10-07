@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class AiPlanControllerIT extends AbstractApiIT {
 
-    private record Contexto(TestUser responsable, TestUser miembro, Long projectId, Long boardId) {
+    private record Contexto(TestUser responsable, TestUser miembro, Long teamId, Long projectId, Long boardId) {
     }
 
     private Contexto contexto() throws Exception {
@@ -34,7 +34,7 @@ class AiPlanControllerIT extends AbstractApiIT {
         addMember(responsable, teamId, miembro, Role.MIEMBRO);
         Long projectId = workspace.id();
         Long boardId = workspace.boardId();
-        return new Contexto(responsable, miembro, projectId, boardId);
+        return new Contexto(responsable, miembro, teamId, projectId, boardId);
     }
 
     @Test
@@ -69,6 +69,25 @@ class AiPlanControllerIT extends AbstractApiIT {
                         .content("{\"boardId\":%d,\"tasks\":[]}".formatted(ctx.boardId())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("El asistente es para quien trabaja en el espacio: el docente, que solo lo sigue, no puede preguntarle")
+    void assistantIsForWhoWorksInTheWorkspace() throws Exception {
+        Contexto ctx = contexto();
+        TestUser docente = registerUser(Role.DOCENTE);
+        addMember(ctx.responsable(), ctx.teamId(), docente, Role.DOCENTE);
+        String pregunta = "{\"message\":\"Que hago primero?\"}";
+
+        mockMvc.perform(authorized(post("/api/workspaces/{id}/ai/chat", ctx.projectId()), docente)
+                        .contentType(MediaType.APPLICATION_JSON).content(pregunta))
+                .andExpect(status().isForbidden());
+
+        // Un alumno si pasa el permiso: con la IA apagada en los tests, lo que recibe es que no esta disponible.
+        mockMvc.perform(authorized(post("/api/workspaces/{id}/ai/chat", ctx.projectId()), ctx.miembro())
+                        .contentType(MediaType.APPLICATION_JSON).content(pregunta))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("AI_UNAVAILABLE"));
     }
 
     @Test

@@ -28,6 +28,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
@@ -103,10 +104,13 @@ class TaskServiceTest {
 
         assertThat(moved.getBoardColumn()).isEqualTo(doing);
         assertThat(moved.getPosition()).isEqualTo(1);
-        assertThat(first.getPosition()).isZero();
-        assertThat(second.getPosition()).isEqualTo(2);
+        // Las demas se recolocan en la base de datos, sin pasar por la entidad (asi no cambia
+        // su ultima modificacion), y solo las que de verdad se desplazan.
+        verify(taskRepository, never()).updatePosition(eq(3L), anyInt());
+        verify(taskRepository).updatePosition(4L, 2);
         // La columna de origen se reindexa: la tarea que queda pasa a la posicion 0
-        assertThat(stays.getPosition()).isZero();
+        verify(taskRepository).updatePosition(2L, 0);
+        verify(taskRepository, never()).updatePosition(eq(1L), anyInt());
     }
 
     @Test
@@ -153,7 +157,22 @@ class TaskServiceTest {
         taskService.move(1L, new MoveTaskRequest(10L, 1));
 
         assertThat(moved.getPosition()).isEqualTo(1);
-        assertThat(other.getPosition()).isZero();
+        verify(taskRepository).updatePosition(2L, 0);
+    }
+
+    @Test
+    @DisplayName("Al borrar una tarea, las de detras suben un puesto sin tocar su ultima modificacion")
+    void deleteClosesTheGapWithoutTouchingTheOthers() {
+        Task deleted = task(1L, "Tarea 1", todo, 0);
+        Task next = task(2L, "Tarea 2", todo, 1);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(deleted));
+        when(taskRepository.findByBoardColumn_IdOrderByPositionAsc(10L)).thenReturn(List.of(next));
+
+        taskService.delete(1L);
+
+        verify(taskRepository).delete(deleted);
+        verify(taskRepository).updatePosition(2L, 0);
+        assertThat(next.getPosition()).isEqualTo(1);
     }
 
     @Test

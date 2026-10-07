@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { KeyRound, Pencil } from 'lucide-react'
 import { HomeShell } from '@/components/shell/HomeShell'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Card, CardGroup } from '@/components/ui/Card'
+import { DialogActions } from '@/components/ui/DialogActions'
 import { Modal } from '@/components/ui/Modal'
 import { PasswordInput } from '@/components/ui/PasswordInput'
+import { PhotoActions } from '@/components/ui/PhotoActions'
 import { Tag } from '@/components/ui/Tag'
 import styles from './SettingsScreen.module.css'
 import { useUserMutations } from '@/hooks/useData'
+import { useImagePicker } from '@/hooks/useImagePicker'
 import { useAuth } from '@/state/context'
 import { ROLE_LABELS } from '@/lib/roles'
 import { formatDateTime } from '@/lib/format'
@@ -102,45 +105,23 @@ function EditProfileModal({
 
 function EditProfileForm({ user, onClose }: { user: UserResponse; onClose: () => void }) {
   const [fullName, setFullName] = useState(user.fullName)
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const [removeAvatar, setRemoveAvatar] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const foto = useImagePicker()
   const mutations = useUserMutations(user.id)
-
-  // La vista previa es un objeto local: hay que liberarlo si se cambia de
-  // fichero o se cierra el dialogo, o si no se acumulan URLs sin usar.
-  useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview) }, [avatarPreview])
 
   const nombreValido = fullName.trim().length > 0
   const guardando = mutations.update.isPending || mutations.uploadAvatar.isPending || mutations.removeAvatar.isPending
-
-  function pickFile(file: File | undefined) {
-    if (!file) return
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-    setAvatarFile(file)
-    setAvatarPreview(URL.createObjectURL(file))
-    setRemoveAvatar(false)
-  }
-
-  function quitarFoto() {
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-    setAvatarFile(null)
-    setAvatarPreview(null)
-    setRemoveAvatar(true)
-  }
 
   async function submit() {
     if (!nombreValido || guardando) return
     try {
       // Se limpia el estado de la foto nada mas confirmarla el servidor: si
       // el nombre falla despues, un reintento no debe volver a subirla.
-      if (avatarFile) {
-        await mutations.uploadAvatar.mutateAsync(avatarFile)
-        setAvatarFile(null)
-      } else if (removeAvatar) {
+      if (foto.file) {
+        await mutations.uploadAvatar.mutateAsync(foto.file)
+        foto.saved()
+      } else if (foto.removed) {
         await mutations.removeAvatar.mutateAsync()
-        setRemoveAvatar(false)
+        foto.saved()
       }
       if (fullName.trim() !== user.fullName) {
         await mutations.update.mutateAsync({ fullName: fullName.trim() })
@@ -152,8 +133,8 @@ function EditProfileForm({ user, onClose }: { user: UserResponse; onClose: () =>
     }
   }
 
-  const avatarActual = removeAvatar ? null : user.avatarUrl
-  const tieneFoto = Boolean(avatarPreview || avatarActual)
+  const avatarActual = foto.removed ? null : user.avatarUrl
+  const tieneFoto = Boolean(foto.preview || avatarActual)
 
   return (
     <Modal
@@ -161,37 +142,16 @@ function EditProfileForm({ user, onClose }: { user: UserResponse; onClose: () =>
       title="Editar perfil"
       onClose={onClose}
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={submit} disabled={!nombreValido || guardando}>
-            {guardando ? 'Guardando…' : 'Guardar'}
-          </Button>
-        </>
+        <DialogActions onCancel={onClose} onConfirm={submit} label="Guardar" pending={guardando} disabled={!nombreValido} />
       }
     >
       <div className={styles.form}>
         <div className={styles.avatarEditor}>
-          {avatarPreview
-            ? <img className={styles.avatarPreview} src={avatarPreview} alt="Vista previa" />
+          {foto.preview
+            ? <img className={styles.avatarPreview} src={foto.preview} alt="Vista previa" />
             : <Avatar user={user} avatarUrl={avatarActual} size={64} />}
           <div className={styles.avatarActions}>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              hidden
-              onChange={(event) => pickFile(event.target.files?.[0])}
-            />
-            <Button variant="secondary" small onClick={() => fileInputRef.current?.click()}>
-              Cambiar foto
-            </Button>
-            {tieneFoto && (
-              <Button variant="ghost" small onClick={quitarFoto}>
-                Quitar foto
-              </Button>
-            )}
+            <PhotoActions picker={foto} hasPhoto={tieneFoto} />
           </div>
         </div>
 
@@ -236,9 +196,9 @@ function ChangePasswordForm({ user, onClose }: { user: UserResponse; onClose: ()
   const valido = actualValida && passwordValida && confirmacionValida
 
   async function submit() {
-    if (!valido || mutations.changePassword.isPending) return
+    if (!valido || mutations.update.isPending) return
     try {
-      await mutations.changePassword.mutateAsync({
+      await mutations.update.mutateAsync({
         fullName: user.fullName,
         currentPassword,
         password,
@@ -257,14 +217,13 @@ function ChangePasswordForm({ user, onClose }: { user: UserResponse; onClose: ()
       title="Cambiar contraseña"
       onClose={onClose}
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={submit} disabled={!valido || mutations.changePassword.isPending}>
-            {mutations.changePassword.isPending ? 'Guardando…' : 'Guardar'}
-          </Button>
-        </>
+        <DialogActions
+          onCancel={onClose}
+          onConfirm={submit}
+          label="Guardar"
+          pending={mutations.update.isPending}
+          disabled={!valido}
+        />
       }
     >
       <div className={styles.form}>

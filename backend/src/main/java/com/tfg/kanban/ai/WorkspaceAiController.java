@@ -37,16 +37,17 @@ public class WorkspaceAiController {
     @Operation(summary = "Preguntar al asistente",
             description = """
                     Responde en texto sobre el estado real del espacio de trabajo: tareas, columnas,
-                    fechas, personas y comentarios. No modifica nada.
+                    fechas, personas y comentarios. No modifica nada. RESPONSABLE o MIEMBRO: el
+                    asistente ayuda a hacer el trabajo, y el DOCENTE solo lo sigue.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Respuesta generada"),
-            @ApiResponse(responseCode = "403", description = "No se pertenece a este espacio de trabajo",
+            @ApiResponse(responseCode = "403", description = "No se trabaja en este espacio de trabajo",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "503", description = "DeepSeek no esta disponible",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    @PreAuthorize("@access.canReadProject(#workspaceId)")
+    @PreAuthorize("@access.canWriteProject(#workspaceId)")
     @PostMapping("/chat")
     public ChatResponse chat(@PathVariable Long workspaceId, @Valid @RequestBody ChatRequest request) {
         return assistantChatService.answer(workspaceId, request);

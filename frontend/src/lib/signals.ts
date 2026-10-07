@@ -1,13 +1,13 @@
-import { daysSince, daysUntil, formatDate, relativeTime } from '@/lib/format'
-import type { BoardResponse, ColumnResponse, Signal, TaskResponse } from '@/types/api'
+import { daysSince, daysUntil, formatDate } from '@/lib/format'
+import type { ColumnResponse, TaskResponse } from '@/types/api'
 
 /** Dias sin tocar una tarea a partir de los cuales se considera parada. */
 const DIAS_PARADA = 4
 
 /*
  * Las tres reglas de aviso, escritas una sola vez. Las usan los avisos de cada
- * tarjeta ({@link taskWarning}), las senales del tablero ({@link deriveSignals})
- * y el resumen del equipo, asi que no pueden decir cosas distintas.
+ * tarjeta ({@link taskWarning}), la franja de aviso del tablero ({@link boardWarningText}),
+ * los insights y el resumen del equipo, asi que no pueden decir cosas distintas.
  */
 
 /** Dias que faltan para su fecha limite si vence hoy o ya vencio y no esta terminada; null si no. */
@@ -36,70 +36,29 @@ export function unassignedInProgress(task: TaskResponse, columns: ColumnResponse
 }
 
 /**
- * Las senales son objetos de primera clase de PlanifIA, pero el backend no las
- * expone: se derivan aqui del estado real del tablero. Cada una nombra el dato
- * que la produjo y propone una accion de resolucion.
- *
- * A diferencia del aviso de la tarjeta (uno por tarea, el mas grave), aqui una
- * tarea puede dar varias senales: parada y ademas sin responsable son dos cosas
- * que resolver. Reglas, en orden de gravedad:
- *   1. Fecha de entrega vencida o venciendo hoy, sin terminar ({@link overdueDays}).
- *   2. Sin tocar durante {@link DIAS_PARADA} dias en una columna de trabajo ({@link stalledDays}).
- *   3. En curso sin responsable ({@link unassignedInProgress}).
+ * La frase del aviso mas grave del tablero, para la franja de debajo de las columnas:
+ * «X vencio hace 3 d y sigue en En progreso». Mismo orden de gravedad que el aviso de
+ * cada tarjeta: primero lo que va tarde, luego lo parado, luego lo que esta en curso sin
+ * nadie. Null si no hay ninguno.
  */
-export function deriveSignals(board?: BoardResponse): Signal[] {
-  if (!board?.columns?.length) return []
+export function boardWarningText(columns: ColumnResponse[]): string | null {
+  const tasks = columns.flatMap((column) => column.tasks ?? [])
 
-  const columns = board.columns
-  const allTasks = columns.flatMap((column) => column.tasks ?? [])
-  const target = (task: TaskResponse) => ({ screen: 'tablero' as const, taskId: task.id, boardId: board.id })
-  const signals: Signal[] = []
-
-  for (const task of allTasks) {
+  for (const task of tasks) {
     const remaining = overdueDays(task, columns)
     if (remaining === null) continue
-    signals.push({
-      id: `fecha-${task.id}`,
-      kind: 'fecha',
-      label: 'Fecha en riesgo',
-      age: relativeTime(task.updatedAt ?? task.createdAt),
-      text:
-        remaining === 0
-          ? `«${task.title}» vence hoy y sigue en ${task.columnName}.`
-          : `«${task.title}» venció hace ${Math.abs(remaining)} d y sigue en ${task.columnName}.`,
-      actionLabel: 'Revisar ahora',
-      target: target(task),
-    })
+    return remaining === 0
+      ? `«${task.title}» vence hoy y sigue en ${task.columnName}.`
+      : `«${task.title}» venció hace ${Math.abs(remaining)} d y sigue en ${task.columnName}.`
   }
-
-  for (const task of allTasks) {
+  for (const task of tasks) {
     const stale = stalledDays(task, columns)
-    if (stale === null) continue
-    signals.push({
-      id: `parada-${task.id}`,
-      kind: 'parada',
-      label: 'Tarea parada',
-      age: relativeTime(task.updatedAt ?? task.createdAt),
-      text: `«${task.title}» lleva ${stale} días sin movimiento en ${task.columnName}.`,
-      actionLabel: 'Ver la tarea',
-      target: target(task),
-    })
+    if (stale !== null) return `«${task.title}» lleva ${stale} días sin movimiento en ${task.columnName}.`
   }
-
-  for (const task of allTasks) {
-    if (!unassignedInProgress(task, columns)) continue
-    signals.push({
-      id: `bloqueo-${task.id}`,
-      kind: 'bloqueo',
-      label: 'Sin responsable',
-      age: relativeTime(task.createdAt),
-      text: `«${task.title}» está en ${task.columnName} sin nadie asignado, así que no va a avanzar sola.`,
-      actionLabel: 'Asignar a alguien',
-      target: target(task),
-    })
-  }
-
-  return signals
+  const sinNadie = tasks.find((task) => unassignedInProgress(task, columns))
+  return sinNadie
+    ? `«${sinNadie.title}» está en ${sinNadie.columnName} sin nadie asignado, así que no va a avanzar sola.`
+    : null
 }
 
 export type TaskWarningKind = 'fecha' | 'parada' | 'sin-responsable'
@@ -110,8 +69,8 @@ export type TaskWarningKind = 'fecha' | 'parada' | 'sin-responsable'
  * para quitarlo. Una tarea solo lleva un aviso, el mas grave: primero la fecha,
  * luego que este parada, luego que no tenga responsable.
  *
- * Es la unica fuente de los avisos: la etiqueta, el panel, el filtro «Avisos» y
- * su leyenda salen de aqui, asi que no pueden contar cosas distintas.
+ * Es la unica fuente de los avisos de cada tarea: la etiqueta, el panel y el filtro
+ * «Avisos» salen de aqui, asi que no pueden contar cosas distintas.
  */
 export interface TaskWarning {
   kind: TaskWarningKind
@@ -147,7 +106,8 @@ export function taskWarning(task: TaskResponse, columns: ColumnResponse[]): Task
       kind: 'parada',
       short: `${stale} d sin avance`,
       detail: `Lleva ${stale} días en «${columnName}» sin ningún cambio.`,
-      action: 'Muévela de columna, actualízala o comenta cómo va.',
+      // Comentar no la quita: el aviso mira cuando cambio la tarea, no su conversacion.
+      action: 'Muévela de columna o actualízala: cualquier cambio en la tarea cuenta como avance.',
     }
   }
   if (unassignedInProgress(task, columns)) {
@@ -155,13 +115,8 @@ export function taskWarning(task: TaskResponse, columns: ColumnResponse[]): Task
       kind: 'sin-responsable',
       short: 'sin responsable',
       detail: `Está en «${columnName}» pero no tiene a nadie asignado.`,
-      action: 'Asígnala a alguien para que alguien la saque adelante.',
+      action: 'Asígnala a alguien del equipo para que la saque adelante.',
     }
   }
   return undefined
-}
-
-/** Etiqueta corta del aviso, la que se pinta sobre la tarjeta. */
-export function taskBadge(task: TaskResponse, columns: ColumnResponse[]): string | undefined {
-  return taskWarning(task, columns)?.short
 }

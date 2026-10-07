@@ -28,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -84,7 +85,9 @@ class AiPlanServiceTest {
 
         service = new AiPlanService(properties, deepSeekClient, new ObjectMapper(), projectService,
                 boardService, taskRepository, userRepository, activityService, taskMapper,
-                documentIngestion, progressTracker, new AiTaskScheduler());
+                documentIngestion, progressTracker, new AiTaskScheduler(),
+                // Sin base de datos: lo que va dentro de una transaccion se ejecuta tal cual.
+                TransactionOperations.withoutTransaction());
 
         // El procesamiento real del documento se prueba en DocumentIngestionServiceTest: aqui
         // basta con que un fichero de texto llegue como el texto que contiene.

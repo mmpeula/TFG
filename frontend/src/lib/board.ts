@@ -1,3 +1,4 @@
+import { plainText } from '@/lib/format'
 import type { TaskResponse } from '@/types/api'
 
 /**
@@ -27,11 +28,6 @@ export function dropPosition(
 /** Marca de «sin responsable» en el filtro por persona: no es el id de nadie. */
 export const SIN_ASIGNAR = 0
 
-/** Minusculas y sin tildes: «Diseño» encuentra «diseno» y al reves. */
-function plain(text: string): string {
-  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-}
-
 /**
  * Si una tarea pasa los filtros del tablero.
  *
@@ -40,11 +36,11 @@ function plain(text: string): string {
  *               responsable); vacio no filtra
  */
 export function matchesBoardFilters(task: TaskResponse, search: string, people: number[]): boolean {
-  const query = plain(search.trim())
+  const query = plainText(search.trim())
   if (query) {
     const numero = query.replace(/^#/, '')
     const porNumero = /^\d+$/.test(numero) && String(task.id).startsWith(numero)
-    if (!porNumero && !plain(task.title).includes(query)) return false
+    if (!porNumero && !plainText(task.title).includes(query)) return false
   }
   if (people.length > 0) {
     const suya = task.assignees.some((assignee) => people.includes(assignee.id))

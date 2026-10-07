@@ -1,11 +1,13 @@
 package com.tfg.kanban.task;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.tfg.kanban.AbstractApiIT;
 import com.tfg.kanban.domain.model.Role;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -44,7 +46,6 @@ class TaskControllerIT extends AbstractApiIT {
     void moveTaskBetweenColumns() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         Workspace workspace = createWorkspace(responsable, "Equipo drag and drop");
-        Long teamId = workspace.teamId();
         Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);
 
@@ -70,6 +71,40 @@ class TaskControllerIT extends AbstractApiIT {
                 .andExpect(jsonPath("$.columns[0].tasks[1].id").value(third))
                 .andExpect(jsonPath("$.columns[0].tasks[1].position").value(1))
                 .andExpect(jsonPath("$.columns[1].tasks.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("Mover una tarea no cambia la ultima modificacion de las que solo se desplazan")
+    void movingATaskDoesNotTouchTheOthers() throws Exception {
+        TestUser responsable = registerUser(Role.MIEMBRO);
+        Workspace workspace = createWorkspace(responsable, "Equipo fechas");
+        Long boardId = workspace.boardId();
+        long[] columns = columnIds(responsable, boardId);
+
+        Long first = createTask(responsable, columns[0], "Tarea 1");
+        createTask(responsable, columns[0], "Tarea 2");
+        createTask(responsable, columns[0], "Tarea 3");
+        JsonNode antes = tasksOfFirstColumn(responsable, boardId);
+
+        mockMvc.perform(authorized(patch("/api/tasks/{id}/move", first), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"columnId":%d,"position":0}
+                                """.formatted(columns[1])))
+                .andExpect(status().isOk());
+
+        JsonNode despues = tasksOfFirstColumn(responsable, boardId);
+        // Las dos que quedan suben un puesto...
+        assertThat(despues.get(0).get("position").asInt()).isZero();
+        assertThat(despues.get(1).get("position").asInt()).isEqualTo(1);
+        // ...pero nadie las ha tocado: para las metricas y los avisos siguen igual que antes.
+        assertThat(despues.get(0).get("updatedAt").asText()).isEqualTo(antes.get(1).get("updatedAt").asText());
+        assertThat(despues.get(1).get("updatedAt").asText()).isEqualTo(antes.get(2).get("updatedAt").asText());
+    }
+
+    private JsonNode tasksOfFirstColumn(TestUser user, Long boardId) throws Exception {
+        return json(mockMvc.perform(authorized(get("/api/boards/{id}", boardId), user)).andReturn())
+                .get("columns").get(0).get("tasks");
     }
 
     @Test
@@ -110,7 +145,6 @@ class TaskControllerIT extends AbstractApiIT {
         TestUser responsable = registerUser(Role.MIEMBRO);
         TestUser extrano = registerUser(Role.MIEMBRO);
         Workspace workspace = createWorkspace(responsable, "Equipo asignaciones");
-        Long teamId = workspace.teamId();
         Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);
         Long taskId = createTask(responsable, columns[0], "Tarea a asignar");
@@ -128,7 +162,6 @@ class TaskControllerIT extends AbstractApiIT {
     void searchCombinesFilters() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         Workspace workspace = createWorkspace(responsable, "Equipo filtros");
-        Long teamId = workspace.teamId();
         Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);
 
@@ -172,7 +205,6 @@ class TaskControllerIT extends AbstractApiIT {
     void searchFiltersTasks() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);
         Workspace workspace = createWorkspace(responsable, "Equipo busqueda");
-        Long teamId = workspace.teamId();
         Long projectId = workspace.id();
         Long boardId = workspace.boardId();
         long[] columns = columnIds(responsable, boardId);

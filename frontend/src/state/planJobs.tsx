@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { PlanJobsContext, useUi, type PlanGenerateRequest, type PlanJob } from './context'
@@ -19,6 +19,15 @@ export function PlanJobsProvider({ children }: { children: ReactNode }) {
   const { pushToast } = useUi()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  // Si la sesion se cierra mientras se genera, el resultado ya no es de nadie que este
+  // mirando: no se avisa con un toast a quien entre despues en la misma pestana.
+  const vigente = useRef(true)
+  useEffect(() => {
+    vigente.current = true
+    return () => {
+      vigente.current = false
+    }
+  }, [])
 
   const start = useCallback(
     (request: PlanGenerateRequest) => {
@@ -39,12 +48,14 @@ export function PlanJobsProvider({ children }: { children: ReactNode }) {
 
       call.then(
         (plan) => {
+          if (!vigente.current) return
           setJobs((current) => ({ ...current, [workspaceId]: { status: 'done', sourceLabel, plan, options } }))
           // Subir un documento actualiza el guion guardado del proyecto; lo demas no lo toca.
           if (file) queryClient.invalidateQueries({ queryKey: keys.project(workspaceId) })
           pushToast(`Propuesta de planificación lista para «${workspaceName}»`, verElPlan)
         },
         (err) => {
+          if (!vigente.current) return
           const message = toErrorMessage(err)
           setJobs((current) => ({ ...current, [workspaceId]: { status: 'error', sourceLabel, error: message } }))
           pushToast(`No se ha podido generar la planificación de «${workspaceName}»`, verElPlan)

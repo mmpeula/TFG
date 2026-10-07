@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { homeForRole, ROUTES } from './app/routes'
 import { ProtectedRoute, RoleAreaRoute } from './screens/ProtectedRoute'
@@ -6,15 +7,23 @@ import { RegisterScreen } from './screens/RegisterScreen'
 import { WorkspacesScreen } from './screens/WorkspacesScreen'
 import { PlanScreen } from './screens/PlanScreen'
 import { BoardScreen } from './screens/BoardScreen'
-import { GeneratePlanScreen } from './screens/GeneratePlanScreen'
-import { MembersScreen } from './screens/MembersScreen'
-import { WorkspaceSettingsScreen } from './screens/WorkspaceSettingsScreen'
-import { PulseScreen } from './screens/PulseScreen'
-import { SettingsScreen } from './screens/SettingsScreen'
-import { AdminScreen } from './screens/AdminScreen'
-import { TeacherScreen } from './screens/TeacherScreen'
-import { InvitationScreen } from './screens/InvitationScreen'
+import { Skeleton } from './components/ui/Skeleton'
 import { useAuth } from './state/context'
+
+/*
+ * Lo que se abre a diario (entrar, la lista, el plan y el tablero) va en el paquete
+ * principal. El resto se descarga la primera vez que se visita: el administrador no
+ * tiene por que bajarse el generador de planes, ni un alumno el panel de administracion.
+ */
+const GeneratePlanScreen = lazy(() => import('./screens/GeneratePlanScreen').then((m) => ({ default: m.GeneratePlanScreen })))
+const MembersScreen = lazy(() => import('./screens/MembersScreen').then((m) => ({ default: m.MembersScreen })))
+const WorkspaceSettingsScreen = lazy(() =>
+  import('./screens/WorkspaceSettingsScreen').then((m) => ({ default: m.WorkspaceSettingsScreen })))
+const PulseScreen = lazy(() => import('./screens/PulseScreen').then((m) => ({ default: m.PulseScreen })))
+const SettingsScreen = lazy(() => import('./screens/SettingsScreen').then((m) => ({ default: m.SettingsScreen })))
+const AdminScreen = lazy(() => import('./screens/AdminScreen').then((m) => ({ default: m.AdminScreen })))
+const TeacherScreen = lazy(() => import('./screens/TeacherScreen').then((m) => ({ default: m.TeacherScreen })))
+const InvitationScreen = lazy(() => import('./screens/InvitationScreen').then((m) => ({ default: m.InvitationScreen })))
 
 /** Entrar en un workspace es ver su plan: /workspaces/:id lleva a su seccion Plan. */
 function WorkspaceHomeRedirect() {
@@ -30,40 +39,42 @@ function RoleHomeRedirect() {
 
 export function App() {
   return (
-    <Routes>
-      <Route path={ROUTES.login} element={<LoginScreen />} />
-      <Route path={ROUTES.register} element={<RegisterScreen />} />
+    <Suspense fallback={<Skeleton label="Cargando…" lines={3} />}>
+      <Routes>
+        <Route path={ROUTES.login} element={<LoginScreen />} />
+        <Route path={ROUTES.register} element={<RegisterScreen />} />
 
-      <Route element={<ProtectedRoute />}>
-        <Route path={ROUTES.home} element={<RoleHomeRedirect />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path={ROUTES.home} element={<RoleHomeRedirect />} />
 
-        {/* Fuera del area por rol a proposito: responder a una invitacion no es
-            entrar en el espacio de nadie, y la reciben tanto estudiantes como
-            docentes. Lo que si hace falta es tener sesion, para saber de quien
-            es la invitacion. */}
-        <Route path={ROUTES.invitacion} element={<InvitationScreen />} />
+          {/* Fuera del area por rol a proposito: responder a una invitacion no es
+              entrar en el espacio de nadie, y la reciben tanto estudiantes como
+              docentes. Lo que si hace falta es tener sesion, para saber de quien
+              es la invitacion. */}
+          <Route path={ROUTES.invitacion} element={<InvitationScreen />} />
 
-        <Route element={<RoleAreaRoute />}>
-          <Route path={ROUTES.workspaces} element={<WorkspacesScreen />} />
+          <Route element={<RoleAreaRoute />}>
+            <Route path={ROUTES.workspaces} element={<WorkspacesScreen />} />
 
-          {/* Entrar en un workspace es ver su plan; el tablero es el dia a dia. */}
-          <Route path={ROUTES.workspace} element={<WorkspaceHomeRedirect />} />
-          <Route path={ROUTES.plan} element={<PlanScreen />} />
-          <Route path={ROUTES.tablero} element={<BoardScreen />} />
-          <Route path={ROUTES.generarPlan} element={<GeneratePlanScreen />} />
-          <Route path={ROUTES.miembros} element={<MembersScreen />} />
-          <Route path={ROUTES.ajustes} element={<WorkspaceSettingsScreen />} />
-          <Route path={ROUTES.pulso} element={<PulseScreen />} />
+            {/* Entrar en un workspace es ver su plan; el tablero es el dia a dia. */}
+            <Route path={ROUTES.workspace} element={<WorkspaceHomeRedirect />} />
+            <Route path={ROUTES.plan} element={<PlanScreen />} />
+            <Route path={ROUTES.tablero} element={<BoardScreen />} />
+            <Route path={ROUTES.generarPlan} element={<GeneratePlanScreen />} />
+            <Route path={ROUTES.miembros} element={<MembersScreen />} />
+            <Route path={ROUTES.ajustes} element={<WorkspaceSettingsScreen />} />
+            <Route path={ROUTES.pulso} element={<PulseScreen />} />
 
-          {/* Solo la ve quien tiene rol global ADMIN. */}
-          <Route path={ROUTES.administracion} element={<AdminScreen />} />
-          <Route path={ROUTES.docente} element={<TeacherScreen />} />
+            {/* Solo la ve quien tiene rol global ADMIN. */}
+            <Route path={ROUTES.administracion} element={<AdminScreen />} />
+            <Route path={ROUTES.docente} element={<TeacherScreen />} />
+          </Route>
+
+          <Route path={ROUTES.configuracion} element={<SettingsScreen />} />
         </Route>
 
-        <Route path={ROUTES.configuracion} element={<SettingsScreen />} />
-      </Route>
-
-      <Route path="*" element={<Navigate to={ROUTES.workspaces} replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to={ROUTES.workspaces} replace />} />
+      </Routes>
+    </Suspense>
   )
 }

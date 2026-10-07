@@ -6,7 +6,6 @@ import { homeForRole, ROUTES } from '@/app/routes'
 /** Deja pasar solo a los usuarios autenticados; el resto va al login. */
 export function ProtectedRoute() {
   const { isAuthenticated, isLoading } = useAuth()
-  const location = useLocation()
 
   if (isLoading) {
     return (
@@ -17,7 +16,7 @@ export function ProtectedRoute() {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={ROUTES.login} state={{ from: location.pathname }} replace />
+    return <Navigate to={ROUTES.login} replace />
   }
 
   return <Outlet />

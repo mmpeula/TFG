@@ -10,8 +10,8 @@ import java.util.stream.Stream;
 /**
  * Que rol de equipo puede tener cada cuenta.
  *
- * <p>Vive aparte porque hacen falta en dos sitios que deben decir exactamente lo
- * mismo: al anadir a alguien directamente y al invitarle. Y en el caso de la
+ * <p>Vive aparte porque hace falta en varios sitios que deben decir exactamente lo
+ * mismo: al cambiar el rol de alguien del equipo y al invitarle. Y en el caso de la
  * invitacion, dos veces: al mandarla, para no prometer algo imposible, y al
  * aceptarla, porque entre una cosa y otra un administrador ha podido cambiarle
  * el tipo de cuenta.</p>

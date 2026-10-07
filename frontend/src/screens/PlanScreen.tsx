@@ -79,9 +79,10 @@ export function PlanScreen() {
   const { data: project } = useProject(workspaceId)
   const taskMutations = useTaskMutations(boards?.[0]?.id, workspaceId)
 
-  // El alcance elegido se recuerda: nadie quiere volver a fijarlo cada vez.
+  // El alcance elegido se recuerda: nadie quiere volver a fijarlo cada vez. Lo guardado se
+  // comprueba: un valor raro (de otra version, o tocado a mano) no puede dejar la vista sin ninguno.
   const [chosenScope, setScope] = useState<'mine' | 'team'>(
-    () => (leerGuardado(GUARDADO_ALCANCE, 'mine') as 'mine' | 'team') ?? 'mine',
+    () => (leerGuardado(GUARDADO_ALCANCE, 'mine') === 'team' ? 'team' : 'mine'),
   )
   // Lo decide el rol en ESTE espacio, no el de la cuenta. Un docente no tiene tareas suyas: siempre
   // ve el equipo. Un alumno, siempre lo suyo. Solo quien es responsable puede elegir.
@@ -156,20 +157,26 @@ export function PlanScreen() {
                   {plan.sprints.length === 1 ? 'sprint' : 'sprints'}
                 </span>
               </p>
+              {/* Cambiarlo es cosa de quien administra el espacio: al resto se le dice de donde
+                  sale, sin ofrecerle un enlace a unos ajustes que no puede tocar. */}
               {!workspace?.startDate && (
                 <p className={styles.note}>
                   El inicio sale de la primera tarea.{' '}
-                  <button className={styles.link} onClick={() => navigate(ROUTES.ajustesById(workspaceId))}>
-                    Fijar la fecha de inicio
-                  </button>
+                  {responsable && (
+                    <button className={styles.link} onClick={() => navigate(ROUTES.ajustesById(workspaceId))}>
+                      Fijar la fecha de inicio
+                    </button>
+                  )}
                 </p>
               )}
               {!workspace?.sprintDays && (
                 <p className={styles.note}>
                   Sprints de {DEFAULT_SPRINT_DAYS / 7} semanas, por defecto.{' '}
-                  <button className={styles.link} onClick={() => navigate(ROUTES.ajustesById(workspaceId))}>
-                    Cambiar la duración
-                  </button>
+                  {responsable && (
+                    <button className={styles.link} onClick={() => navigate(ROUTES.ajustesById(workspaceId))}>
+                      Cambiar la duración
+                    </button>
+                  )}
                 </p>
               )}
             </div>
@@ -222,7 +229,7 @@ export function PlanScreen() {
                 <SprintColumn
                   key={sprint.number}
                   sprint={sprint}
-                  canWrite={writable}
+                  writable={writable}
                   onOpen={setOpenTask}
                   onDelete={(task) => taskMutations.remove.mutate(task.id)}
                 />
@@ -282,10 +289,10 @@ function columnsOf(columns?: ColumnResponse[]): ColumnResponse[] {
  * pueden discrepar de lo que se ve.
  */
 function SprintColumn({
-  sprint, canWrite, onOpen, onDelete,
+  sprint, writable, onOpen, onDelete,
 }: {
   sprint: Sprint
-  canWrite: boolean
+  writable: boolean
   onOpen: (task: TaskResponse) => void
   onDelete: (task: TaskResponse) => void
 }) {
@@ -320,7 +327,7 @@ function SprintColumn({
               draggable={false}
               done={item.state === 'terminada'}
               status={STATE_COLORS[item.state]}
-              canWrite={canWrite}
+              canWrite={writable}
               onOpen={onOpen}
               onDelete={onDelete}
             />

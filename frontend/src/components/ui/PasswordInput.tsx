@@ -1,5 +1,5 @@
 import {
-  useLayoutEffect, useRef, useState, type ChangeEvent, type InputHTMLAttributes, type KeyboardEvent,
+  useId, useLayoutEffect, useRef, useState, type ChangeEvent, type InputHTMLAttributes, type KeyboardEvent,
 } from 'react'
 import { ArrowBigUp, Eye, EyeOff } from 'lucide-react'
 import styles from './PasswordInput.module.css'
@@ -38,6 +38,8 @@ export function PasswordInput({
   // Posicion de la ultima letra escrita; null si lo ultimo fue borrar, pegar o autocompletar.
   const [peek, setPeek] = useState<number | null>(null)
   const [ownValue, setOwnValue] = useState(String(rest.defaultValue ?? ''))
+  // Un id por campo: en el registro o al cambiar la contrasena hay varios en la misma pantalla.
+  const capsHintId = useId()
 
   const inputRef = useRef<HTMLInputElement>(null)
   const maskRef = useRef<HTMLSpanElement>(null)
@@ -132,7 +134,7 @@ export function PasswordInput({
             paddingRight: 36,
             ...(visible ? {} : { fontFamily: 'var(--font-mono)' }),
           }}
-          aria-describedby={capsLock === true ? 'caps-lock-hint' : rest['aria-describedby']}
+          aria-describedby={capsLock === true ? capsHintId : rest['aria-describedby']}
           onChange={handleChange}
           onScroll={follow}
           onKeyDown={(event) => {
@@ -169,7 +171,7 @@ export function PasswordInput({
         </button>
       </div>
       {capsLock === true && (
-        <span id="caps-lock-hint" className={styles.caps} role="status">
+        <span id={capsHintId} className={styles.caps} role="status">
           <ArrowBigUp size={14} strokeWidth={2.5} aria-hidden="true" />
           Bloq Mayús activado
         </span>

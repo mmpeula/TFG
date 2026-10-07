@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown, Search, UserCheck, UserX } from 'lucide-react'
+import { AdminSearch } from './AdminSearch'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Tag } from '@/components/ui/Tag'
@@ -11,19 +12,13 @@ import styles from './AdminPanel.module.css'
 import { useAdminUserMutations, useAdminUsers } from '@/hooks/useData'
 import { useAuth } from '@/state/context'
 import { ROLE_LABELS } from '@/lib/roles'
-import { formatDate } from '@/lib/format'
+import { formatDate, matchesSearch } from '@/lib/format'
 import type { Role, UserResponse } from '@/types/api'
 
 /** Los tres tipos de cuenta, para filtrar. RESPONSABLE no esta: se es de un equipo, no de la plataforma. */
 const ROLES: Role[] = ['MIEMBRO', 'DOCENTE', 'ADMIN']
 
 type Filtro = Role | 'TODAS'
-
-function matches(user: UserResponse, term: string): boolean {
-  const q = term.trim().toLowerCase()
-  if (!q) return true
-  return user.fullName.toLowerCase().includes(q) || user.email.toLowerCase().includes(q)
-}
 
 /**
  * Cuentas de toda la plataforma: rol global y alta o baja.
@@ -45,7 +40,7 @@ export function AdminAccountsPanel() {
 
   const todas = useMemo(() => data?.content ?? [], [data])
   const cuentas = useMemo(
-    () => todas.filter((u) => matches(u, search) && (filtro === 'TODAS' || u.role === filtro)),
+    () => todas.filter((u) => matchesSearch(search, u.fullName, u.email) && (filtro === 'TODAS' || u.role === filtro)),
     [todas, search, filtro],
   )
 
@@ -57,16 +52,7 @@ export function AdminAccountsPanel() {
   return (
     <div className={styles.panel}>
       <div className={styles.toolbar}>
-        <div className={styles.searchBox}>
-          <Search size={14} strokeWidth={2.75} aria-hidden="true" />
-          <input
-            className={styles.searchInput}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por nombre o correo"
-            aria-label="Buscar cuentas"
-          />
-        </div>
+        <AdminSearch value={search} onChange={setSearch} placeholder="Buscar por nombre o correo" label="Buscar cuentas" />
 
         <div className={styles.filters}>
           <Chip active={filtro === 'TODAS'} onClick={() => setFiltro('TODAS')}>

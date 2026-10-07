@@ -29,6 +29,9 @@ import type { Role } from '@/types/api'
  */
 const ROLES_DE_TRABAJO: Role[] = ['MIEMBRO', 'RESPONSABLE']
 
+/** Un correo con forma de correo: solo entonces se pregunta al servidor de quien es. */
+const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 /**
  * Quien trabaja en este workspace y que puede hacer cada uno.
  *
@@ -50,7 +53,8 @@ export function MembersScreen() {
   const [email, setEmail] = useState('')
   // Solo se pregunta por la cuenta cuando el correo esta completo y se ha dejado de teclear.
   const correo = useDebouncedValue(email.trim().toLowerCase(), 400)
-  const correoValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo) && correo === email.trim().toLowerCase()
+  const correoEscrito = email.trim().toLowerCase()
+  const correoValido = CORREO.test(correo) && correo === correoEscrito
   const { data: candidato, isFetching: buscandoCuenta } = useInviteCandidate(
     workspace?.teamId, correoValido ? correo : undefined,
   )
@@ -64,9 +68,7 @@ export function MembersScreen() {
   // Mientras no se sepa que cuenta es (aun tecleando, o esperando al servidor) no se envia:
   // si no, pegar el correo y pulsar Invitar en el acto mandaba la invitacion antes de que
   // saliera la pregunta, con el rol por defecto.
-  const correoEscrito = email.trim().toLowerCase()
-  const comprobando = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoEscrito)
-    && (correo !== correoEscrito || buscandoCuenta)
+  const comprobando = CORREO.test(correoEscrito) && (correo !== correoEscrito || buscandoCuenta)
   const faltaElegir = puedeElegir && !rolElegido
 
   const manageable = canManage(workspace?.myRole)
@@ -80,18 +82,20 @@ export function MembersScreen() {
           {manageable && (
             <form
               className={styles.inviteForm}
-              onSubmit={async (event) => {
+              onSubmit={(event) => {
                 event.preventDefault()
                 if (comprobando || faltaElegir) return
                 // Invitar, no anadir: no entra en el equipo hasta que acepte. Entra como alumno o
                 // como docente segun su tipo de cuenta, salvo que se pida que una cuenta docente
                 // trabaje aqui como alumno; a responsable se le pasa despues, desde esta pantalla.
-                await invitaciones.invite.mutateAsync({
-                  email: email.trim(),
-                  role: puedeElegir && (rolElegido === 'MIEMBRO' || rolElegido === 'DOCENTE') ? rolElegido : undefined,
-                })
-                setEmail('')
-                setEleccion(null)
+                invitaciones.invite.mutate(
+                  {
+                    email: email.trim(),
+                    role: puedeElegir && (rolElegido === 'MIEMBRO' || rolElegido === 'DOCENTE') ? rolElegido : undefined,
+                  },
+                  // Si falla (no hay cuenta, ya esta dentro...), el aviso lo cuenta y el correo se queda escrito.
+                  { onSuccess: () => { setEmail(''); setEleccion(null) } },
+                )
               }}
             >
               <Card
@@ -166,7 +170,7 @@ export function MembersScreen() {
                         <div className={styles.identity}>
                           <div className={styles.name}>
                             {member.user.fullName}
-                            {isMe && <span className={styles.you}> (tu)</span>}
+                            {isMe && <span className={styles.you}> (tú)</span>}
                           </div>
                           <div className={styles.mail}>{member.user.email}</div>
                         </div>

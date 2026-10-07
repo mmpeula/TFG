@@ -28,7 +28,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @ToString(exclude = {"team", "invited", "invitedBy"})
-@EqualsAndHashCode(of = "id")
+@EqualsAndHashCode(of = "id", callSuper = false)
 public class Invitation extends Auditable {
 
     @Id

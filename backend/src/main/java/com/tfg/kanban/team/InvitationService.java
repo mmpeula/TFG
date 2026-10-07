@@ -136,7 +136,7 @@ public class InvitationService {
         User invited = invitation.getInvited();
 
         if (teamMemberRepository.existsByTeam_IdAndUser_Id(team.getId(), invited.getId())) {
-            // Alguien le anadio a mano mientras tanto: la invitacion sobra, no falla.
+            // Ya esta dentro (dos invitaciones mandadas a la vez, y otra se acepto antes): esta sobra, no falla.
             resolver(invitation, InvitationStatus.ACEPTADA);
             return TeamMemberResponse.from(
                     teamMemberRepository.findByTeam_IdAndUser_Id(team.getId(), invited.getId()).orElseThrow());
@@ -211,7 +211,7 @@ public class InvitationService {
                 invitation.getInvited().getFullName(),
                 quien,
                 invitation.getTeam().getName(),
-                invitation.getRole().name().toLowerCase(),
+                invitation.getRole().label(),
                 enlace);
 
         return mailService.send(invitation.getInvited().getEmail(),

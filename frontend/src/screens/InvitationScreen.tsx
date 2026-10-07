@@ -44,13 +44,13 @@ export function InvitationScreen() {
               <Button
                 variant="secondary"
                 disabled={reject.isPending}
-                onClick={() => reject.mutateAsync(token).then(() => navigate(ROUTES.workspaces))}
+                onClick={() => reject.mutate(token, { onSuccess: () => navigate(ROUTES.workspaces) })}
               >
                 Rechazar
               </Button>
               <Button
                 disabled={accept.isPending}
-                onClick={() => accept.mutateAsync(token).then(() => navigate(ROUTES.workspaces))}
+                onClick={() => accept.mutate(token, { onSuccess: () => navigate(ROUTES.workspaces) })}
               >
                 {accept.isPending ? 'Entrando…' : 'Aceptar invitación'}
               </Button>

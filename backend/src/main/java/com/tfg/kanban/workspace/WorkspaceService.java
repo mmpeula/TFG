@@ -201,24 +201,30 @@ public class WorkspaceService {
     }
 
     /**
-     * Borra el workspace. Si su equipo se queda sin proyectos y lo creo esta misma
-     * persona, se borra tambien: de otro modo quedarian equipos vacios invisibles.
+     * Borra el workspace con su tablero, sus tareas y su foto, y tambien su equipo.
+     *
+     * <p>El equipo existe solo para su workspace (se crean juntos), asi que se va con
+     * el lo borre quien lo borre: el responsable que lo creo, otro responsable o
+     * soporte. Si se quedara, sus miembros e invitaciones seguirian en la base de
+     * datos sin ninguna pantalla desde la que alcanzarlos.</p>
      */
     @Transactional
     public void delete(Long workspaceId) {
         Project project = getProject(workspaceId);
         Team team = project.getTeam();
+        String cover = project.getCoverStoredName();
 
         projectRepository.delete(project);
         projectRepository.flush();
 
-        boolean vacio = projectRepository.findByTeam_Id(team.getId()).isEmpty();
-        boolean esMio = team.getOwner() != null && team.getOwner().getId().equals(SecurityUtils.requireCurrentUserId());
-        if (vacio && esMio) {
+        if (projectRepository.findByTeam_Id(team.getId()).isEmpty()) {
             // Las invitaciones, aunque ya esten respondidas, apuntan al equipo: sin quitarlas antes,
             // ningun espacio al que se haya invitado a alguien se podria borrar.
             invitationRepository.deleteByTeam_Id(team.getId());
             teamRepository.delete(team);
+        }
+        if (cover != null) {
+            fileStorageService.deleteAfterCommit(cover);
         }
     }
 
@@ -264,7 +270,7 @@ public class WorkspaceService {
         project.setCoverStoredName(image.storedName());
         project.setCoverContentType(image.contentType());
         if (previous != null) {
-            fileStorageService.delete(previous);
+            fileStorageService.deleteAfterCommit(previous);
         }
         return findById(workspaceId);
     }
@@ -279,7 +285,7 @@ public class WorkspaceService {
         }
         project.setCoverStoredName(null);
         project.setCoverContentType(null);
-        fileStorageService.delete(previous);
+        fileStorageService.deleteAfterCommit(previous);
     }
 
     public CoverFile loadCover(Long workspaceId) {

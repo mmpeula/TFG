@@ -20,6 +20,9 @@ interface Props {
  */
 export function AssigneePicker({ members, selected, onChange, align = 'left', className }: Props) {
   const selectedIds = selected.map((user) => user.id)
+  // Los docentes siguen el trabajo, no lo hacen: no se les asignan tareas (el filtro por persona y
+  // el resumen del equipo tampoco los cuentan). Solo sale uno si ya lo estaba, para poder quitarlo.
+  const elegibles = members.filter((member) => member.role !== 'DOCENTE' || selectedIds.includes(member.user.id))
 
   function toggle(userId: number) {
     onChange(
@@ -53,7 +56,7 @@ export function AssigneePicker({ members, selected, onChange, align = 'left', cl
           <DropdownItem onClick={() => { close(); onChange([]) }}>
             Sin asignar
           </DropdownItem>
-          {members.map((member) => (
+          {elegibles.map((member) => (
             <DropdownItem
               key={member.user.id}
               active={selectedIds.includes(member.user.id)}

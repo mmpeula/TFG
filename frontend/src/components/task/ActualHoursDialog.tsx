@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button } from '@/components/ui/Button'
+import { DialogActions } from '@/components/ui/DialogActions'
 import { Modal } from '@/components/ui/Modal'
 import styles from './ActualHoursDialog.module.css'
 import { hoursNumber, parseHours } from '@/lib/hours'
@@ -52,14 +52,14 @@ function ActualHoursForm({
       title="Tarea terminada"
       onClose={onClose}
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Ahora no
-          </Button>
-          <Button onClick={guardar} disabled={hours === null || saving}>
-            {saving ? 'Guardando…' : 'Guardar'}
-          </Button>
-        </>
+        <DialogActions
+          onCancel={onClose}
+          onConfirm={guardar}
+          cancelLabel="Ahora no"
+          label="Guardar"
+          pending={saving}
+          disabled={hours === null}
+        />
       }
     >
       <label className={styles.body}>

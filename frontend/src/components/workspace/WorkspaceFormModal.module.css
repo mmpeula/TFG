@@ -1,20 +1,8 @@
-.form { display: flex; flex-direction: column; gap: var(--space-3); }
-
-.label {
-  display: flex; flex-direction: column; gap: 5px;
-  font-size: 12px; font-weight: 500; color: var(--color-neutral-700);
-}
-.optional { font-weight: 500; color: var(--color-neutral-500); text-transform: none; }
-
-.input {
-  font-family: inherit; font-size: 14px; font-weight: 400; color: var(--color-text);
-  background: var(--color-bg);
-  border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-sm);
-  padding: 9px 11px;
-  transition: var(--transition);
-}
-.input:focus { outline: none; border-color: var(--color-neutral-900); }
+/* Los campos comunes vienen de ui/Form.module.css. */
+.form { composes: form from '../ui/Form.module.css'; }
+.label { composes: label from '../ui/Form.module.css'; }
+.optional { composes: optional from '../ui/Form.module.css'; }
+.input { composes: input from '../ui/Form.module.css'; }
 
 .row { display: grid; grid-template-columns: 1fr auto; gap: var(--space-3); align-items: start; }
 .row:has(input[type=date]) { grid-template-columns: 1fr 1fr; }

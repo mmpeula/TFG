@@ -263,6 +263,14 @@ class UserControllerIT extends AbstractApiIT {
                                 {"email":"%s","password":"password123"}
                                 """.formatted(victim.email())))
                 .andExpect(status().isConflict());
+
+        // ...pero que esta deshabilitada solo se le dice a quien sabe su contrasena: con otra,
+        // es un login fallido mas y no revela si la cuenta existe ni en que estado esta.
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"otra-cualquiera"}
+                                """.formatted(victim.email())))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

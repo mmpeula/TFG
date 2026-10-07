@@ -7,7 +7,7 @@ interface Props {
   lines?: number
 }
 
-/** Esqueleto de carga: tres barras y un punto terracota que late. */
+/** Esqueleto de carga: unas barras grises y un punto que late junto a lo que se esta cargando. */
 export function Skeleton({ label, lines = 3 }: Props) {
   return (
     <div className={styles.block} aria-live="polite" aria-busy="true">

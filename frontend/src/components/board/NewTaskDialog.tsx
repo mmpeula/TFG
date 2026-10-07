@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { DateInput } from '@/components/ui/DateInput'
 import { parseHours } from '@/lib/hours'
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { DialogActions } from '@/components/ui/DialogActions'
 import { AssigneePicker } from '@/components/task/AssigneePicker'
 import styles from './NewTaskDialog.module.css'
 import type { TaskPayload } from '@/api/endpoints'
@@ -19,9 +19,11 @@ interface Props {
 }
 
 /**
- * Alta de tarea con los cuatro campos que de verdad se usan al crearla. Todo lo
- * demas (prioridad, horas, comentarios, adjuntos) vive en el panel de detalle:
- * pedirlo aqui solo conseguiria que nadie creara tareas.
+ * Alta de tarea con todo lo que se suele saber al crearla: titulo, tipo, que hay que
+ * hacer, fecha, horas, responsables y columna. Solo el titulo es obligatorio. La
+ * prioridad (media por defecto) y los comentarios se tocan despues, en el panel de la
+ * tarea; para crear una al vuelo, solo con el titulo, esta el «+ Añadir tarea» de cada
+ * columna.
  */
 export function NewTaskDialog({ open, columns, members, isPending, onClose, onSubmit }: Props) {
   // El formulario nace vacio cada vez que se abre porque solo se monta entonces.
@@ -53,15 +55,19 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
 
   async function submit() {
     if (!valido || isPending) return
-    await onSubmit(Number(columnId), {
-      title: title.trim(),
-      type,
-      description: description.trim() || undefined,
-      dueDate: dueDate || null,
-      estimatedHours: horas,
-      assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined,
-    })
-    onClose()
+    try {
+      await onSubmit(Number(columnId), {
+        title: title.trim(),
+        type,
+        description: description.trim() || undefined,
+        dueDate: dueDate || null,
+        estimatedHours: horas,
+        assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined,
+      })
+      onClose()
+    } catch {
+      // El motivo ya sale en el aviso de la mutacion; el dialogo sigue abierto con lo escrito.
+    }
   }
 
   return (
@@ -70,14 +76,14 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
       title="Nueva tarea"
       onClose={onClose}
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={submit} disabled={!valido || isPending}>
-            {isPending ? 'Creando…' : 'Crear tarea'}
-          </Button>
-        </>
+        <DialogActions
+          onCancel={onClose}
+          onConfirm={submit}
+          label="Crear tarea"
+          pendingLabel="Creando…"
+          pending={isPending}
+          disabled={!valido}
+        />
       }
     >
       <div className={styles.form}>
@@ -93,7 +99,6 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
           />
         </label>
 
-        {/* El tipo define el color de la tarjeta en el plan; por eso va arriba. */}
         <div className={styles.label}>
           Tipo
           <div className={styles.types} role="radiogroup" aria-label="Tipo de tarea">
@@ -149,18 +154,15 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
           </label>
         </div>
 
-        <div className={styles.row}>
-
-          <label className={styles.label}>
-            Responsables <span className={styles.optional}>opcional</span>
-            <AssigneePicker
-              members={members}
-              selected={members.filter((member) => assigneeIds.includes(member.user.id)).map((member) => member.user)}
-              onChange={setAssigneeIds}
-              className={styles.input}
-            />
-          </label>
-        </div>
+        <label className={styles.label}>
+          Responsables <span className={styles.optional}>opcional</span>
+          <AssigneePicker
+            members={members}
+            selected={members.filter((member) => assigneeIds.includes(member.user.id)).map((member) => member.user)}
+            onChange={setAssigneeIds}
+            className={styles.input}
+          />
+        </label>
 
         {columns.length > 1 && (
           <label className={styles.label}>

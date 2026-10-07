@@ -44,10 +44,10 @@ public class AiPlanController {
     @Operation(summary = "Generar una propuesta de planificacion",
             description = """
                     Envia a DeepSeek el guion de la practica completo, el calendario, el equipo con
-                    sus horas y preferencias y las tareas que ya existen, y devuelve un plan por
-                    sprints, con objetivos y dependencias entre tareas. Lo medible (horas por
-                    persona y sprint, dependencias validas) se comprueba en el servidor. No crea
-                    nada: para llevar las tareas al tablero hay que aceptarlas con
+                    sus preferencias y las tareas que ya existen, y devuelve un plan por sprints,
+                    con objetivos y dependencias entre tareas. Lo medible (el reparto de horas y de
+                    tareas criticas por persona, dependencias validas) se comprueba en el servidor.
+                    No crea nada: para llevar las tareas al tablero hay que aceptarlas con
                     POST /api/projects/{projectId}/ai-plan/apply.
                     """)
     @ApiResponses({

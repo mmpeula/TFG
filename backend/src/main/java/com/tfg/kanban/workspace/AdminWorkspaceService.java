@@ -43,14 +43,13 @@ import java.util.stream.Collectors;
 public class AdminWorkspaceService {
 
     private final ProjectRepository projectRepository;
-    private final TeamRepository teamRepository;
-    private final InvitationRepository invitationRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final BoardColumnRepository columnRepository;
     private final TaskRepository taskRepository;
     private final ActivityLogRepository activityLogRepository;
     private final ActivityService activityService;
     private final TeamService teamService;
+    private final WorkspaceService workspaceService;
 
     /**
      * Todos los workspaces. Se resuelve con consultas por lotes, como la pantalla
@@ -137,8 +136,8 @@ public class AdminWorkspaceService {
 
         // Queda en la actividad del propio workspace: el equipo ve quien lo toco.
         activityService.record(project, ActivityAction.ACTUALIZACION, "TeamMember", userId,
-                "Soporte cambió el rol de '%s': %s -> %s".formatted(
-                        member.getUser().getFullName(), anterior, role));
+                "Soporte cambió el rol de '%s' de %s a %s".formatted(
+                        member.getUser().getFullName(), anterior.label(), role.label()));
         log.info("Soporte: {} pasa de {} a {} en el workspace {}",
                 member.getUser().getEmail(), anterior, role, workspaceId);
     }
@@ -167,26 +166,14 @@ public class AdminWorkspaceService {
     }
 
     /**
-     * Borra un workspace ajeno.
-     *
-     * <p>A diferencia del borrado normal, aqui no hay dueno que valga: el equipo se
-     * borra tambien si se queda sin proyectos, porque si no quedaria un equipo
-     * vacio que su creador ya no puede alcanzar desde ninguna pantalla.</p>
+     * Borra un workspace ajeno. Es el mismo borrado que el del responsable (ver
+     * {@link WorkspaceService#delete}), con su equipo y su foto: solo cambia quien
+     * puede pedirlo.
      */
     @Transactional
     public void delete(Long workspaceId) {
-        Project project = getProject(workspaceId);
-        Team team = project.getTeam();
-        String nombre = project.getName();
-
-        projectRepository.delete(project);
-        projectRepository.flush();
-
-        if (projectRepository.findByTeam_Id(team.getId()).isEmpty()) {
-            // Las invitaciones, aunque ya esten respondidas, apuntan al equipo y bloquearian el borrado.
-            invitationRepository.deleteByTeam_Id(team.getId());
-            teamRepository.delete(team);
-        }
+        String nombre = getProject(workspaceId).getName();
+        workspaceService.delete(workspaceId);
         log.info("Soporte: borrado el workspace {} ('{}')", workspaceId, nombre);
     }
 

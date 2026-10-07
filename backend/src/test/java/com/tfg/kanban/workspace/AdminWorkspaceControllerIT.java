@@ -198,7 +198,6 @@ class AdminWorkspaceControllerIT extends AbstractApiIT {
     void supportCannotLeaveTheTeamWithoutResponsable() throws Exception {
         TestUser duena = registerUser(Role.MIEMBRO);
         Workspace workspace = createWorkspace(duena, "Equipo de una sola responsable");
-        Long teamId = workspace.teamId();
         Long workspaceId = workspace.id();
         TestUser admin = registerUser(Role.ADMIN);
 

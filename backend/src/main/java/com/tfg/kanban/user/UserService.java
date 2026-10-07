@@ -140,7 +140,7 @@ public class UserService {
         user.setAvatarStoredName(image.storedName());
         user.setAvatarContentType(image.contentType());
         if (previous != null) {
-            fileStorageService.delete(previous);
+            fileStorageService.deleteAfterCommit(previous);
         }
         return UserResponse.from(user);
     }
@@ -155,7 +155,7 @@ public class UserService {
         }
         user.setAvatarStoredName(null);
         user.setAvatarContentType(null);
-        fileStorageService.delete(previous);
+        fileStorageService.deleteAfterCommit(previous);
     }
 
     public AvatarFile loadAvatar(Long id) {

@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { DateInput } from '@/components/ui/DateInput'
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { DialogActions } from '@/components/ui/DialogActions'
 import { Segmented } from '@/components/ui/Controls'
+import { PhotoActions } from '@/components/ui/PhotoActions'
 import { WorkspaceBadge } from './WorkspaceBadge'
 import styles from './WorkspaceFormModal.module.css'
 import { WORKSPACE_COLORS } from '@/lib/workspace'
 import { DEFAULT_SPRINT_DAYS, SPRINT_DURATIONS } from '@/lib/sprints'
 import { useWorkspaceMutations } from '@/hooks/useData'
+import { useImagePicker } from '@/hooks/useImagePicker'
 import type { WorkspacePayload } from '@/api/endpoints'
 import type { WorkspaceResponse } from '@/types/api'
 
@@ -47,7 +49,7 @@ export function WorkspaceFormModal({ open, workspace, isPending, onClose, onSubm
 function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 'open'>) {
   const editing = Boolean(workspace)
   const mutations = useWorkspaceMutations(workspace?.id)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const foto = useImagePicker()
 
   const [name, setName] = useState(workspace?.name ?? '')
   const [description, setDescription] = useState(workspace?.description ?? '')
@@ -56,64 +58,47 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
   const [startDate, setStartDate] = useState(workspace?.startDate ?? '')
   const [deadline, setDeadline] = useState(workspace?.deadline ?? '')
   const [sprintDays, setSprintDays] = useState(String(workspace?.sprintDays ?? DEFAULT_SPRINT_DAYS))
-  const [coverFile, setCoverFile] = useState<File | null>(null)
-  const [coverPreview, setCoverPreview] = useState<string | null>(null)
-  const [removeCover, setRemoveCover] = useState(false)
-
-  // La vista previa es un objeto local: hay que liberarlo si se cambia de
-  // fichero o se cierra el dialogo, o si no se acumulan URLs sin usar.
-  useEffect(() => () => { if (coverPreview) URL.revokeObjectURL(coverPreview) }, [coverPreview])
 
   const valido = name.trim().length > 0
   const guardandoFoto = mutations.uploadPhoto.isPending || mutations.removePhoto.isPending
 
-  function pickFile(file: File | undefined) {
-    if (!file) return
-    if (coverPreview) URL.revokeObjectURL(coverPreview)
-    setCoverFile(file)
-    setCoverPreview(URL.createObjectURL(file))
-    setRemoveCover(false)
-  }
-
-  function quitarFoto() {
-    if (coverPreview) URL.revokeObjectURL(coverPreview)
-    setCoverFile(null)
-    setCoverPreview(null)
-    setRemoveCover(true)
-  }
-
   async function submit() {
     if (!valido || isPending || guardandoFoto) return
-    // Al crear no se mandan fechas ni duracion de sprint: eso se propone desde el
-    // guion (si lo dice) o se ajusta luego a mano, nunca se rellena aqui con un
-    // valor inventado. El resto de la identidad del workspace si se manda ya.
-    const saved = await onSubmit({
-      name: name.trim(),
-      description: description.trim() || undefined,
-      color,
-      icon: icon.trim() || undefined,
-      ...(editing && {
-        startDate: startDate || null,
-        deadline: deadline || null,
-        sprintDays: Number(sprintDays),
-      }),
-    })
+    try {
+      // Al crear no se mandan fechas ni duracion de sprint: eso se propone desde el
+      // guion (si lo dice) o se ajusta luego a mano, nunca se rellena aqui con un
+      // valor inventado. El resto de la identidad del workspace si se manda ya.
+      const saved = await onSubmit({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        color,
+        icon: icon.trim() || undefined,
+        ...(editing && {
+          startDate: startDate || null,
+          deadline: deadline || null,
+          sprintDays: Number(sprintDays),
+        }),
+      })
 
-    // La foto se sube aparte (multipart, no cabe en el mismo cuerpo JSON) y
-    // hace falta un id: al editar ya existe, al crear lo acaba de devolver
-    // onSubmit.
-    if (coverFile) {
-      await mutations.uploadPhoto.mutateAsync({ file: coverFile, targetId: saved.id })
-      setCoverFile(null)
-    } else if (removeCover && workspace) {
-      await mutations.removePhoto.mutateAsync(workspace.id)
-      setRemoveCover(false)
+      // La foto se sube aparte (multipart, no cabe en el mismo cuerpo JSON) y
+      // hace falta un id: al editar ya existe, al crear lo acaba de devolver
+      // onSubmit.
+      if (foto.file) {
+        await mutations.uploadPhoto.mutateAsync({ file: foto.file, targetId: saved.id })
+        foto.saved()
+      } else if (foto.removed && workspace) {
+        await mutations.removePhoto.mutateAsync(workspace.id)
+        foto.saved()
+      }
+      onClose()
+    } catch {
+      // El motivo ya lo cuenta el aviso de la mutacion; el formulario se queda abierto
+      // con lo escrito para poder corregirlo.
     }
-    onClose()
   }
 
-  const coverActual = removeCover ? null : workspace?.coverUrl ?? null
-  const tieneFoto = Boolean(coverPreview || coverActual)
+  const coverActual = foto.removed ? null : workspace?.coverUrl ?? null
+  const tieneFoto = Boolean(foto.preview || coverActual)
 
   return (
     <Modal
@@ -121,20 +106,19 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
       title={editing ? 'Editar el espacio de trabajo' : 'Nuevo espacio de trabajo'}
       onClose={onClose}
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={submit} disabled={!valido || isPending || guardandoFoto}>
-            {isPending || guardandoFoto ? 'Guardando…' : editing ? 'Guardar' : 'Crear espacio de trabajo'}
-          </Button>
-        </>
+        <DialogActions
+          onCancel={onClose}
+          onConfirm={submit}
+          label={editing ? 'Guardar' : 'Crear espacio de trabajo'}
+          pending={isPending || guardandoFoto}
+          disabled={!valido}
+        />
       }
     >
       <div className={styles.form}>
         <div className={styles.coverEditor}>
-          {coverPreview
-            ? <img className={styles.coverPreview} src={coverPreview} alt="Vista previa" />
+          {foto.preview
+            ? <img className={styles.coverPreview} src={foto.preview} alt="Vista previa" />
             : (
               <WorkspaceBadge
                 workspace={{ id: workspace?.id ?? 0, name: name || 'Espacio de trabajo', color, icon, coverUrl: coverActual }}
@@ -142,21 +126,7 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
               />
             )}
           <div className={styles.coverActions}>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              hidden
-              onChange={(event) => pickFile(event.target.files?.[0])}
-            />
-            <Button variant="secondary" small onClick={() => fileInputRef.current?.click()}>
-              Cambiar foto
-            </Button>
-            {tieneFoto && (
-              <Button variant="ghost" small onClick={quitarFoto}>
-                Quitar foto
-              </Button>
-            )}
+            <PhotoActions picker={foto} hasPhoto={tieneFoto} />
           </div>
         </div>
 

@@ -9,6 +9,8 @@ import org.apache.tika.Tika;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -125,6 +127,24 @@ public class FileStorageService {
         } catch (IOException ex) {
             log.warn("No se ha podido borrar el fichero {}: {}", storedName, ex.getMessage());
         }
+    }
+
+    /**
+     * Borra el fichero cuando se confirme la transaccion en curso, no antes: si algo
+     * falla despues y la transaccion se deshace, la base de datos volveria a apuntar a
+     * una foto que ya no existe. Fuera de una transaccion, se borra en el acto.
+     */
+    public void deleteAfterCommit(String storedName) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            delete(storedName);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                delete(storedName);
+            }
+        });
     }
 
     /** Nombre original saneado, sin ruta, comillas ni saltos de linea: se usa al leer un documento subido. */

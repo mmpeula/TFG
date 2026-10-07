@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { hayCapaAbierta } from './useEscape'
 
 interface Shortcuts {
   newTask?: () => void
@@ -7,10 +8,9 @@ interface Shortcuts {
   pulse?: () => void
   generatePlan?: () => void
   help?: () => void
-  escape?: () => void
 }
 
-/** Tecla suelta -> accion. Esc se trata aparte porque no lleva la misma logica. */
+/** Tecla suelta -> accion. Esc no esta: cierra lo que haya abierto (ver useEscape). */
 const KEYS: Record<string, keyof Shortcuts> = {
   n: 'newTask',
   p: 'plan',
@@ -22,7 +22,9 @@ const KEYS: Record<string, keyof Shortcuts> = {
 
 /**
  * Atajos globales de la aplicacion. No se disparan mientras se escribe en un
- * campo, para no robarle las teclas al usuario.
+ * campo, para no robarle las teclas al usuario, ni con algo abierto por encima (un
+ * dialogo, el panel de una tarea, un menu): una tecla ahi no deberia sacarte de la
+ * pantalla que hay debajo.
  */
 export function useShortcuts(shortcuts: Shortcuts) {
   const ref = useRef(shortcuts)
@@ -33,20 +35,14 @@ export function useShortcuts(shortcuts: Shortcuts) {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      const handlers = ref.current
       const target = event.target as HTMLElement | null
       const typing =
-        target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
-
-      if (event.key === 'Escape') {
-        handlers.escape?.()
-        return
-      }
-
-      if (typing || event.metaKey || event.ctrlKey || event.altKey) return
+        target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.tagName === 'SELECT'
+        || target?.isContentEditable
+      if (typing || hayCapaAbierta() || event.metaKey || event.ctrlKey || event.altKey) return
 
       const name = KEYS[event.key.toLowerCase()]
-      const handler = name && handlers[name]
+      const handler = name && ref.current[name]
       if (handler) {
         event.preventDefault()
         handler()

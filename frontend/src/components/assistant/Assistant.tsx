@@ -1,12 +1,12 @@
-import { useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import axios from 'axios'
+import { isAxiosError } from 'axios'
 import { Minus, X } from 'lucide-react'
 import { Chat } from './Chat'
 import styles from './Assistant.module.css'
 import assistantIcon from '@/assets/assistant-icon.png'
 import { workspaces as workspacesApi } from '@/api/endpoints'
 import { toErrorMessage } from '@/lib/api-client'
+import { useEscape } from '@/hooks/useEscape'
 import { useAssistant } from '@/state/context'
 import type { ChatTurn } from '@/types/api'
 
@@ -25,14 +25,7 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
   const messages = messagesOf(workspaceId)
 
   // Escape cierra el panel, como cualquier cosa que se abre por encima.
-  useEffect(() => {
-    if (!open) return
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') close()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, close])
+  useEscape(close, open)
 
   const ask = useMutation({
     mutationFn: (message: string) => {
@@ -47,7 +40,7 @@ export function Assistant({ workspaceId }: { workspaceId: number }) {
       })
     },
     onError: (err) => {
-      const status = axios.isAxiosError(err) ? err.response?.status : undefined
+      const status = isAxiosError(err) ? err.response?.status : undefined
       const content = status === 503
         ? `${toErrorMessage(err)} Revisa la conexión con DeepSeek y su API key.`
         : toErrorMessage(err)

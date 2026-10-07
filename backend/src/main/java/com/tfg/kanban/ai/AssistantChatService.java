@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -32,6 +32,10 @@ import java.util.stream.Collectors;
  * aqui el modelo solo <b>responde</b>: no escribe nada. Lo que hace util la
  * respuesta es el contexto, que se arma con el estado real del tablero (tareas,
  * columnas, fechas, personas) en lugar de dejar que el modelo se lo imagine.</p>
+ *
+ * <p>Ese contexto se lee en una transaccion corta; la llamada al modelo, que puede
+ * tardar, va fuera, para no tener una conexion de la base de datos esperando la
+ * respuesta.</p>
  */
 @Slf4j
 @Service
@@ -211,20 +215,27 @@ public class AssistantChatService {
     private final WorkspaceService workspaceService;
     private final TaskRepository taskRepository;
     private final CommentRepository commentRepository;
+    private final TransactionOperations transactions;
 
-    @Transactional(readOnly = true)
+    /** Lo que el modelo necesita saber del espacio, ya en texto: se arma antes de llamarle. */
+    private record ChatContext(String text, String summary, int taskCount, Long selectedTaskId) {
+    }
+
     public ChatResponse answer(Long workspaceId, ChatRequest request) {
         if (!properties.isEnabled()) {
             throw new AiUnavailableException("El módulo de IA está desactivado en la configuración del servidor");
         }
 
-        Project project = workspaceService.getProject(workspaceId);
-        List<Task> tasks = tasksOf(project);
-        Task tareaSeleccionada = selectedTask(project, request.taskId());
-        String context = buildContext(project, tasks, tareaSeleccionada);
+        ChatContext context = transactions.execute(tx -> {
+            Project project = workspaceService.getProject(workspaceId);
+            List<Task> tasks = tasksOf(project);
+            Task tareaSeleccionada = selectedTask(project, request.taskId());
+            return new ChatContext(buildContext(project, tasks, tareaSeleccionada), summary(project, tasks),
+                    tasks.size(), tareaSeleccionada == null ? null : tareaSeleccionada.getId());
+        });
 
         List<DeepSeekClient.Message> messages = new ArrayList<>();
-        messages.add(new DeepSeekClient.Message("user", context));
+        messages.add(new DeepSeekClient.Message("user", context.text()));
         messages.add(new DeepSeekClient.Message("assistant",
                 "Vale, ya tengo delante el enunciado y el tablero de este espacio de trabajo. Que necesitas?"));
         for (ChatTurn turn : recent(request.historyOrEmpty())) {
@@ -238,8 +249,8 @@ public class AssistantChatService {
         }
 
         log.info("Asistente: respuesta para el espacio de trabajo {} con {} tareas de contexto{}", workspaceId,
-                tasks.size(), tareaSeleccionada == null ? "" : ", sobre la tarea " + tareaSeleccionada.getId());
-        return ChatResponse.of(answer, properties.getModel(), summary(project, tasks));
+                context.taskCount(), context.selectedTaskId() == null ? "" : ", sobre la tarea " + context.selectedTaskId());
+        return ChatResponse.of(answer, properties.getModel(), context.summary());
     }
 
     private List<Task> tasksOf(Project project) {
@@ -298,7 +309,7 @@ public class AssistantChatService {
                     .count();
             boolean esQuienPregunta = member.getUser().getId().equals(quienPregunta);
             sb.append("- ").append(member.getUser().getFullName())
-                    .append(" (").append(member.getRole().name().toLowerCase()).append("): ")
+                    .append(" (").append(member.getRole().label()).append("): ")
                     .append(suyas).append(" tareas pendientes")
                     .append(esQuienPregunta ? "  <-- ES QUIEN TE ESTA PREGUNTANDO\n" : "\n");
         }

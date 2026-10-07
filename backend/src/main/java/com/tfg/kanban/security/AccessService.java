@@ -21,7 +21,7 @@ import java.util.Set;
  *
  * <ul>
  *   <li><b>Leer</b>: cualquier miembro del equipo (los tres roles).</li>
- *   <li><b>Escribir</b> (tareas y comentarios): RESPONSABLE y MIEMBRO.</li>
+ *   <li><b>Escribir</b> (tareas, comentarios y el asistente): RESPONSABLE y MIEMBRO.</li>
  *   <li><b>Administrar</b> (equipo, proyecto, tableros, miembros): solo RESPONSABLE.</li>
  * </ul>
  */
@@ -84,6 +84,14 @@ public class AccessService {
         return roleInProject(projectId).filter(Role.RESPONSABLE::equals).isPresent();
     }
 
+    /**
+     * Trabajar en el proyecto: lo mismo que escribir en sus tareas. Es lo que pide el
+     * asistente, que esta para ayudar a hacer el trabajo; el docente solo lo sigue.
+     */
+    public boolean canWriteProject(Long projectId) {
+        return roleInProject(projectId).filter(WRITERS::contains).isPresent();
+    }
+
     public boolean canReadBoard(Long boardId) {
         return roleInBoard(boardId).isPresent();
     }
@@ -100,15 +108,22 @@ public class AccessService {
         return roleInTask(taskId).filter(WRITERS::contains).isPresent();
     }
 
-    /** El autor puede editar/borrar su comentario; el RESPONSABLE del equipo, cualquiera. */
+    /**
+     * El autor puede editar o borrar su comentario; el RESPONSABLE del equipo, cualquiera.
+     *
+     * <p>En los dos casos hay que seguir en el equipo, con el espacio sin suspender: ser el
+     * autor no basta. Quien se ha ido del equipo (o lo han sacado) ya no toca lo que dejo
+     * escrito, igual que ya no ve la tarea.</p>
+     */
     public boolean canModifyComment(Long commentId) {
         Long userId = SecurityUtils.currentUserId().orElse(null);
         if (userId == null) {
             return false;
         }
         return commentRepository.findById(commentId)
-                .map(comment -> comment.getAuthor().getId().equals(userId)
-                        || roleInTask(comment.getTask().getId()).filter(Role.RESPONSABLE::equals).isPresent())
+                .flatMap(comment -> roleInTask(comment.getTask().getId())
+                        .map(role -> role == Role.RESPONSABLE
+                                || (WRITERS.contains(role) && comment.getAuthor().getId().equals(userId))))
                 .orElse(false);
     }
 

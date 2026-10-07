@@ -3,6 +3,7 @@ package com.tfg.kanban.ai;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.Month;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -47,17 +48,13 @@ final class IterationDeliveryDetector {
     private static final Pattern NOT_DEFINITIVE = Pattern.compile(
             "(?i)se concretar[aá]|se confirmar[aá]|pendiente de confirmar|fecha exacta");
 
-    private static final Map<String, Integer> MESES = Map.ofEntries(
-            Map.entry("enero", 1), Map.entry("febrero", 2), Map.entry("marzo", 3), Map.entry("abril", 4),
-            Map.entry("mayo", 5), Map.entry("junio", 6), Map.entry("julio", 7), Map.entry("agosto", 8),
-            Map.entry("septiembre", 9), Map.entry("setiembre", 9), Map.entry("octubre", 10),
-            Map.entry("noviembre", 11), Map.entry("diciembre", 12));
+    private static final Locale ESPANOL = Locale.forLanguageTag("es-ES");
 
     /** Una entrega de iteracion: un dia o un rango, con o sin fecha exacta confirmada. */
     record Delivery(int iteration, int day1, int day2, int month, int year, boolean definitive) {
 
         String describe() {
-            String mes = Month.of(month).getDisplayName(java.time.format.TextStyle.FULL, new Locale("es", "ES"));
+            String mes = Month.of(month).getDisplayName(TextStyle.FULL, ESPANOL);
             String cuando = day1 == day2
                     ? "el %d de %s de %d".formatted(day1, mes, year)
                     : "la semana del %d al %d de %s de %d".formatted(day1, day2, mes, year);
@@ -123,7 +120,7 @@ final class IterationDeliveryDetector {
         String plano = ventana.toLowerCase(Locale.ROOT);
         int mejor = -1;
         Integer mes = null;
-        for (Map.Entry<String, Integer> entry : MESES.entrySet()) {
+        for (Map.Entry<String, Integer> entry : DocumentDateDetector.MESES.entrySet()) {
             int pos = plano.indexOf(entry.getKey());
             if (pos != -1 && (mejor == -1 || pos < mejor)) {
                 mejor = pos;
@@ -133,12 +130,7 @@ final class IterationDeliveryDetector {
         return Optional.ofNullable(mes);
     }
 
-    /**
-     * El curso academico ("Curso 2025/2026") dice que anio le toca a cada mes:
-     * de agosto a diciembre el primero, de enero a julio el segundo. Sin ese
-     * dato, se intenta con la fecha de inicio ya detectada; si tampoco hay,
-     * el anio en curso.
-     */
+    /** Si el dia existe de verdad en ese mes y ese anio (nada de un 31 de noviembre). */
     private static boolean esFechaValida(int year, int month, int day) {
         try {
             LocalDate.of(year, month, day);
@@ -148,6 +140,12 @@ final class IterationDeliveryDetector {
         }
     }
 
+    /**
+     * El curso academico ("Curso 2025/2026") dice que anio le toca a cada mes:
+     * de agosto a diciembre el primero, de enero a julio el segundo. Sin ese
+     * dato, se intenta con la fecha de inicio ya detectada; si tampoco hay,
+     * el anio en curso.
+     */
     private static Optional<Integer> yearFor(int month, String text) {
         Matcher curso = ACADEMIC_YEAR.matcher(text);
         if (curso.find()) {

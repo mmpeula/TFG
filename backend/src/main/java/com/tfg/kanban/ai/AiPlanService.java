@@ -25,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -51,6 +52,11 @@ import java.util.stream.Collectors;
  * tareas— se comprueba en Java sobre el resultado, no se le pide al modelo que
  * se autoevalue. Las fechas de los sprints y de las tareas las pone siempre el
  * servidor, para que casen con los sprints de la pestana Plan.</p>
+ *
+ * <p>Generar no va en una transaccion: lo que hace falta de la base de datos se lee
+ * antes, en una corta ({@link PlanInput}), y la llamada al modelo, que puede tardar
+ * minutos, va fuera. Si no, cada generacion tendria una conexion del pool esperando
+ * a DeepSeek, y unas pocas a la vez dejarian sin conexiones al resto de la aplicacion.</p>
  */
 @Slf4j
 @Service
@@ -101,33 +107,44 @@ public class AiPlanService {
     private final DocumentIngestionService documentIngestion;
     private final PlanProgressTracker progressTracker;
     private final AiTaskScheduler aiTaskScheduler;
+    private final TransactionOperations transactions;
 
     /** Genera el plan a partir del guion ya guardado en el proyecto. */
-    @Transactional(readOnly = true)
     public AiPlanResponse generate(Long projectId, PlanOptions options) {
-        Project project = projectService.getProject(projectId);
-
-        if (project.getBriefing() == null || project.getBriefing().isBlank()) {
-            throw new BusinessRuleException(
-                    "El proyecto no tiene guion de la práctica: súbelo como documento o escríbelo en el proyecto");
-        }
-        return tracked(projectId, () -> plan(project, project.getBriefing(), "guion del proyecto", options, List.of()));
+        ensureEnabled();
+        return tracked(projectId, () -> plan(transactions.execute(tx -> {
+            Project project = projectService.getProject(projectId);
+            if (project.getBriefing() == null || project.getBriefing().isBlank()) {
+                throw new BusinessRuleException(
+                        "El proyecto no tiene guion de la práctica: súbelo como documento o escríbelo en el proyecto");
+            }
+            return prepare(project, project.getBriefing(), "guion del proyecto", options, List.of());
+        })));
     }
 
     /**
-     * Genera el plan a partir de un documento subido. El texto extraido se guarda
-     * ademas como guion del proyecto: es la fuente de verdad de la practica.
+     * Genera el plan a partir de un documento subido. Si sale bien, el texto extraido se
+     * guarda ademas como guion del proyecto: es la fuente de verdad de la practica.
      */
-    @Transactional
     public AiPlanResponse generateFromDocument(Long projectId, MultipartFile file, PlanOptions options) {
-        Project project = projectService.getProject(projectId);
         return tracked(projectId, () -> {
+            // Leer el documento tambien puede llamar a DeepSeek (paginas escaneadas): fuera de la transaccion.
+            // Va antes de mirar si la IA esta activa: un documento que no se puede leer se dice primero.
             ProcessedDocument document = documentIngestion.ingest(file, stage -> progressTracker.advance(projectId, stage));
+            ensureEnabled();
             String context = document.context();
-            project.setBriefing(context);
+            AiPlanResponse response = plan(transactions.execute(tx -> prepare(projectService.getProject(projectId),
+                    context, "documento: " + document.filename(), options, document.warnings())));
 
-            return plan(project, context, "documento: " + document.filename(), options, document.warnings());
+            transactions.executeWithoutResult(tx -> projectService.getProject(projectId).setBriefing(context));
+            return response;
         });
+    }
+
+    private void ensureEnabled() {
+        if (!properties.isEnabled()) {
+            throw new AiUnavailableException("El módulo de IA está desactivado en la configuración del servidor");
+        }
     }
 
     /**
@@ -146,9 +163,9 @@ public class AiPlanService {
     /**
      * Busca la fecha de inicio en un documento sin generar nada: es deteccion por
      * texto, no una llamada a DeepSeek, asi que se puede pedir antes de generar para
-     * no tener que adivinar (y luego regenerar si la adivinanza fallaba).
+     * no tener que adivinar (y luego regenerar si la adivinanza fallaba). Tampoco toca
+     * la base de datos, asi que no abre transaccion.
      */
-    @Transactional(readOnly = true)
     public Optional<LocalDate> detectStartDate(MultipartFile file) {
         return DocumentDateDetector.detect(documentIngestion.localContext(file));
     }
@@ -158,21 +175,28 @@ public class AiPlanService {
      * practica de...»). No toca el guion guardado: eso queda reservado al
      * documento oficial de la actividad.
      */
-    @Transactional(readOnly = true)
     public AiPlanResponse generateFromText(Long projectId, String text, PlanOptions options) {
-        Project project = projectService.getProject(projectId);
         if (text == null || text.isBlank()) {
             throw new BusinessRuleException("Escribe de qué va el trabajo para que pueda proponerte tareas");
         }
-        return tracked(projectId, () -> plan(project, text.trim(), "descripción escrita", options, List.of()));
+        ensureEnabled();
+        return tracked(projectId, () -> plan(transactions.execute(tx ->
+                prepare(projectService.getProject(projectId), text.trim(), "descripción escrita", options, List.of()))));
     }
 
-    private AiPlanResponse plan(Project project, String text, String source, PlanOptions requested,
-                                List<String> documentWarnings) {
-        if (!properties.isEnabled()) {
-            throw new AiUnavailableException("El módulo de IA está desactivado en la configuración del servidor");
-        }
-        progressTracker.advance(project.getId(), ProcessingStage.PLANNING);
+    /**
+     * Todo lo que la generacion necesita de la base de datos, ya leido: el equipo, el
+     * calendario, las tareas que ya hay en el tablero y el prompt montado (con el ritmo
+     * historico de cada persona). Con esto la llamada al modelo ya no toca la base de datos.
+     */
+    private record PlanInput(Long projectId, String text, String source, PlanTeam team, LocalDate start,
+                             int sprintDays, List<AiTaskScheduler.Window> fixedWindows,
+                             List<String> existingTitles, String userPrompt, List<String> documentWarnings) {
+    }
+
+    /** Lee y resuelve lo que hace falta para generar. Se llama dentro de una transaccion corta. */
+    private PlanInput prepare(Project project, String text, String source, PlanOptions requested,
+                              List<String> documentWarnings) {
         PlanOptions options = requested == null ? PlanOptions.defaults() : requested;
 
         PlanTeam team = PlanTeam.resolve(project.getTeam().getMembers(), options.team());
@@ -195,18 +219,26 @@ public class AiPlanService {
                 ? aiTaskScheduler.sprintsOf(new AiTaskScheduler.Window(start, deadline), sprintDays)
                 : null;
 
-        String userPrompt = buildPrompt(text, team, start, sprintDays, fixedWindows, existingTasks(project));
-        BalancedPlan balanced = requestBalancedPlan(userPrompt, team);
+        List<String> existingTitles = existingTasks(project).stream().map(Task::getTitle).toList();
+        String userPrompt = buildPrompt(text, team, start, sprintDays, fixedWindows, existingTitles);
+        return new PlanInput(project.getId(), text, source, team, start, sprintDays, fixedWindows,
+                existingTitles, userPrompt, documentWarnings);
+    }
+
+    /** Pide el plan al modelo y lo completa. No toca la base de datos: todo viene ya en {@code input}. */
+    private AiPlanResponse plan(PlanInput input) {
+        progressTracker.advance(input.projectId(), ProcessingStage.PLANNING);
+        BalancedPlan balanced = requestBalancedPlan(input.userPrompt(), input.team());
         ParsedPlan parsed = balanced.parsed();
 
-        List<AiTaskScheduler.Window> ventanas = fixedWindows != null ? fixedWindows
-                : aiTaskScheduler.consecutiveSprints(start, sprintCountFrom(parsed), sprintDays);
+        List<AiTaskScheduler.Window> ventanas = input.fixedWindows() != null ? input.fixedWindows()
+                : aiTaskScheduler.consecutiveSprints(input.start(), sprintCountFrom(parsed), input.sprintDays());
 
-        List<String> deliveryWarnings = IterationDeliveryDetector.detect(text).stream()
+        List<String> deliveryWarnings = IterationDeliveryDetector.detect(input.text()).stream()
                 .map(IterationDeliveryDetector.Delivery::describe).toList();
 
-        AiPlanResponse response = toResponse(project, source, team, start, ventanas, parsed, deliveryWarnings);
-        List<String> extra = new ArrayList<>(documentWarnings);
+        AiPlanResponse response = toResponse(input, ventanas, parsed, deliveryWarnings);
+        List<String> extra = new ArrayList<>(input.documentWarnings());
         extra.addAll(balanced.warnings());
         return extra.isEmpty() ? response : withExtraWarnings(response, extra);
     }
@@ -253,6 +285,14 @@ public class AiPlanService {
     }
 
     /**
+     * El plan ya interpretado, mas los avisos del ajuste de reparto (vacia si no
+     * ha hecho falta ninguno). Van aparte de {@link ParsedPlan#modelWarnings()} a
+     * proposito, para no mezclar lo que dice el modelo con lo que corrige el codigo.
+     */
+    private record BalancedPlan(ParsedPlan parsed, List<String> warnings) {
+    }
+
+    /**
      * Igual que {@link #requestPlan}, pero ademas comprueba el reparto con
      * {@link PlanBalanceValidator}: horas y tareas criticas por persona, y que
      * quien implementa no sea el unico que valida. Si algo falla, se le manda al
@@ -261,14 +301,6 @@ public class AiPlanService {
      * {@link #rebalance} hace un ultimo ajuste en codigo, sin volver a llamar al
      * modelo.
      */
-    /**
-     * El plan ya interpretado, mas los avisos del ajuste de reparto (vacia si no
-     * ha hecho falta ninguno). Van aparte de {@link ParsedPlan#modelWarnings()} a
-     * proposito, para no mezclar lo que dice el modelo con lo que corrige el codigo.
-     */
-    private record BalancedPlan(ParsedPlan parsed, List<String> warnings) {
-    }
-
     private BalancedPlan requestBalancedPlan(String userPrompt, PlanTeam team) {
         PlanAttempt intento = requestPlan(userPrompt);
 
@@ -429,17 +461,16 @@ public class AiPlanService {
     }
 
     /** Junta lo que ha devuelto el modelo, resuelve fechas y personas, y calcula los avisos. */
-    private AiPlanResponse toResponse(Project project, String source, PlanTeam team, LocalDate start,
-                                      List<AiTaskScheduler.Window> ventanas, ParsedPlan parsed,
+    private AiPlanResponse toResponse(PlanInput input, List<AiTaskScheduler.Window> ventanas, ParsedPlan parsed,
                                       List<String> deliveryWarnings) {
-        List<Task> existing = existingTasks(project);
+        PlanTeam team = input.team();
 
         // Un sprint que no exista se trata como "sin sprint", no se descarta la tarea.
         List<ProposedTask> conSprintValido = parsed.tasks().stream()
                 .map(task -> sprintValido(task.sprint(), ventanas.size()) ? task : withSprint(task, null))
                 .toList();
 
-        List<ProposedTask> sinDuplicados = withoutDuplicates(conSprintValido, existing);
+        List<ProposedTask> sinDuplicados = withoutDuplicates(conSprintValido, input.existingTitles());
         int duplicates = conSprintValido.size() - sinDuplicados.size();
         List<ProposedTask> limitadas = sinDuplicados.size() > properties.getMaxTasks()
                 ? sinDuplicados.subList(0, properties.getMaxTasks()) : sinDuplicados;
@@ -475,13 +506,13 @@ public class AiPlanService {
         }
 
         LocalDate fin = ventanas.get(ventanas.size() - 1).end();
-        long dias = new AiTaskScheduler.Window(start, fin).days();
+        long dias = new AiTaskScheduler.Window(input.start(), fin).days();
         int semanas = (int) Math.ceil(dias / 7.0);
 
         log.info("IA: {} tareas en {} sprints para el proyecto {} ({} avisos)",
-                tasks.size(), sprints.size(), project.getId(), warnings.size());
+                tasks.size(), sprints.size(), input.projectId(), warnings.size());
 
-        return AiPlanResponse.of(project.getId(), properties.getModel(), source, semanas, sprints, tasks,
+        return AiPlanResponse.of(input.projectId(), properties.getModel(), input.source(), semanas, sprints, tasks,
                 workload(tasks, team), warnings, duplicates);
     }
 
@@ -605,7 +636,7 @@ public class AiPlanService {
         }
 
         activityService.record(project, ActivityAction.GENERACION_IA, "Board", board.getId(),
-                "Anadio %d %s generadas con IA a '%s'".formatted(
+                "Añadió %d %s generadas con IA a '%s'".formatted(
                         created.size(), created.size() == 1 ? "tarea" : "tareas", column.getName()));
 
         return taskMapper.toResponses(created);
@@ -630,8 +661,8 @@ public class AiPlanService {
      * con algo que ya esta en el tablero: la comprobacion se hace tambien aqui,
      * que es determinista.
      */
-    private List<ProposedTask> withoutDuplicates(List<ProposedTask> proposed, List<Task> existing) {
-        List<String> known = existing.stream().map(task -> TextNormalizer.keywords(task.getTitle())).toList();
+    private List<ProposedTask> withoutDuplicates(List<ProposedTask> proposed, List<String> existingTitles) {
+        List<String> known = existingTitles.stream().map(TextNormalizer::keywords).toList();
 
         List<ProposedTask> result = new ArrayList<>();
         for (ProposedTask task : proposed) {
@@ -654,7 +685,7 @@ public class AiPlanService {
      * documento completo.
      */
     String buildPrompt(String text, PlanTeam team, LocalDate start, int sprintDays,
-                       List<AiTaskScheduler.Window> fixedSprints, List<Task> existing) {
+                       List<AiTaskScheduler.Window> fixedSprints, List<String> existingTitles) {
         StringBuilder prompt = new StringBuilder();
         // Sin esto el modelo planifica en el ano en que se entreno.
         prompt.append("Fecha de hoy: ").append(LocalDate.now()).append('\n');
@@ -698,9 +729,9 @@ public class AiPlanService {
                   .append('\n');
         }
 
-        if (!existing.isEmpty()) {
+        if (!existingTitles.isEmpty()) {
             prompt.append("\nYA ESTA EN EL TABLERO (no lo repitas)\n");
-            existing.forEach(task -> prompt.append("- ").append(task.getTitle()).append('\n'));
+            existingTitles.forEach(title -> prompt.append("- ").append(title).append('\n'));
         }
 
         prompt.append("\nDOCUMENTO DEL PROYECTO\n").append(text).append('\n');

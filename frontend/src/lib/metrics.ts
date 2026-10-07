@@ -1,4 +1,4 @@
-import { daysSince, daysUntil, decimal } from '@/lib/format'
+import { daysUntil, decimal } from '@/lib/format'
 import { overdueDays, stalledDays, taskWarning, type TaskWarningKind } from '@/lib/signals'
 import type { BoardResponse, ColumnResponse, ProjectResponse, TaskResponse } from '@/types/api'
 
@@ -90,15 +90,15 @@ export function derivePulse(board?: BoardResponse, project?: ProjectResponse, we
   const total = tasks.length
 
   // Velocidad: tareas terminadas por semana durante las ultimas cuatro. Para la variacion,
-  // la misma cuenta hecha hace una semana (las cuatro semanas anteriores a esa).
+  // la misma cuenta hecha hace una semana (las cuatro semanas anteriores a esa), con la misma
+  // ventana: si se midieran distinto, la flecha subiria o bajaria sin que cambiara nada.
   const finishedAt = (task: TaskResponse) => new Date(task.updatedAt ?? task.createdAt).getTime()
   const now = Date.now()
   const velocityAt = (weeksAgo: number) => {
     const end = now - weeksAgo * MS_SEMANA
     return done.filter((task) => finishedAt(task) <= end && finishedAt(task) > end - 4 * MS_SEMANA).length / 4
   }
-  const doneLastMonth = done.filter((task) => daysSince(task.updatedAt ?? task.createdAt) <= 28)
-  const velocity = doneLastMonth.length / 4
+  const velocity = velocityAt(0)
   const hayHistoria = done.some((task) => finishedAt(task) <= now - MS_SEMANA)
   const velocityDelta = hayHistoria ? velocity - velocityAt(1) : null
 
@@ -193,22 +193,27 @@ function buildInsights(input: InsightInput): Insight[] {
     const weeksNeeded = velocity > 0 ? pending.length / velocity : Infinity
     const remaining = project?.deadline ? daysUntil(project.deadline) : null
     const weeksLeft = remaining === null ? null : remaining / 7
+    const vencida = remaining !== null && remaining < 0
+    const diasVencida = vencida ? Math.abs(remaining) : 0
 
     const body =
-      velocity <= 0
-        ? `Quedan ${pending.length} tareas y en el último mes no se ha cerrado ninguna, así que todavía no hay ritmo con el que estimar la fecha de entrega.`
-        : remaining === null
-          ? `Quedan ${pending.length} tareas a un ritmo de ${decimal(velocity)} por semana: unas ${decimal(weeksNeeded)} semanas de trabajo. El proyecto no tiene fecha de entrega fijada.`
-          : weeksLeft !== null && weeksNeeded > weeksLeft
-            ? `Quedan ${pending.length} tareas a ${decimal(velocity)} por semana, es decir ${decimal(weeksNeeded)} semanas, pero hasta la entrega solo hay ${remaining} días. Al ritmo actual se llega tarde.`
-            : `Quedan ${pending.length} tareas a ${decimal(velocity)} por semana y hasta la entrega hay ${remaining} días: el ritmo actual llega a tiempo.`
+      vencida
+        ? `La entrega era hace ${diasVencida} ${diasVencida === 1 ? 'día' : 'días'} y todavía quedan ${pending.length} tareas sin cerrar.`
+        : velocity <= 0
+          ? `Quedan ${pending.length} tareas y en el último mes no se ha cerrado ninguna, así que todavía no hay ritmo con el que estimar la fecha de entrega.`
+          : remaining === null
+            ? `Quedan ${pending.length} tareas a un ritmo de ${decimal(velocity)} por semana: unas ${decimal(weeksNeeded)} semanas de trabajo. El proyecto no tiene fecha de entrega fijada.`
+            : weeksLeft !== null && weeksNeeded > weeksLeft
+              ? `Quedan ${pending.length} tareas a ${decimal(velocity)} por semana, es decir ${decimal(weeksNeeded)} semanas, pero hasta la entrega solo hay ${remaining} ${remaining === 1 ? 'día' : 'días'}. Al ritmo actual se llega tarde.`
+              : `Quedan ${pending.length} tareas a ${decimal(velocity)} por semana y hasta la entrega hay ${remaining} ${remaining === 1 ? 'día' : 'días'}: el ritmo actual llega a tiempo.`
 
-    const late = velocity > 0 && weeksLeft !== null && weeksNeeded > weeksLeft
+    // Con la entrega ya pasada y tareas sin cerrar se llega tarde, haya ritmo medido o no.
+    const late = vencida || (velocity > 0 && weeksLeft !== null && weeksNeeded > weeksLeft)
     const facts: InsightFact[] = [
       remaining === null
         ? { icon: 'calendar', text: 'Entrega', value: 'sin fecha fijada' }
-        : remaining < 0
-          ? { icon: 'calendar', text: 'Entrega', value: `vencida hace ${Math.abs(remaining)} ${Math.abs(remaining) === 1 ? 'día' : 'días'}`, bad: true }
+        : vencida
+          ? { icon: 'calendar', text: 'Entrega', value: `vencida hace ${diasVencida} ${diasVencida === 1 ? 'día' : 'días'}`, bad: true }
           : { icon: 'calendar', text: 'Entrega en', value: `${remaining} ${remaining === 1 ? 'día' : 'días'}`, bad: late },
       velocity > 0
         ? { icon: 'trend', text: 'Ritmo estimado:', value: `${decimal(weeksNeeded)} ${weeksNeeded === 1 ? 'semana' : 'semanas'}` }
@@ -218,7 +223,9 @@ function buildInsights(input: InsightInput): Insight[] {
       id: 'riesgo',
       variant: late ? 'risk' : 'ok',
       kicker: late ? 'Riesgo de entrega' : 'Ritmo de entrega',
-      title: late ? 'El ritmo actual no llega a la fecha de entrega' : `Quedan ${pending.length} tareas por cerrar`,
+      title: vencida
+        ? 'La fecha de entrega ya ha pasado'
+        : late ? 'El ritmo actual no llega a la fecha de entrega' : `Quedan ${pending.length} tareas por cerrar`,
       body,
       recommended: late,
       facts,

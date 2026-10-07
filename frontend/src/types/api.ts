@@ -21,14 +21,12 @@ export interface PageResponse<T> {
 }
 
 /**
- * ADMIN es distinto de los otros tres: es un rol global de plataforma, nunca
- * de equipo. Solo aparece en UserResponse.role, jamas en el rol de un
- * TeamMember (ver lib/roles.ts).
+ * Rol global (de la cuenta) y rol dentro de un workspace. RESPONSABLE nunca es global,
+ * y ADMIN nunca es de equipo: solo aparece en UserResponse.role (ver lib/roles.ts).
  */
-/** Rol global (cuenta) y rol dentro de un workspace. RESPONSABLE nunca es global. */
 export type Role = 'RESPONSABLE' | 'MIEMBRO' | 'DOCENTE' | 'ADMIN'
 export type TaskPriority = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA'
-/** De que va la tarea. Es lo unico que colorea la interfaz (ver lib/taskTypes.ts). */
+/** De que va la tarea: su punto de color en el panel y en la propuesta del plan (ver lib/taskTypes.ts). */
 export type TaskType = 'EPICA' | 'HISTORIA' | 'TAREA' | 'BUG' | 'INCIDENCIA'
 export type ProjectStatus = 'PLANIFICACION' | 'EN_CURSO' | 'ENTREGADO' | 'ARCHIVADO'
 export type ActivityAction =
@@ -324,20 +322,4 @@ export interface ChatResponse {
   /** Que datos del workspace ha visto el modelo, para poder ensenarlo. */
   contextSummary: string
   generatedAt: string
-}
-
-export type SignalKind = 'parada' | 'fecha' | 'bloqueo'
-
-/**
- * Las senales no vienen del backend: se calculan en el cliente a partir del
- * tablero real (ver lib/signals.ts).
- */
-export interface Signal {
-  id: string
-  kind: SignalKind
-  label: string
-  age: string
-  text: string
-  actionLabel: string
-  target: { screen: 'tablero' | 'pulso'; taskId?: number; columnId?: number; boardId?: number }
 }

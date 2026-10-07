@@ -17,8 +17,10 @@ import java.util.Optional;
 /**
  * Generacion y validacion de tokens JWT (HS256).
  *
- * El token lleva el email del usuario en el subject y su rol en el claim "role",
- * de modo que el filtro puede construir las autoridades sin ir a base de datos.
+ * El token lleva el email del usuario en el subject y su id y su rol en claims. El
+ * filtro solo se fia del id: lo que la cuenta puede hacer lo vuelve a leer de la base
+ * de datos en cada peticion (ver {@link JwtAuthenticationFilter}), para que una baja o
+ * un cambio de rol valgan al momento y no cuando caduque el token.
  */
 @Slf4j
 @Service

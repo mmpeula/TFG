@@ -4,6 +4,7 @@ import com.tfg.kanban.common.CountByEntity;
 import com.tfg.kanban.domain.model.Task;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.Collection;
@@ -16,6 +17,20 @@ public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificat
     List<Task> findByBoardColumn_Board_IdOrderByPositionAsc(Long boardId);
 
     long countByBoardColumn_Id(Long columnId);
+
+    /**
+     * Cambia solo la posicion de una tarea, directamente en la base de datos.
+     *
+     * <p>Es lo que usa la reordenacion de una columna para las tareas que solo se
+     * desplazan por el hueco que abre o cierra la que se mueve. Hecho sobre la entidad,
+     * Hibernate actualizaria tambien su {@code updatedAt}, que para el resto de la
+     * aplicacion significa «alguien ha tocado esta tarea»: las terminadas volverian a
+     * contar como terminadas ese dia en las metricas y las paradas perderian su aviso
+     * sin que nadie las hubiera tocado.</p>
+     */
+    @Modifying
+    @Query("update Task t set t.position = :position where t.id = :id")
+    void updatePosition(Long id, int position);
 
     /** Tareas por columna para un lote de columnas, en una sola consulta. */
     @Query("""

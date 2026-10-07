@@ -75,7 +75,16 @@ public class AuthService {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, request.password()));
         } catch (DisabledException ex) {
-            throw new BusinessRuleException("La cuenta está deshabilitada");
+            // Spring mira si la cuenta esta deshabilitada antes que la contrasena: sin esto,
+            // bastaria con un correo para saber si tiene cuenta y si se la han dado de baja.
+            // Solo se le dice a quien demuestra que es suya.
+            boolean esSuya = userRepository.findByEmailIgnoreCase(email)
+                    .map(user -> passwordEncoder.matches(request.password(), user.getPasswordHash()))
+                    .orElse(false);
+            if (esSuya) {
+                throw new BusinessRuleException("La cuenta está deshabilitada");
+            }
+            throw new InvalidCredentialsException();
         } catch (AuthenticationException ex) {
             throw new InvalidCredentialsException();
         }

@@ -36,17 +36,6 @@
 .ghost { background: transparent; color: var(--color-neutral-600); }
 .ghost:hover:not(:disabled) { background: var(--color-neutral-200); color: var(--color-text); }
 
-/* Sobre fondo oscuro se invierte: blanco lleno y blanco al aire. */
-.onDark { background: #ffffff; color: var(--color-neutral-900); }
-.onDark:hover:not(:disabled) { background: var(--color-neutral-200); }
-
-.onDarkGhost {
-  background: transparent;
-  border: 1px solid rgb(255 255 255 / .28);
-  color: rgb(255 255 255 / .9);
-}
-.onDarkGhost:hover:not(:disabled) { background: rgb(255 255 255 / .12); }
-
 .destructive { background: var(--color-danger-600); color: #ffffff; }
 .destructive:hover:not(:disabled) { background: var(--color-danger-700); }
 

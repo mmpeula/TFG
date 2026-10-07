@@ -1,9 +1,18 @@
+/**
+ * Una fecha del servidor como Date, o null si no hay o no se entiende.
+ *
+ * Las fechas sin hora («2026-10-06», como la fecha limite) son ese dia en la hora local.
+ * {@code new Date("2026-10-06")} las lee como medianoche en UTC, que fuera de Europa
+ * cae el dia anterior: la tarjeta diria una fecha y el plan la pondria en otro dia.
+ */
+export function toDate(value?: string | null): Date | null {
+  if (!value) return null
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 export function formatDate(value?: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? '—'
-    : date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+  return toDate(value)?.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) ?? '—'
 }
 
 export function formatTime(value: number): string {
@@ -11,11 +20,18 @@ export function formatTime(value: number): string {
 }
 
 export function formatDateTime(value?: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? '—'
-    : date.toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
+  return toDate(value)?.toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) ?? '—'
+}
+
+/** Minusculas y sin tildes, para buscar: «Diseño» encuentra «diseno» y «García», «garcia». */
+export function plainText(text: string): string {
+  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+}
+
+/** Si alguno de los textos contiene lo buscado, sin mirar mayusculas ni tildes. Sin busqueda, todo vale. */
+export function matchesSearch(search: string, ...fields: (string | null | undefined)[]): boolean {
+  const query = plainText(search.trim())
+  return !query || fields.some((field) => field != null && plainText(field).includes(query))
 }
 
 export function initials(fullName?: string): string {
@@ -25,9 +41,8 @@ export function initials(fullName?: string): string {
 
 /** Dias que faltan para una fecha (negativo si ya paso). */
 export function daysUntil(value?: string | null): number | null {
-  if (!value) return null
-  const target = new Date(value)
-  if (Number.isNaN(target.getTime())) return null
+  const target = toDate(value)
+  if (!target) return null
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   target.setHours(0, 0, 0, 0)

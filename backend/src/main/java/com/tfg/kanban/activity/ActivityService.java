@@ -20,8 +20,8 @@ import java.time.Instant;
  * Registro del historial de actividad.
  *
  * Cada operacion relevante del dominio (crear/editar/borrar/mover tareas, comentar,
- * adjuntar ficheros, gestionar miembros...) llama a {@link #record}. El panel de
- * estadisticas de fases posteriores se construira sobre esta tabla.
+ * generar con IA, lo que hace soporte...) llama a {@link #record}. Es lo que se ve en
+ * «Actividad reciente» de los ajustes del espacio y lo que fecha su ultimo movimiento.
  */
 @Service
 @RequiredArgsConstructor

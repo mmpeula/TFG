@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import styles from './Button.module.css'
 
-type Variant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'onDark' | 'onDarkGhost' | 'destructive'
+type Variant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'destructive'
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
