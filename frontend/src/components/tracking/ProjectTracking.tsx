@@ -2,19 +2,19 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Info } from 'lucide-react'
 import { Dropdown } from '@/components/ui/Controls'
-import { InsightCard } from './Pulse'
+import { InsightCard } from './Tracking'
 import { ProgressDashboard } from './ProgressDashboard'
 import styles from './ProgressDashboard.module.css'
-import { derivePulse, SEMANAS_POR_DEFECTO } from '@/lib/metrics'
+import { deriveTracking, SEMANAS_POR_DEFECTO } from '@/lib/metrics'
 import { ROUTES } from '@/app/routes'
 import type { BoardResponse, ProjectResponse } from '@/types/api'
 
 /**
  * Panel de progreso de un espacio de trabajo con sus insights debajo: lo que ve
- * el docente al entrar en un espacio (pestaña Plan) y cualquiera en Pulso. Un
+ * el docente al entrar en un espacio (pestaña Plan) y cualquiera en el panel de seguimiento. Un
  * solo componente para que las dos pantallas no puedan contar cosas distintas.
  */
-export function ProjectPulse({
+export function ProjectTracking({
   projectId,
   board,
   project,
@@ -28,11 +28,11 @@ export function ProjectPulse({
 }) {
   const navigate = useNavigate()
   const [weeks, setWeeks] = useState<number>(SEMANAS_POR_DEFECTO)
-  const pulse = useMemo(() => derivePulse(board, project, weeks), [board, project, weeks])
+  const tracking = useMemo(() => deriveTracking(board, project, weeks), [board, project, weeks])
 
   return (
-    <ProgressDashboard pulse={pulse} weeks={weeks} onWeeksChange={setWeeks} hideCycleTime={hideCycleTime}>
-      {pulse.insights.length > 0 && (
+    <ProgressDashboard tracking={tracking} weeks={weeks} onWeeksChange={setWeeks} hideCycleTime={hideCycleTime}>
+      {tracking.insights.length > 0 && (
         <section className={styles.insightsSection}>
           <header className={styles.insightsHead}>
             <div className={styles.insightsTitle}>
@@ -71,7 +71,7 @@ export function ProjectPulse({
             <span className={styles.panelSubtitle}>Calculados a partir de la actividad real del tablero</span>
           </header>
           <div className={styles.insights}>
-            {pulse.insights.map((insight) => (
+            {tracking.insights.map((insight) => (
               <InsightCard
                 key={insight.id}
                 insight={insight}

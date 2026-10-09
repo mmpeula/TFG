@@ -325,6 +325,14 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
               </span>
             )}
 
+            {done && task.completedAt && (
+              <>
+                {/* La apunta el servidor al pasarla a «Hecho»: no se edita, se ve. */}
+                <span className={styles.propLabel}>Terminada</span>
+                <span className={[styles.propValue, styles.measured].join(' ')}>{formatDate(task.completedAt)}</span>
+              </>
+            )}
+
             {done && (
               <>
                 <span className={styles.propLabel}>Horas reales</span>
@@ -426,15 +434,8 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
                   value={comment}
                   placeholder="Escribe un comentario…"
                   onChange={(event) => setComment(event.target.value)}
-                  onKeyDown={(event) => {
-                    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                      event.preventDefault()
-                      comentar()
-                    }
-                  }}
                 />
                 <div className={styles.composerFoot}>
-                  <span className={styles.hint}>⌘+Enter envía</span>
                   <Button small disabled={!comment.trim() || commentMutations.create.isPending} onClick={comentar}>
                     <Send size={13} strokeWidth={2.75} />
                     Comentar

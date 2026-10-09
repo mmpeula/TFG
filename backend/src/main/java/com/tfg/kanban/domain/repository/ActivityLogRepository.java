@@ -21,4 +21,7 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, Long> 
     List<Object[]> lastActivityByProjects(Collection<Long> projectIds);
 
     List<ActivityLog> findTop1ByProject_IdOrderByOccurredAtDesc(Long projectId);
+
+    /** El historial de una entidad concreta (una tarea, por ejemplo), lo mas reciente primero. */
+    List<ActivityLog> findByEntityTypeAndEntityIdOrderByOccurredAtDesc(String entityType, Long entityId);
 }

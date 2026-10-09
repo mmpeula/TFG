@@ -24,7 +24,7 @@ proxy lo hace Nginx y la aplicación se sirve en el puerto 3000.
 | `/workspaces/:id/generar-plan` | Generar plan con IA a partir de un documento o una descripción | Responsable del espacio |
 | `/workspaces/:id/miembros` | Equipo, roles e invitaciones | Miembros del espacio |
 | `/workspaces/:id/ajustes` | Calendario, foto y actividad del espacio (editable solo por el responsable) | Miembros del espacio |
-| `/workspaces/:id/pulso` | Métricas y progreso | Miembros del espacio |
+| `/workspaces/:id/seguimiento` | Métricas y progreso | Miembros del espacio |
 | `/docente` | Panel docente: los espacios que se siguen como docente, con sus alertas | Docente |
 | `/administracion` | Cuentas y espacios de toda la plataforma | Administrador |
 | `/configuracion` | Mi cuenta: nombre, foto y contraseña | Cualquiera con sesión |
@@ -39,7 +39,7 @@ proxy lo hace Nginx y la aplicación se sirve en el puerto 3000.
 |---|---|
 | Cuentas, espacios, equipos, invitaciones, tableros, columnas, tareas, comentarios, adjuntos, actividad | **API real** |
 | Señales (`lib/signals.ts`) | Derivadas del tablero: columna por encima del WIP, fecha vencida, tarea sin tocar, tarea en curso sin responsable |
-| Pulso: KPIs, series e insights (`lib/metrics.ts`) | Calculados a partir de las tareas y sus fechas |
+| Panel de seguimiento: KPIs, series e insights (`lib/metrics.ts`) | Calculados a partir de las tareas y sus fechas |
 | Plan por sprints (`lib/sprints.ts`) | Calculado a partir de las fechas del espacio y de las tareas |
 | Generar plan y asistente | `POST /api/projects/{id}/ai-plan…` y `POST /api/workspaces/{id}/ai/chat`, que el backend resuelve con **DeepSeek** |
 
@@ -53,7 +53,7 @@ src/
 ├── lib/             api-client (axios + JWT) · signals · metrics · sprints · roles · format
 ├── state/           sesión, interfaz, trabajos de generación de plan, borradores y asistente
 ├── hooks/           useData (TanStack Query) · useShortcuts · useMediaQuery · useDebouncedValue
-├── components/      ui · shell · common · workspace · board · task · pulse ·
+├── components/      ui · shell · common · workspace · board · task · tracking ·
 │                    generator · assistant · admin · home
 │                    (board/TaskCard es la tarjeta de tarea del tablero y del plan)
 └── screens/         una por ruta de la tabla de arriba

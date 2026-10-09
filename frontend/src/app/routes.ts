@@ -21,8 +21,8 @@ export const ROUTES = {
   miembrosById: (id: string | number) => `/workspaces/${id}/miembros`,
   ajustes: '/workspaces/:workspaceId/ajustes',
   ajustesById: (id: string | number) => `/workspaces/${id}/ajustes`,
-  pulso: '/workspaces/:workspaceId/pulso',
-  pulsoById: (id: string | number) => `/workspaces/${id}/pulso`,
+  seguimiento: '/workspaces/:workspaceId/seguimiento',
+  seguimientoById: (id: string | number) => `/workspaces/${id}/seguimiento`,
 
   configuracion: '/configuracion',
   administracion: '/administracion',

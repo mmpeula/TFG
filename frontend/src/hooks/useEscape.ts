@@ -12,11 +12,6 @@ function alPulsar(event: KeyboardEvent) {
   if (event.key === 'Escape' && capas.length > 0) capas[capas.length - 1]()
 }
 
-/** Si hay algo abierto por encima de la pantalla (para no disparar atajos de teclado debajo). */
-export function hayCapaAbierta(): boolean {
-  return capas.length > 0
-}
-
 /** Cierra esta capa con Esc mientras {@code active}; la ultima en abrirse es la primera en cerrarse. */
 export function useEscape(onEscape: () => void, active = true) {
   const latest = useRef(onEscape)

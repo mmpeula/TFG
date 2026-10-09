@@ -106,7 +106,12 @@ export function AiWorkbench({
         type="file"
         accept=".pdf,.docx,.txt,.md,.csv"
         className={styles.hiddenInput}
-        onChange={(event) => onFile(event.target.files?.[0] ?? null)}
+        onChange={(event) => {
+          onFile(event.target.files?.[0] ?? null)
+          // Se vacia al momento: si el documento se quita desde fuera (al añadir el plan al
+          // tablero), volver a elegir el mismo fichero tiene que seguir funcionando.
+          event.target.value = ''
+        }}
       />
 
       <CardGroup>

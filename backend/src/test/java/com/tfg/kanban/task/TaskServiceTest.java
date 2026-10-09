@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,6 +35,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -111,6 +113,47 @@ class TaskServiceTest {
         // La columna de origen se reindexa: la tarea que queda pasa a la posicion 0
         verify(taskRepository).updatePosition(2L, 0);
         verify(taskRepository, never()).updatePosition(eq(1L), anyInt());
+    }
+
+    @Test
+    @DisplayName("Entrar en la ultima columna da la tarea por terminada; salir de ella la reabre")
+    void movingIntoTheLastColumnCompletesTheTask() {
+        BoardColumn done = BoardColumn.builder().id(12L).name("Hecho").position(2).board(board).build();
+        board.getColumns().addAll(List.of(todo, doing, done));
+        Task task = task(1L, "Tarea", doing, 0);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(boardService.getColumn(12L)).thenReturn(done);
+        when(boardService.getColumn(11L)).thenReturn(doing);
+
+        taskService.move(1L, new MoveTaskRequest(12L, 0));
+        assertThat(task.getCompletedAt()).isNotNull();
+
+        // Reordenarla dentro de «Hecho» no cambia cuando se termino.
+        Instant terminada = task.getCompletedAt();
+        taskService.move(1L, new MoveTaskRequest(12L, 0));
+        assertThat(task.getCompletedAt()).isEqualTo(terminada);
+
+        taskService.move(1L, new MoveTaskRequest(11L, 0));
+        assertThat(task.getCompletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("Una tarea creada ya en la ultima columna nace terminada")
+    void creatingInTheLastColumnCompletesTheTask() {
+        BoardColumn done = BoardColumn.builder().id(12L).name("Hecho").position(2).board(board).build();
+        board.getColumns().addAll(List.of(todo, doing, done));
+        when(boardService.getColumn(12L)).thenReturn(done);
+        when(boardService.getColumn(10L)).thenReturn(todo);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(User.builder().id(1L).fullName("Yo").build()));
+        when(taskRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        taskService.create(12L, new TaskRequest("Hecha", null, null, null, null, null, null, null));
+        taskService.create(10L, new TaskRequest("Por hacer", null, null, null, null, null, null, null));
+
+        ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
+        verify(taskRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues().get(0).getCompletedAt()).isNotNull();
+        assertThat(captor.getAllValues().get(1).getCompletedAt()).isNull();
     }
 
     @Test

@@ -3,7 +3,7 @@ import styles from './ProgressDashboard.module.css'
 import { PROGRESS_STATE_COLORS } from '@/lib/planStatus'
 
 /**
- * Piezas comunes de los paneles de la app (el del docente y Pulso, y el resumen
+ * Piezas comunes de los paneles de la app (el del docente y el panel de seguimiento, y el resumen
  * del equipo en el plan): asi todos se ven igual, con las mismas tarjetas de cifra
  * y los mismos paneles con titulo.
  */

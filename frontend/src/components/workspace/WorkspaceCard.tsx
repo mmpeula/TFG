@@ -53,7 +53,9 @@ export function WorkspaceCard({
           </span>
         )}
 
-        {workspace.description && <p className={styles.description}>{workspace.description}</p>}
+        {workspace.description && (
+          <p className={styles.description} title={workspace.description}>{workspace.description}</p>
+        )}
 
         <div className={styles.status}>
           {vacio ? (

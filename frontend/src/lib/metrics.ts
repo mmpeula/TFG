@@ -60,7 +60,7 @@ export interface Insight {
 /** En que punto esta cada columna: la primera es «por hacer», la ultima «hecho», el resto «en curso». */
 export type StatusKind = 'todo' | 'doing' | 'done'
 
-interface Pulse {
+interface Tracking {
   weekly: { week: string; done: number; created: number; current?: boolean }[]
   byStatus: { label: string; value: number; max: number; kind: StatusKind }[]
   insights: Insight[]
@@ -76,11 +76,11 @@ interface Pulse {
 }
 
 /**
- * El backend no expone metricas: el pulso se calcula aqui a partir del tablero
+ * El backend no expone metricas: el seguimiento se calcula aqui a partir del tablero
  * real. Cada cifra que se muestra sale de estos calculos, y los insights citan
  * exactamente esas cifras — nunca un insight sin dato ni sin accion.
  */
-export function derivePulse(board?: BoardResponse, project?: ProjectResponse, weeks: number = SEMANAS_POR_DEFECTO): Pulse {
+export function deriveTracking(board?: BoardResponse, project?: ProjectResponse, weeks: number = SEMANAS_POR_DEFECTO): Tracking {
   const columns = board?.columns ?? []
   const tasks = columns.flatMap((column) => column.tasks ?? [])
   const lastColumn = columns[columns.length - 1]
@@ -92,7 +92,7 @@ export function derivePulse(board?: BoardResponse, project?: ProjectResponse, we
   // Velocidad: tareas terminadas por semana durante las ultimas cuatro. Para la variacion,
   // la misma cuenta hecha hace una semana (las cuatro semanas anteriores a esa), con la misma
   // ventana: si se midieran distinto, la flecha subiria o bajaria sin que cambiara nada.
-  const finishedAt = (task: TaskResponse) => new Date(task.updatedAt ?? task.createdAt).getTime()
+  const finishedAt = (task: TaskResponse) => new Date(finishedOn(task)).getTime()
   const now = Date.now()
   const velocityAt = (weeksAgo: number) => {
     const end = now - weeksAgo * MS_SEMANA
@@ -147,10 +147,18 @@ export function formatCycle(days: number, samples: number): string {
   return `${decimal(days)} d`
 }
 
+/**
+ * Cuando se termino una tarea hecha: su fecha de fin, que apunta el servidor al pasarla a
+ * «Hecho». Su ultimo cambio solo vale de respaldo, porque tambien se mueve al editarla despues.
+ */
+function finishedOn(task: TaskResponse): string {
+  return task.completedAt ?? task.updatedAt ?? task.createdAt
+}
+
 function cycleOf(task: TaskResponse): number | null {
-  if (!task.updatedAt) return null
+  if (!task.completedAt && !task.updatedAt) return null
   const created = new Date(task.createdAt).getTime()
-  const finished = new Date(task.updatedAt).getTime()
+  const finished = new Date(finishedOn(task)).getTime()
   if (Number.isNaN(created) || Number.isNaN(finished)) return null
   return Math.max(0, (finished - created) / (24 * 60 * 60 * 1000))
 }
@@ -169,7 +177,7 @@ function weeklySeries(tasks: TaskResponse[], done: TaskResponse[], weeks: number
     return {
       week: `S${weeks - offset}`,
       created: tasks.filter((task) => inRange(task.createdAt)).length,
-      done: done.filter((task) => inRange(task.updatedAt ?? task.createdAt)).length,
+      done: done.filter((task) => inRange(finishedOn(task))).length,
       current: offset === 0,
     }
   })

@@ -305,7 +305,7 @@ public class AssistantChatService {
             long suyas = tasks.stream()
                     .filter(task -> task.getAssignees().stream()
                             .anyMatch(assignee -> assignee.getId().equals(member.getUser().getId())))
-                    .filter(task -> !esUltimaColumna(task))
+                    .filter(task -> !task.getBoardColumn().isDone())
                     .count();
             boolean esQuienPregunta = member.getUser().getId().equals(quienPregunta);
             sb.append("- ").append(member.getUser().getFullName())
@@ -342,6 +342,9 @@ public class AssistantChatService {
             }
             if (task.getEstimatedHours() != null) {
                 sb.append(" | horas estimadas: ").append(task.getEstimatedHours());
+            }
+            if (task.getCompletedAt() != null) {
+                sb.append(" | terminada el ").append(task.getCompletedAt().atZone(ZoneId.systemDefault()).toLocalDate());
             }
             diasParada(task, hoy).ifPresent(dias ->
                     sb.append(" | sin mover desde hace ").append(dias).append(" dias (PARADA)"));
@@ -408,13 +411,6 @@ public class AssistantChatService {
         return briefing.substring(0, MAX_BRIEFING_CHARS) + "\n[...enunciado recortado por espacio]";
     }
 
-    /** La ultima columna del tablero es la de terminadas, se llame como se llame. */
-    private boolean esUltimaColumna(Task task) {
-        List<BoardColumn> columns = task.getBoardColumn().getBoard().getColumns();
-        return !columns.isEmpty()
-                && columns.get(columns.size() - 1).getId().equals(task.getBoardColumn().getId());
-    }
-
     /**
      * Ni "por hacer" (nadie la ha tocado todavia, no es que este atascada) ni
      * "hecho" (ya no importa cuanto tardo). Solo cuenta como parada una tarea que
@@ -447,7 +443,7 @@ public class AssistantChatService {
     }
 
     private String summary(Project project, List<Task> tasks) {
-        long pendientes = tasks.stream().filter(task -> !esUltimaColumna(task)).count();
+        long pendientes = tasks.stream().filter(task -> !task.getBoardColumn().isDone()).count();
         return "%d tareas (%d pendientes) · %d personas".formatted(
                 tasks.size(), pendientes, project.getTeam().getMembers().size());
     }

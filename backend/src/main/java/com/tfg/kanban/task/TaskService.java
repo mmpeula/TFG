@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,6 +33,9 @@ import java.util.stream.Collectors;
  * (0..n-1) despues de cada baja o movimiento, de forma que el drag &amp; drop
  * del frontend siempre recibe posiciones consecutivas y sin huecos. Las altas
  * entran al final, asi que no desplazan a nadie.
+ *
+ * Una tarea esta terminada cuando esta en la ultima columna ({@link BoardColumn#isDone()}),
+ * y {@code completedAt} guarda desde cuando: se pone al entrar ahi y se quita al salir.
  */
 @Service
 @RequiredArgsConstructor
@@ -78,6 +82,8 @@ public class TaskService {
                 .estimatedHours(request.estimatedHours())
                 .actualHours(request.actualHours())
                 .boardColumn(column)
+                // Creada ya en «Hecho» (por ejemplo, algo que se hizo y se apunta despues): terminada hoy.
+                .completedAt(column.isDone() ? Instant.now() : null)
                 .assignees(resolveAssignees(column, request.assigneeIds()))
                 .createdBy(creator)
                 .position((int) tasksInColumn)
@@ -143,6 +149,8 @@ public class TaskService {
         reindex(targetTasks, task);
 
         if (changesColumn) {
+            // Entrar en la ultima columna es terminarla, hoy; salir de ella la vuelve a abrir.
+            task.setCompletedAt(target.isDone() ? Instant.now() : null);
             reindex(taskRepository.findByBoardColumn_IdOrderByPositionAsc(origin.getId()).stream()
                     .filter(candidate -> !candidate.getId().equals(taskId))
                     .toList(), null);

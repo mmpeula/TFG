@@ -13,7 +13,7 @@ import { NewTaskDialog } from '@/components/board/NewTaskDialog'
 import { PeopleFilter } from '@/components/board/PeopleFilter'
 import { TaskPanel } from '@/components/task/TaskPanel'
 import { Button } from '@/components/ui/Button'
-import { Chip, Segmented } from '@/components/ui/Controls'
+import { Segmented } from '@/components/ui/Controls'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import styles from './BoardScreen.module.css'
@@ -27,7 +27,8 @@ import { canManage, canWrite } from '@/lib/roles'
 import { boardWarningText, taskWarning } from '@/lib/signals'
 import { dropPosition, matchesBoardFilters } from '@/lib/board'
 import { ROUTES } from '@/app/routes'
-import type { TaskResponse } from '@/types/api'
+import { FilterMenu } from '@/components/board/FilterMenu'
+import type { TaskResponse, TaskType } from '@/types/api'
 
 export function BoardScreen() {
   const { workspaceId: workspaceIdParam } = useParams()
@@ -42,6 +43,9 @@ export function BoardScreen() {
   // Cada workspace tiene un unico tablero: nace con el y no se crean otros.
   const board = boards?.[0]
   const { data: detail, isPending } = useBoard(board?.id)
+  // Sin tablero la consulta del tablero no llega a lanzarse y React Query la deja «pendiente»
+  // para siempre: solo se espera por ella si hay tablero que pedir.
+  const cargando = loadingBoards || (board !== undefined && isPending)
   const { data: members } = useTeamMembers(workspace?.teamId)
 
   const taskMutations = useTaskMutations(board?.id, projectId)
@@ -49,14 +53,16 @@ export function BoardScreen() {
   const finish = useFinishPrompt(board?.id, projectId)
 
   const { user } = useAuth()
-  // Se puede llegar con el filtro «Avisos» ya puesto (desde el insight de Pulso).
+  // Se puede llegar con el filtro «Avisos» ya puesto (desde el insight del panel de seguimiento).
   const [onlySignals, setOnlySignals] = useState(
     () => Boolean((location.state as { onlyWarnings?: boolean } | null)?.onlyWarnings),
   )
   // Filtros de encima del tablero: buscar por titulo o numero, y por persona.
   const [search, setSearch] = useState('')
   const [people, setPeople] = useState<number[]>([])
-  const filtering = onlySignals || search.trim() !== '' || people.length > 0
+  const [types, setTypes] = useState<TaskType[]>([])
+  const [statuses, setStatuses] = useState<number[]>([])
+  const filtering = onlySignals || search.trim() !== '' || people.length > 0 || types.length > 0 || statuses.length > 0
   const [openTask, setOpenTask] = useState<TaskResponse | null>(null)
   // El asistente sabe de que tarea hablar mientras el panel esta abierto, sin que
   // haya que repetirsela en cada pregunta; se limpia sola al cerrar el panel o al
@@ -78,7 +84,7 @@ export function BoardScreen() {
 
   const columns = useMemo(() => detail?.columns ?? [], [detail])
 
-  // Llegar con una tarea concreta (desde «Abrir la tarea» de Pulso): se abre su panel en
+  // Llegar con una tarea concreta (desde «Abrir la tarea» del panel de seguimiento): se abre su panel en
   // cuanto el tablero esta cargado. Se decide durante el render, sin efecto; el efecto de
   // abajo solo resalta la tarjeta y limpia el estado de la navegacion, para que recargar o
   // volver atras no la abra otra vez.
@@ -118,9 +124,10 @@ export function BoardScreen() {
     () => new Map(columns.map((column) => [
       column.id,
       (column.tasks ?? []).filter((task) =>
-        (!onlySignals || taskWarning(task, columns)) && matchesBoardFilters(task, search, people)),
+        (statuses.length === 0 || statuses.includes(column.id)) &&
+        (!onlySignals || taskWarning(task, columns)) && matchesBoardFilters(task, search, people, types)),
     ])),
-    [columns, onlySignals, search, people],
+    [columns, onlySignals, search, people, types, statuses],
   )
   const tasksOf = (columnId: number): TaskResponse[] => visibleByColumn.get(columnId) ?? []
   const sinResultados = [...visibleByColumn.values()].every((list) => list.length === 0)
@@ -186,7 +193,6 @@ export function BoardScreen() {
     <WorkspaceShell
       workspace={workspace}
       workspaceId={projectId}
-      onNewTask={openNewTask}
       action={
         openNewTask ? (
           <Button onClick={openNewTask}>
@@ -196,7 +202,7 @@ export function BoardScreen() {
         ) : undefined
       }
     >
-      {loadingBoards || isPending ? (
+      {cargando ? (
         <Skeleton label="Cargando el tablero…" lines={4} />
       ) : !board ? (
         <EmptyState
@@ -227,17 +233,20 @@ export function BoardScreen() {
             <PeopleFilter members={members ?? []} selected={people} currentUserId={user?.id} onChange={setPeople} />
 
             <div className={styles.filters}>
-              {/* Filtra el tablero a las tareas que llevan un aviso en la tarjeta («venció hace…»,
-                  «… sin avance», «sin responsable»). Cuantas hay se ve al pasar el raton. */}
-              <Chip
-                danger
-                active={onlySignals}
-                onClick={() => setOnlySignals((value) => !value)}
-                title={`Ver solo las tareas con aviso: vencidas, paradas o sin responsable (${signalCount})`}
-              >
-                <AlertTriangle size={13} strokeWidth={2.5} />
-                Avisos
-              </Chip>
+              <FilterMenu
+                members={members ?? []}
+                currentUserId={user?.id}
+                columns={columns}
+                people={people}
+                onPeople={setPeople}
+                statuses={statuses}
+                onStatuses={setStatuses}
+                types={types}
+                onTypes={setTypes}
+                onlySignals={onlySignals}
+                onOnlySignals={setOnlySignals}
+                signalCount={signalCount}
+              />
             </div>
           </div>
 
@@ -289,7 +298,7 @@ export function BoardScreen() {
               <Button
                 variant="ghost"
                 small
-                onClick={() => { setSearch(''); setPeople([]); setOnlySignals(false) }}
+                onClick={() => { setSearch(''); setPeople([]); setTypes([]); setStatuses([]); setOnlySignals(false) }}
               >
                 Quitar los filtros
               </Button>
@@ -351,7 +360,7 @@ export function BoardScreen() {
                 Aviso del tablero
               </span>
               <p className={styles.boardSignalText}>{boardWarning}</p>
-              <Button variant="ghost" small onClick={() => navigate(ROUTES.pulsoById(projectId))}>
+              <Button variant="ghost" small onClick={() => navigate(ROUTES.seguimientoById(projectId))}>
                 Ver el detalle
               </Button>
             </div>

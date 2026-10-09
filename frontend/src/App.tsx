@@ -19,7 +19,7 @@ const GeneratePlanScreen = lazy(() => import('./screens/GeneratePlanScreen').the
 const MembersScreen = lazy(() => import('./screens/MembersScreen').then((m) => ({ default: m.MembersScreen })))
 const WorkspaceSettingsScreen = lazy(() =>
   import('./screens/WorkspaceSettingsScreen').then((m) => ({ default: m.WorkspaceSettingsScreen })))
-const PulseScreen = lazy(() => import('./screens/PulseScreen').then((m) => ({ default: m.PulseScreen })))
+const TrackingScreen = lazy(() => import('./screens/TrackingScreen').then((m) => ({ default: m.TrackingScreen })))
 const SettingsScreen = lazy(() => import('./screens/SettingsScreen').then((m) => ({ default: m.SettingsScreen })))
 const AdminScreen = lazy(() => import('./screens/AdminScreen').then((m) => ({ default: m.AdminScreen })))
 const TeacherScreen = lazy(() => import('./screens/TeacherScreen').then((m) => ({ default: m.TeacherScreen })))
@@ -63,7 +63,7 @@ export function App() {
             <Route path={ROUTES.generarPlan} element={<GeneratePlanScreen />} />
             <Route path={ROUTES.miembros} element={<MembersScreen />} />
             <Route path={ROUTES.ajustes} element={<WorkspaceSettingsScreen />} />
-            <Route path={ROUTES.pulso} element={<PulseScreen />} />
+            <Route path={ROUTES.seguimiento} element={<TrackingScreen />} />
 
             {/* Solo la ve quien tiene rol global ADMIN. */}
             <Route path={ROUTES.administracion} element={<AdminScreen />} />

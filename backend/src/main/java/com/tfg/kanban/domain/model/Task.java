@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -82,6 +83,15 @@ public class Task extends Auditable {
      */
     @Column(name = "ACTUAL_HOURS", precision = 6, scale = 2)
     private BigDecimal actualHours;
+
+    /**
+     * Cuando se termino: el momento en que entro en la ultima columna del tablero («Hecho»).
+     * Lo pone el servidor al moverla ahi (o al crearla ya ahi) y lo quita si vuelve a otra
+     * columna. Las metricas de velocidad y de tiempo por tarea cuentan con esta fecha, no con
+     * el ultimo cambio, que tambien se mueve al editar una tarea ya terminada.
+     */
+    @Column(name = "COMPLETED_AT")
+    private Instant completedAt;
 
     /** true si la tarea fue creada automaticamente por el modulo de IA. */
     @Column(name = "AI_GENERATED", nullable = false)

@@ -5,7 +5,7 @@ import { WorkspaceShell } from '@/components/shell/WorkspaceShell'
 import { TaskCard } from '@/components/board/TaskCard'
 import { TaskPanel } from '@/components/task/TaskPanel'
 import { TeamDashboard } from '@/components/plan/TeamDashboard'
-import { ProjectPulse } from '@/components/pulse/ProjectPulse'
+import { ProjectTracking } from '@/components/tracking/ProjectTracking'
 import { Button } from '@/components/ui/Button'
 import { Segmented } from '@/components/ui/Controls'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -59,7 +59,7 @@ function guardar(clave: string, valor: string) {
  * responsable elige entre lo suyo y «Todo el equipo», que cambia los sprints
  * por un resumen de como va el equipo y cada persona (ver TeamDashboard). Un
  * docente, que solo observa, ve el panel de progreso del proyecto (el mismo de
- * Pulso, ver ProjectPulse).
+ * el panel de seguimiento, ver ProjectTracking).
  *
  * La duracion del sprint no se elige aqui: se fija una vez al crear el
  * workspace (y se puede cambiar en sus ajustes), para que todos los sprints
@@ -75,6 +75,8 @@ export function PlanScreen() {
   const { data: workspace } = useWorkspace(workspaceId)
   const { data: boards, isPending: loadingBoards } = useProjectBoards(workspaceId)
   const { data: detail, isPending } = useBoard(boards?.[0]?.id)
+  // Sin tablero la consulta del tablero no se lanza y se quedaria «pendiente» para siempre.
+  const cargando = loadingBoards || (boards?.[0] !== undefined && isPending)
   const { data: members } = useTeamMembers(workspace?.teamId)
   const { data: project } = useProject(workspaceId)
   const taskMutations = useTaskMutations(boards?.[0]?.id, workspaceId)
@@ -129,7 +131,7 @@ export function PlanScreen() {
 
   return (
     <WorkspaceShell workspace={workspace} workspaceId={workspaceId}>
-      {loadingBoards || isPending ? (
+      {cargando ? (
         <Skeleton label="Repartiendo el trabajo en sprints…" lines={4} />
       ) : sinTareasEnAbsoluto ? (
         <EmptyState
@@ -187,10 +189,10 @@ export function PlanScreen() {
             </div>
           </header>
 
-          {/* El docente entra a ver como va el equipo: el panel de progreso (el mismo de Pulso, sin el
+          {/* El docente entra a ver como va el equipo: el panel de progreso (el mismo del panel de seguimiento, sin el
               tiempo medio por tarea). El responsable, en «Todo el equipo», tiene su resumen propio. */}
           {soloObserva ? (
-            <ProjectPulse projectId={workspaceId} board={detail} project={project} hideCycleTime />
+            <ProjectTracking projectId={workspaceId} board={detail} project={project} hideCycleTime />
           ) : scope === 'team' && (
             <TeamDashboard tasks={tasks} columns={columns} members={members ?? []} sprints={plan.sprints} />
           )}

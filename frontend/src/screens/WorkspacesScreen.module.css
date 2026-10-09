@@ -11,9 +11,10 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--space-4);
-  /* Cada tarjeta mide lo que mide su contenido: estirarlas dejaba huecos raros
-     entre una con descripcion y otra sin ella. */
-  align-items: start;
+  /* Todas las tarjetas igual de altas, tengan descripcion o no: todas las filas miden
+     lo que la tarjeta mas alta, y dentro de cada una el progreso y el pie van abajo
+     (ver WorkspaceCard), asi quedan alineados de una tarjeta a otra. */
+  grid-auto-rows: 1fr;
 }
 
 @media (max-width: 767px) {

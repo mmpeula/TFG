@@ -18,7 +18,7 @@ import java.util.List;
          "assignees":[{"id":2,"fullName":"Luis Perez","email":"luis@uni.es"}],
          "createdBy":{"id":1,"fullName":"Ana Garcia","email":"ana@uni.es"},
          "commentCount":2,
-         "createdAt":"2026-08-21T10:15:30Z","updatedAt":"2026-08-21T11:00:00Z"}
+         "createdAt":"2026-08-21T10:15:30Z","updatedAt":"2026-08-21T11:00:00Z","completedAt":null}
         """)
 public record TaskResponse(
         Long id,
@@ -39,7 +39,9 @@ public record TaskResponse(
         UserSummary createdBy,
         long commentCount,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        @Schema(description = "Cuando se termino (al entrar en la ultima columna); vacio si no esta terminada")
+        Instant completedAt
 ) {
 
     public static TaskResponse from(Task task, long commentCount) {
@@ -51,6 +53,6 @@ public record TaskResponse(
                 task.isAiGenerated(), column.getId(), column.getName(), column.getBoard().getId(),
                 column.getBoard().getProject().getId(),
                 UserSummary.fromAll(task.getAssignees()), UserSummary.from(task.getCreatedBy()),
-                commentCount, task.getCreatedAt(), task.getUpdatedAt());
+                commentCount, task.getCreatedAt(), task.getUpdatedAt(), task.getCompletedAt());
     }
 }

@@ -97,7 +97,8 @@ export function GeneratePlanScreen() {
       // cual, parece que no ha pasado nada (o que se ha quedado atascada) en
       // vez de reflejar que ya esta hecho. El resumen plegable de abajo es la
       // confirmacion de que salio bien.
-      set({ appliedTitles: created.map((task) => task.title), selected: null })
+      // El documento o la descripcion ya han servido: se quitan para poder dar el siguiente.
+      set({ appliedTitles: created.map((task) => task.title), selected: null, text: '', file: null })
       planJobs.clear(workspaceId)
 
       const boardId = boards?.[0]?.id

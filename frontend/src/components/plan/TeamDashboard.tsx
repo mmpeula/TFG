@@ -1,6 +1,6 @@
 import { CalendarRange, Clock3, PauseCircle } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
-import { DashPanel, KpiCard, StatusWheelPanel } from '@/components/pulse/DashboardParts'
+import { DashPanel, KpiCard, StatusWheelPanel } from '@/components/tracking/DashboardParts'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import styles from './TeamDashboard.module.css'
 import { daysUntil, formatDate } from '@/lib/format'

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Bot, CalendarRange, Columns3, LogOut, PauseCircle, Settings, Users } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
@@ -6,8 +6,6 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Tooltip } from '@/components/ui/Controls'
 import { Assistant } from '@/components/assistant/Assistant'
 import { WorkspaceBadge } from '@/components/workspace/WorkspaceBadge'
-import { ShortcutsDialog } from './ShortcutsDialog'
-import { useShortcuts } from '@/hooks/useShortcuts'
 import styles from './WorkspaceShell.module.css'
 import { ROUTES } from '@/app/routes'
 import { useAuth } from '@/state/context'
@@ -22,8 +20,6 @@ interface Props {
   workspaceId: number
   /** Accion principal de la pantalla, a la derecha de la cabecera. */
   action?: ReactNode
-  /** Atajo «N»: crear tarea. Solo lo pasa el tablero. */
-  onNewTask?: () => void
   children: ReactNode
 }
 
@@ -34,11 +30,10 @@ interface Props {
  * Por eso la cabecera lleva la vuelta atras a la izquierda y cuatro pestanas, y
  * no una barra lateral con el resto de la aplicacion dentro.
  */
-export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, children }: Props) {
+export function WorkspaceShell({ workspace, workspaceId, action, children }: Props) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { user, signOut } = useAuth()
-  const [helpOpen, setHelpOpen] = useState(false)
   // Lo que se ve lo decide el rol en ESTE espacio, no el de la cuenta: un mismo docente es
   // responsable de los que crea y solo observa los que le anaden como docente.
   const soloObserva = isTeacher(workspace?.myRole)
@@ -52,20 +47,6 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
   // la lista, que si lo sigue devolviendo precisamente para poder explicarlo.
   const { data: misWorkspaces } = useWorkspaces()
   const suspendido = misWorkspaces?.find((item) => item.id === workspaceId)?.enabled === false
-
-  useShortcuts(
-    useMemo(
-      () => ({
-        newTask: onNewTask,
-        board: () => navigate(ROUTES.tableroById(workspaceId)),
-        plan: () => navigate(ROUTES.planById(workspaceId)),
-        generatePlan: puedeAutomatizar ? () => navigate(ROUTES.generarPlanById(workspaceId)) : undefined,
-        pulse: () => navigate(ROUTES.pulsoById(workspaceId)),
-        help: () => setHelpOpen(true),
-      }),
-      [puedeAutomatizar, navigate, onNewTask, workspaceId],
-    ),
-  )
 
   const tabs = [
     { label: 'Plan', icon: <CalendarRange {...ICON} />, to: ROUTES.planById(workspaceId) },
@@ -144,13 +125,6 @@ export function WorkspaceShell({ workspace, workspaceId, action, onNewTask, chil
           primero?» se hace mirando el tablero, no yendose a otra pantalla. El
           docente no lo ve: observa el trabajo, no lo hace. */}
       {workspace && !soloObserva && <Assistant workspaceId={workspaceId} />}
-
-      <ShortcutsDialog
-        open={helpOpen}
-        onClose={() => setHelpOpen(false)}
-        canCreateTask={Boolean(onNewTask)}
-        canGeneratePlan={puedeAutomatizar}
-      />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { AlertTriangle, ArrowRight, CalendarDays, Clock3, PauseCircle, TrendingUp, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import styles from './Pulse.module.css'
+import styles from './Tracking.module.css'
 import type { Insight, InsightAction, InsightTask } from '@/lib/metrics'
 
 /** Icono de cada motivo de aviso en la lista de tareas afectadas. */

@@ -3,9 +3,14 @@ package com.tfg.kanban.task;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.tfg.kanban.AbstractApiIT;
 import com.tfg.kanban.domain.model.Role;
+import com.tfg.kanban.domain.repository.TaskRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -13,6 +18,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class TaskControllerIT extends AbstractApiIT {
+
+    @Autowired
+    private TaskRepository taskRepository;
+    @Autowired
+    private CompletedAtBackfill completedAtBackfill;
+    @Autowired
+    private TransactionTemplate transactions;
 
     @Test
     @DisplayName("Un MIEMBRO crea, edita y borra tareas")
@@ -105,6 +117,58 @@ class TaskControllerIT extends AbstractApiIT {
     private JsonNode tasksOfFirstColumn(TestUser user, Long boardId) throws Exception {
         return json(mockMvc.perform(authorized(get("/api/boards/{id}", boardId), user)).andReturn())
                 .get("columns").get(0).get("tasks");
+    }
+
+    private JsonNode task(TestUser user, Long taskId) throws Exception {
+        return json(mockMvc.perform(authorized(get("/api/tasks/{id}", taskId), user)).andReturn());
+    }
+
+    private void move(TestUser user, Long taskId, long columnId) throws Exception {
+        mockMvc.perform(authorized(patch("/api/tasks/{id}/move", taskId), user)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"columnId\":%d,\"position\":0}".formatted(columnId)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Al pasar a «Hecho» se apunta cuando se termino; al sacarla de ahi, se quita")
+    void movingToDoneRecordsWhenItWasFinished() throws Exception {
+        TestUser responsable = registerUser(Role.MIEMBRO);
+        Workspace workspace = createWorkspace(responsable, "Equipo terminadas");
+        long[] columns = columnIds(responsable, workspace.boardId());
+        Long taskId = createTask(responsable, columns[0], "Escribir la memoria");
+        assertThat(task(responsable, taskId).has("completedAt")).isFalse();
+
+        Instant antes = Instant.now();
+        move(responsable, taskId, columns[2]);
+        Instant terminada = Instant.parse(task(responsable, taskId).get("completedAt").asText());
+        assertThat(terminada).isBetween(antes.minusSeconds(5), Instant.now().plusSeconds(5));
+
+        move(responsable, taskId, columns[1]);
+        assertThat(task(responsable, taskId).has("completedAt")).isFalse();
+    }
+
+    @Test
+    @DisplayName("A las que ya estaban terminadas sin fecha se les pone, sin cambiar su ultima modificacion")
+    void backfillsTheTasksThatWereAlreadyDone() throws Exception {
+        TestUser responsable = registerUser(Role.MIEMBRO);
+        Workspace workspace = createWorkspace(responsable, "Equipo de antes");
+        long[] columns = columnIds(responsable, workspace.boardId());
+        Long taskId = createTask(responsable, columns[0], "Tarea de antes del campo");
+        move(responsable, taskId, columns[2]);
+        Instant terminada = Instant.parse(task(responsable, taskId).get("completedAt").asText());
+
+        // Como estaban antes de existir el campo: en «Hecho», pero sin fecha.
+        transactions.executeWithoutResult(tx -> taskRepository.updateCompletedAt(taskId, null));
+        String ultimoCambio = task(responsable, taskId).get("updatedAt").asText();
+
+        completedAtBackfill.run(null);
+
+        JsonNode despues = task(responsable, taskId);
+        // La fecha sale del historial («Movió la tarea … a 'Hecho'»), que se apunta en el mismo momento.
+        assertThat(Instant.parse(despues.get("completedAt").asText()))
+                .isBetween(terminada.minusSeconds(5), terminada.plusSeconds(5));
+        assertThat(despues.get("updatedAt").asText()).isEqualTo(ultimoCambio);
     }
 
     @Test

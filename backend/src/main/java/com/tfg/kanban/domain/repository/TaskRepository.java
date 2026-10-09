@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 
@@ -31,6 +32,22 @@ public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificat
     @Modifying
     @Query("update Task t set t.position = :position where t.id = :id")
     void updatePosition(Long id, int position);
+
+    /**
+     * Las tareas terminadas (en la ultima columna de su tablero) que todavia no tienen
+     * fecha de fin: las que ya estaban en «Hecho» antes de que existiera el campo.
+     */
+    @Query("""
+            select t from Task t join fetch t.boardColumn c
+            where t.completedAt is null
+              and c.position = (select max(c2.position) from BoardColumn c2 where c2.board = c.board)
+            """)
+    List<Task> findDoneWithoutCompletedAt();
+
+    /** Pone la fecha de fin directamente en la base de datos: igual que {@link #updatePosition}, no es un cambio de la tarea. */
+    @Modifying
+    @Query("update Task t set t.completedAt = :completedAt where t.id = :id")
+    void updateCompletedAt(Long id, Instant completedAt);
 
     /** Tareas por columna para un lote de columnas, en una sola consulta. */
     @Query("""

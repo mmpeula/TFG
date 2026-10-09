@@ -5,18 +5,18 @@ import { DashPanel, KpiCard, StatusWheelPanel } from './DashboardParts'
 import styles from './ProgressDashboard.module.css'
 import { decimal } from '@/lib/format'
 import { formatCycle, SEMANAS_POSIBLES, type StatusKind } from '@/lib/metrics'
-import type { derivePulse } from '@/lib/metrics'
+import type { deriveTracking } from '@/lib/metrics'
 
-type Pulse = ReturnType<typeof derivePulse>
+type Tracking = ReturnType<typeof deriveTracking>
 
 /** Tareas en las columnas de ese estado (por hacer, en curso o hechas). */
-function countOf(pulse: Pulse, kind: StatusKind): number {
-  return pulse.byStatus.filter((row) => row.kind === kind).reduce((sum, row) => sum + row.value, 0)
+function countOf(tracking: Tracking, kind: StatusKind): number {
+  return tracking.byStatus.filter((row) => row.kind === kind).reduce((sum, row) => sum + row.value, 0)
 }
 
 /**
  * Como va un espacio de trabajo, de un vistazo: lo que ve el docente al entrar (y
- * cualquiera en Pulso). Todo sale del tablero real (lib/metrics.ts).
+ * cualquiera en el panel de seguimiento). Todo sale del tablero real (lib/metrics.ts).
  *
  * Arriba, la rueda del estado de las tareas (la misma del resumen del equipo) y
  * las cifras: velocidad y tiempo medio con su variacion frente a la semana
@@ -27,18 +27,18 @@ function countOf(pulse: Pulse, kind: StatusKind): number {
  * velocidad es mejor; mas tiempo por tarea, peor).
  */
 export function ProgressDashboard({
-  pulse,
+  tracking,
   weeks,
   onWeeksChange,
   hideCycleTime,
   children,
 }: {
-  pulse: Pulse
+  tracking: Tracking
   weeks: number
   onWeeksChange: (weeks: number) => void
   /** Sin la tarjeta de tiempo medio por tarea: la fila de arriba queda con una tarjeta menos. */
   hideCycleTime?: boolean
-  /** Lo que va debajo del panel (los insights en Pulso, por ejemplo). */
+  /** Lo que va debajo del panel (los insights en el panel de seguimiento, por ejemplo). */
   children?: ReactNode
 }) {
   return (
@@ -47,28 +47,28 @@ export function ProgressDashboard({
         {/* La misma rueda que el resumen del equipo del responsable: ya dice el porcentaje
             finalizado, asi que no hace falta otra tarjeta de progreso. */}
         <StatusWheelPanel
-          todo={countOf(pulse, 'todo')}
-          doing={countOf(pulse, 'doing')}
-          done={countOf(pulse, 'done')}
+          todo={countOf(tracking, 'todo')}
+          doing={countOf(tracking, 'doing')}
+          done={countOf(tracking, 'done')}
         />
-        <KpiCard label="Velocidad" icon={<Zap />} tone="green" value={decimal(pulse.velocity)} unit="tareas / semana">
-          <Delta value={pulse.velocityDelta} higherIsBetter format={(n) => decimal(n)} />
+        <KpiCard label="Velocidad" icon={<Zap />} tone="green" value={decimal(tracking.velocity)} unit="tareas / semana">
+          <Delta value={tracking.velocityDelta} higherIsBetter format={(n) => decimal(n)} />
         </KpiCard>
         {!hideCycleTime && (
           <KpiCard
             label="Tiempo medio"
             icon={<Clock3 />}
             tone="amber"
-            value={formatCycle(pulse.cycleDays, pulse.cycleSamples)}
+            value={formatCycle(tracking.cycleDays, tracking.cycleSamples)}
             unit="por tarea"
           >
-            <Delta value={pulse.cycleDelta} higherIsBetter={false} format={(n) => `${decimal(n)} d`} />
+            <Delta value={tracking.cycleDelta} higherIsBetter={false} format={(n) => `${decimal(n)} d`} />
           </KpiCard>
         )}
-        <KpiCard label="Pendientes" icon={<FileText />} tone="grey" value={String(pulse.pending)} unit="tareas sin terminar" />
+        <KpiCard label="Pendientes" icon={<FileText />} tone="grey" value={String(tracking.pending)} unit="tareas sin terminar" />
       </div>
 
-      <WeeklyChart series={pulse.weekly} weeks={weeks} onWeeksChange={onWeeksChange} />
+      <WeeklyChart series={tracking.weekly} weeks={weeks} onWeeksChange={onWeeksChange} />
 
       {children}
     </div>
@@ -110,7 +110,7 @@ function niceStep(max: number): number {
 function WeeklyChart({
   series, weeks, onWeeksChange,
 }: {
-  series: Pulse['weekly']
+  series: Tracking['weekly']
   weeks: number
   onWeeksChange: (weeks: number) => void
 }) {

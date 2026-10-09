@@ -143,6 +143,8 @@ export interface TaskResponse {
   estimatedHours?: number
   /** Lo que de verdad ha costado, si se ha apuntado. */
   actualHours?: number
+  /** Cuando se termino: al entrar en la ultima columna («Hecho»). Ausente si no esta terminada. */
+  completedAt?: string
   aiGenerated: boolean
   columnId: number
   columnName: string

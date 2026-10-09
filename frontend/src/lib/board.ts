@@ -1,5 +1,5 @@
 import { plainText } from '@/lib/format'
-import type { TaskResponse } from '@/types/api'
+import type { TaskResponse, TaskType } from '@/types/api'
 
 /**
  * Posicion en la que debe insertarse una tarea al soltarla.
@@ -34,8 +34,14 @@ export const SIN_ASIGNAR = 0
  * @param search texto del buscador: busca en el titulo, o por numero («#13302» o «13302»)
  * @param people ids de persona marcados ({@link SIN_ASIGNAR} para las que no tienen
  *               responsable); vacio no filtra
+ * @param types  tipos de tarea marcados; vacio no filtra (las tareas sin tipo cuentan como «Tarea»)
  */
-export function matchesBoardFilters(task: TaskResponse, search: string, people: number[]): boolean {
+export function matchesBoardFilters(
+  task: TaskResponse,
+  search: string,
+  people: number[],
+  types: TaskType[] = [],
+): boolean {
   const query = plainText(search.trim())
   if (query) {
     const numero = query.replace(/^#/, '')
@@ -47,5 +53,6 @@ export function matchesBoardFilters(task: TaskResponse, search: string, people: 
     const sinNadie = task.assignees.length === 0 && people.includes(SIN_ASIGNAR)
     if (!suya && !sinNadie) return false
   }
+  if (types.length > 0 && !types.includes(task.type ?? 'TAREA')) return false
   return true
 }

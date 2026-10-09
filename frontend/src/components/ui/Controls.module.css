@@ -27,6 +27,7 @@
   color: var(--color-neutral-600);
   padding: 6px var(--space-3);
   font-size: 12px;
+  cursor: pointer;
 }
 .chip:hover { border-color: var(--color-neutral-500); color: var(--color-text); }
 .chipActive {
@@ -35,10 +36,12 @@
   color: #ffffff;
 }
 .chipActive:hover { background: var(--color-neutral-800); color: #ffffff; }
-/* Avisos: siempre en rojo, el color que la app reserva para lo que va mal o tarde. */
-.chipDanger { border-color: var(--color-danger-300); color: var(--color-danger-700); background: var(--color-danger-100); }
-.chipDanger:hover { border-color: var(--color-danger-500); color: var(--color-danger-700); }
+/* Avisos: se ve como un filtro mas (blanco, borde gris) y solo se tiñe de rojo al activarlo;
+   el icono y el numero en rojo avisan de que es lo que va mal o tarde. */
+.chipDanger svg { color: var(--color-danger-600); }
+.chipDanger:hover { border-color: var(--color-danger-500); }
 .chipDanger.chipActive { background: var(--color-danger-600); border-color: var(--color-danger-600); color: #ffffff; }
+.chipDanger.chipActive svg { color: #ffffff; }
 .chipDanger.chipActive:hover { background: var(--color-danger-700); }
 
 /* Dropdown ---------------------------------------------------------------- */

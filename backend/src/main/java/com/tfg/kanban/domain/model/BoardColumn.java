@@ -8,6 +8,7 @@ import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Columna (lista) de un tablero Kanban: "Por hacer", "En curso", "Hecho"...
@@ -51,4 +52,13 @@ public class BoardColumn extends Auditable {
     @OrderBy("position ASC")
     @Builder.Default
     private List<Task> tasks = new ArrayList<>();
+
+    /**
+     * Si es la columna de lo terminado: la ultima del tablero, se llame como se llame. Es la
+     * misma regla que usan el progreso del workspace, el plan y los avisos.
+     */
+    public boolean isDone() {
+        List<BoardColumn> columns = board.getColumns();
+        return !columns.isEmpty() && Objects.equals(columns.get(columns.size() - 1).getId(), id);
+    }
 }

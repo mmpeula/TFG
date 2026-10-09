@@ -1,4 +1,4 @@
-.wrap { position: relative; }
+.wrap { position: relative; height: 100%; }
 
 /* El menu «⋯» va en la esquina, a la altura del titulo, fuera del boton de la
    tarjeta (un boton no puede contener otro). */
@@ -9,7 +9,7 @@
 .card {
   position: relative;
   display: flex; flex-direction: column; gap: 10px;
-  width: 100%; text-align: left;
+  width: 100%; height: 100%; text-align: left;
   background: var(--color-bg);
   border: 1px solid var(--color-divider);
   border-radius: 14px;
@@ -32,12 +32,14 @@
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* Una sola linea, cortada con «…»: una descripcion larga no puede hacer crecer la tarjeta.
+   Entera, al pasar el raton (title). */
 .description {
   font-size: 12.5px; color: var(--color-neutral-600); line-height: 1.45;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-.status { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); margin-top: 4px; }
+.status { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); margin-top: auto; padding-top: 4px; }
 .pending { font-size: 12.5px; color: var(--color-neutral-600); }
 .done { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--color-accent-2-600); }
 .percent { font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--color-neutral-600); }
