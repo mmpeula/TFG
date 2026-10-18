@@ -8,6 +8,7 @@ import com.tfg.kanban.domain.model.TeamMember;
 import com.tfg.kanban.domain.model.User;
 import com.tfg.kanban.domain.repository.TeamMemberRepository;
 import com.tfg.kanban.domain.repository.TeamRepository;
+import com.tfg.kanban.task.TaskService;
 import com.tfg.kanban.team.dto.UpdateMemberNotesRequest;
 import com.tfg.kanban.team.dto.UpdateMemberRoleRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -26,6 +27,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** Tests unitarios de las reglas de equipos y de su composicion. */
@@ -37,6 +42,8 @@ class TeamServiceTest {
     private TeamRepository teamRepository;
     @Mock
     private TeamMemberRepository teamMemberRepository;
+    @Mock
+    private TaskService taskService;
 
     @InjectMocks
     private TeamService teamService;
@@ -129,6 +136,8 @@ class TeamServiceTest {
         assertThatThrownBy(() -> teamService.removeMember(5L, 1L))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("sin responsable");
+        // Si no se va, sus tareas siguen siendo suyas.
+        verify(taskService, never()).releaseOpenTasks(anyLong(), any());
     }
 
     @Test
@@ -231,5 +240,22 @@ class TeamServiceTest {
         teamService.removeMember(5L, 2L);
 
         assertThat(team.getMembers()).containsExactly(suya);
+    }
+
+    @Test
+    @DisplayName("Quien se va del equipo suelta sus tareas sin terminar")
+    void leavingReleasesOpenTasks() {
+        Team team = Team.builder().id(5L).name("Grupo 4").owner(owner).build();
+        User member = User.builder().id(2L).fullName("Luis Perez").build();
+        TeamMember suya = TeamMember.builder().id(8L).team(team).user(owner).role(Role.RESPONSABLE).build();
+        TeamMember membership = TeamMember.builder().id(9L).team(team).user(member).role(Role.MIEMBRO).build();
+        team.getMembers().add(suya);
+        team.getMembers().add(membership);
+
+        when(teamMemberRepository.findByTeam_IdAndUser_Id(5L, 2L)).thenReturn(Optional.of(membership));
+
+        teamService.removeMember(5L, 2L);
+
+        verify(taskService).releaseOpenTasks(5L, member);
     }
 }

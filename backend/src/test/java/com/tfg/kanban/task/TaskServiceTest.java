@@ -326,4 +326,174 @@ class TaskServiceTest {
 
         verify(activityService, never()).record(any(), eq(ActivityAction.ASIGNACION), any(), any(), anyString());
     }
+
+    @Test
+    @DisplayName("Quien se va del equipo deja sus tareas sin terminar; si no queda nadie, quedan sin asignar")
+    void releasingOpenTasksUnassignsTheLeaver() {
+        User luis = User.builder().id(2L).fullName("Luis").build();
+        User ana = User.builder().id(3L).fullName("Ana").build();
+        Task solo = task(1L, "Solo suya", todo, 0);
+        solo.getAssignees().add(luis);
+        Task compartida = task(2L, "Compartida", doing, 0);
+        compartida.getAssignees().addAll(List.of(ana, luis));
+        when(taskRepository.findOpenByTeamAndAssignee(1L, 2L)).thenReturn(List.of(solo, compartida));
+
+        taskService.releaseOpenTasks(1L, luis);
+
+        assertThat(solo.getAssignees()).isEmpty();
+        assertThat(compartida.getAssignees()).containsExactly(ana);
+        verify(activityService).record(project, ActivityAction.ASIGNACION, "Task", 1L,
+                "Luis ha salido del equipo y deja la tarea 'Solo suya' sin asignar");
+        verify(activityService).record(project, ActivityAction.ASIGNACION, "Task", 2L,
+                "Luis ha salido del equipo y deja la tarea 'Compartida'");
+    }
+
+    @Test
+    @DisplayName("Una tarea terminada se puede editar aunque quien la hizo ya no este en el equipo, y sigue constando")
+    void doneTaskKeepsAFormerMember() {
+        BoardColumn done = BoardColumn.builder().id(12L).name("Hecho").position(2).board(board).build();
+        board.getColumns().addAll(List.of(todo, doing, done));
+        User exMiembro = User.builder().id(2L).fullName("Luis").build();
+        Task existing = task(1L, "Tarea", done, 0);
+        existing.getAssignees().add(exMiembro);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 2L)).thenReturn(false);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(exMiembro));
+
+        TaskRequest request = new TaskRequest("Tarea renombrada", null, null, null, null, null, null, List.of(2L));
+        taskService.update(1L, request);
+
+        assertThat(existing.getAssignees()).containsExactly(exMiembro);
+        verify(activityService, never()).record(any(), eq(ActivityAction.ASIGNACION), any(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("En una tarea sin terminar, quien ya no esta en el equipo se quita al guardar en vez de dar error")
+    void openTaskDropsAFormerMemberOnSave() {
+        User exMiembro = User.builder().id(2L).fullName("Luis").build();
+        User ana = User.builder().id(3L).fullName("Ana").build();
+        Task existing = task(1L, "Tarea", doing, 0);
+        existing.getAssignees().addAll(List.of(exMiembro, ana));
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 2L)).thenReturn(false);
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 3L)).thenReturn(true);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(exMiembro));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(ana));
+
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, null, List.of(2L, 3L));
+        taskService.update(1L, request);
+
+        assertThat(existing.getAssignees()).containsExactly(ana);
+        verify(activityService).record(eq(project), eq(ActivityAction.ASIGNACION), eq("Task"), eq(1L), anyString());
+    }
+
+    @Test
+    @DisplayName("Al reabrir una tarea terminada se quita a quien ya no esta en el equipo")
+    void reopeningDropsFormerMembers() {
+        BoardColumn done = BoardColumn.builder().id(12L).name("Hecho").position(2).board(board).build();
+        board.getColumns().addAll(List.of(todo, doing, done));
+        User exMiembro = User.builder().id(2L).fullName("Luis").build();
+        User ana = User.builder().id(3L).fullName("Ana").build();
+        Task task = task(1L, "Tarea", done, 0);
+        task.getAssignees().addAll(List.of(exMiembro, ana));
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(boardService.getColumn(11L)).thenReturn(doing);
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 2L)).thenReturn(false);
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 3L)).thenReturn(true);
+
+        taskService.move(1L, new MoveTaskRequest(11L, 0));
+
+        assertThat(task.getAssignees()).containsExactly(ana);
+        verify(activityService).record(project, ActivityAction.ASIGNACION, "Task", 1L,
+                "Quitó a Luis de la tarea 'Tarea' al reabrirla: ya no está en el equipo");
+    }
+
+    @Test
+    @DisplayName("Mover entre columnas sin terminar no comprueba quien sigue en el equipo")
+    void movingBetweenOpenColumnsKeepsAssignees() {
+        board.getColumns().addAll(List.of(todo, doing,
+                BoardColumn.builder().id(12L).name("Hecho").position(2).board(board).build()));
+        User ana = User.builder().id(3L).fullName("Ana").build();
+        Task task = task(1L, "Tarea", todo, 0);
+        task.getAssignees().add(ana);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(boardService.getColumn(11L)).thenReturn(doing);
+
+        taskService.move(1L, new MoveTaskRequest(11L, 0));
+
+        assertThat(task.getAssignees()).containsExactly(ana);
+        verify(teamMemberRepository, never()).existsByTeam_IdAndUser_Id(anyLong(), anyLong());
+    }
+
+    @Test
+    @DisplayName("Al dar de baja una cuenta se sueltan sus tareas sin terminar de todos sus equipos")
+    void releasingOpenTasksOfADisabledAccount() {
+        User carla = User.builder().id(2L).fullName("Carla Ruiz").build();
+        Task tarea = task(1L, "Informe", todo, 0);
+        tarea.getAssignees().add(carla);
+        when(taskRepository.findOpenByAssignee(2L)).thenReturn(List.of(tarea));
+
+        taskService.releaseOpenTasksOf(carla);
+
+        assertThat(tarea.getAssignees()).isEmpty();
+        verify(activityService).record(project, ActivityAction.ASIGNACION, "Task", 1L,
+                "La cuenta de Carla Ruiz se ha dado de baja y deja la tarea 'Informe' sin asignar");
+    }
+
+    @Test
+    @DisplayName("No se puede asignar una tarea a alguien del equipo con la cuenta dada de baja")
+    void cannotAssignADisabledAccount() {
+        User carla = User.builder().id(2L).fullName("Carla Ruiz").enabled(false).build();
+        Task existing = task(1L, "Tarea", todo, 0);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 2L)).thenReturn(true);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(carla));
+
+        TaskRequest request = new TaskRequest("Tarea", null, null, null, null, null, null, List.of(2L));
+
+        assertThatThrownBy(() -> taskService.update(1L, request))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("La cuenta de Carla Ruiz está dada de baja");
+    }
+
+    @Test
+    @DisplayName("Una cuenta dada de baja sigue en sus tareas terminadas y se quita de las abiertas al guardarlas")
+    void disabledAccountStaysOnlyInDoneTasks() {
+        BoardColumn done = BoardColumn.builder().id(12L).name("Hecho").position(2).board(board).build();
+        board.getColumns().addAll(List.of(todo, doing, done));
+        User carla = User.builder().id(2L).fullName("Carla Ruiz").enabled(false).build();
+        Task terminada = task(1L, "Terminada", done, 0);
+        terminada.getAssignees().add(carla);
+        Task abierta = task(2L, "Abierta", doing, 0);
+        abierta.getAssignees().add(carla);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(terminada));
+        when(taskRepository.findById(2L)).thenReturn(Optional.of(abierta));
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 2L)).thenReturn(true);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(carla));
+
+        taskService.update(1L, new TaskRequest("Terminada", null, null, null, null, null, null, List.of(2L)));
+        taskService.update(2L, new TaskRequest("Abierta", null, null, null, null, null, null, List.of(2L)));
+
+        assertThat(terminada.getAssignees()).containsExactly(carla);
+        assertThat(abierta.getAssignees()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Al reabrir una tarea terminada se quita a quien tiene la cuenta dada de baja")
+    void reopeningDropsDisabledAccounts() {
+        BoardColumn done = BoardColumn.builder().id(12L).name("Hecho").position(2).board(board).build();
+        board.getColumns().addAll(List.of(todo, doing, done));
+        User carla = User.builder().id(2L).fullName("Carla Ruiz").enabled(false).build();
+        Task task = task(1L, "Tarea", done, 0);
+        task.getAssignees().add(carla);
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(boardService.getColumn(11L)).thenReturn(doing);
+        when(teamMemberRepository.existsByTeam_IdAndUser_Id(1L, 2L)).thenReturn(true);
+
+        taskService.move(1L, new MoveTaskRequest(11L, 0));
+
+        assertThat(task.getAssignees()).isEmpty();
+        verify(activityService).record(project, ActivityAction.ASIGNACION, "Task", 1L,
+                "Quitó a Carla Ruiz de la tarea 'Tarea' al reabrirla: su cuenta está dada de baja");
+    }
 }

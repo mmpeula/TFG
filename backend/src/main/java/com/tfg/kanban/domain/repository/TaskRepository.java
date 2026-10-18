@@ -44,6 +44,27 @@ public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificat
             """)
     List<Task> findDoneWithoutCompletedAt();
 
+    /**
+     * Las tareas sin terminar (fuera de la ultima columna de su tablero) que esta
+     * persona tiene asignadas en los proyectos de un equipo: las que hay que soltar
+     * cuando se va de el.
+     */
+    @Query("""
+            select t from Task t join t.assignees a join fetch t.boardColumn c
+            where a.id = :userId
+              and c.board.project.team.id = :teamId
+              and c.position < (select max(c2.position) from BoardColumn c2 where c2.board = c.board)
+            """)
+    List<Task> findOpenByTeamAndAssignee(Long teamId, Long userId);
+
+    /** Lo mismo que {@link #findOpenByTeamAndAssignee}, pero en todos sus equipos: para cuando se da de baja su cuenta. */
+    @Query("""
+            select t from Task t join t.assignees a join fetch t.boardColumn c
+            where a.id = :userId
+              and c.position < (select max(c2.position) from BoardColumn c2 where c2.board = c.board)
+            """)
+    List<Task> findOpenByAssignee(Long userId);
+
     /** Pone la fecha de fin directamente en la base de datos: igual que {@link #updatePosition}, no es un cambio de la tarea. */
     @Modifying
     @Query("update Task t set t.completedAt = :completedAt where t.id = :id")

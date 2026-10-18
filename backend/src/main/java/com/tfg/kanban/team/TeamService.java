@@ -8,6 +8,7 @@ import com.tfg.kanban.domain.model.TeamMember;
 import com.tfg.kanban.domain.model.User;
 import com.tfg.kanban.domain.repository.TeamMemberRepository;
 import com.tfg.kanban.domain.repository.TeamRepository;
+import com.tfg.kanban.task.TaskService;
 import com.tfg.kanban.team.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class TeamService {
 
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final TaskService taskService;
 
     public List<TeamMemberResponse> findMembers(Long teamId) {
         getTeam(teamId);
@@ -78,6 +80,9 @@ public class TeamService {
      * quien crea el equipo no se le trata distinto por serlo —tambien puede irse—,
      * pero al hacerlo hay que pasarle la propiedad a otra persona responsable,
      * porque de ella depende quien puede borrar el equipo al quedarse vacio.</p>
+     *
+     * <p>Sus tareas sin terminar se quedan sin el (ver {@link TaskService#releaseOpenTasks});
+     * en las terminadas sigue constando.</p>
      */
     @Transactional
     public void removeMember(Long teamId, Long userId) {
@@ -90,6 +95,7 @@ public class TeamService {
         if (team.getOwner() != null && team.getOwner().getId().equals(userId)) {
             team.setOwner(otroResponsable(team, userId));
         }
+        taskService.releaseOpenTasks(teamId, member.getUser());
         // Por la coleccion y no por el repositorio: Team.members va con cascade ALL y
         // orphanRemoval, asi que si la lista en memoria sigue conteniendo al miembro
         // (basta con haberla leido, como hace otroResponsable), al volcar los cambios

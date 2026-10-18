@@ -237,6 +237,47 @@ class UserControllerIT extends AbstractApiIT {
     }
 
     @Test
+    @DisplayName("Dar de baja una cuenta suelta sus tareas sin terminar y deja de poder asignarsele nada")
+    void disablingReleasesOpenTasks() throws Exception {
+        TestUser admin = registerUser(Role.ADMIN);
+        TestUser responsable = registerUser(Role.MIEMBRO);
+        TestUser carla = registerUser(Role.MIEMBRO);
+        Workspace workspace = createWorkspace(responsable, "Equipo con una baja de cuenta");
+        addMember(responsable, workspace.teamId(), carla, Role.MIEMBRO);
+        long[] columns = columnIds(responsable, workspace.boardId());
+
+        Long abierta = createTask(responsable, columns[0], "Abierta");
+        Long terminada = createTask(responsable, columns[columns.length - 1], "Terminada");
+        for (Long taskId : new Long[]{abierta, terminada}) {
+            mockMvc.perform(authorized(put("/api/tasks/{id}", taskId), responsable)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"title":"Tarea","assigneeIds":[%d]}
+                                    """.formatted(carla.id())))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(authorized(delete("/api/users/{id}", carla.id()), admin))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(authorized(get("/api/tasks/{id}", abierta), responsable))
+                .andExpect(jsonPath("$.assignees.length()").value(0));
+        mockMvc.perform(authorized(get("/api/tasks/{id}", terminada), responsable))
+                .andExpect(jsonPath("$.assignees[0].id").value(carla.id()));
+
+        // Sigue en el equipo, marcada como baja, pero no se le puede dar trabajo.
+        mockMvc.perform(authorized(get("/api/teams/{id}/members", workspace.teamId()), responsable))
+                .andExpect(jsonPath("$[?(@.user.id == %d)].enabled".formatted(carla.id())).value(false));
+        mockMvc.perform(authorized(put("/api/tasks/{id}", abierta), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Tarea","assigneeIds":[%d]}
+                                """.formatted(carla.id())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("dada de baja")));
+    }
+
+    @Test
     @DisplayName("Dar de baja una cuenta la deshabilita; nadie puede darse de baja a si mismo")
     void disableAccount() throws Exception {
         TestUser admin = registerUser(Role.ADMIN);

@@ -606,9 +606,11 @@ public class AiPlanService {
         User creator = SecurityUtils.currentUserId().flatMap(userRepository::findById).orElse(null);
         int position = (int) taskRepository.countByBoardColumn_Id(column.getId());
 
-        // Solo se asigna a gente que pertenezca al equipo del proyecto.
+        // Solo se asigna a gente que pertenezca al equipo del proyecto y tenga la cuenta activa.
         Set<Long> allowed = project.getTeam().getMembers().stream()
-                .map(member -> member.getUser().getId())
+                .map(TeamMember::getUser)
+                .filter(User::isEnabled)
+                .map(User::getId)
                 .collect(Collectors.toSet());
 
         List<Task> created = new ArrayList<>();
