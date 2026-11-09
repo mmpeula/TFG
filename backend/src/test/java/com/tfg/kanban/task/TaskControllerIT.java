@@ -54,6 +54,25 @@ class TaskControllerIT extends AbstractApiIT {
     }
 
     @Test
+    @DisplayName("La descripcion tiene un tope de 10.000 caracteres")
+    void descriptionHasALimit() throws Exception {
+        TestUser responsable = registerUser(Role.MIEMBRO);
+        Workspace workspace = createWorkspace(responsable, "Equipo descripciones");
+        long[] columns = columnIds(responsable, workspace.boardId());
+
+        mockMvc.perform(authorized(post("/api/columns/{id}/tasks", columns[0]), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Larga\",\"description\":\"%s\"}".formatted("a".repeat(10_001))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("description"));
+
+        mockMvc.perform(authorized(post("/api/columns/{id}/tasks", columns[0]), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Justa\",\"description\":\"%s\"}".formatted("a".repeat(10_000))))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     @DisplayName("Mover una tarea de columna la coloca en la posicion pedida y reindexa el origen")
     void moveTaskBetweenColumns() throws Exception {
         TestUser responsable = registerUser(Role.MIEMBRO);

@@ -76,9 +76,10 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
   admin:
     # Cuenta que se crea al arrancar si todavia no existe ningun ADMIN (vease
-    # AdminBootstrapRunner). Cambia estos valores antes de desplegar de verdad.
+    # AdminBootstrapRunner). La contrasena no tiene valor por defecto a proposito: sin
+    # ADMIN_PASSWORD no se crea ninguna cuenta, en vez de crear una con una clave conocida.
     email: ${ADMIN_EMAIL:admin@planifia.local}
-    password: ${ADMIN_PASSWORD:admin123}
+    password: ${ADMIN_PASSWORD:}
   mail:
     # Los avisos de invitacion a un equipo. Con enabled=false no sale ninguno.
     enabled: ${MAIL_ENABLED:true}

@@ -1,5 +1,6 @@
 package com.tfg.kanban.user.dto;
 
+import com.tfg.kanban.common.validation.MaxUtf8Bytes;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -25,6 +26,7 @@ public record UpdateUserRequest(
 
         @Schema(description = "Nueva contrasena; si se omite, no se cambia")
         @Size(min = 8, max = 72, message = "la contraseña debe tener entre 8 y 72 caracteres")
+        @MaxUtf8Bytes(value = 72, message = "la contraseña es demasiado larga: las tildes y la ñ cuentan como dos caracteres")
         String password
 ) {
 }

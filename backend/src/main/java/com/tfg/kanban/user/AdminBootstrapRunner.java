@@ -10,6 +10,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 /**
  * Deja siempre una cuenta ADMIN lista para entrar, porque ese rol no se puede
@@ -35,6 +36,10 @@ public class AdminBootstrapRunner implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         if (userRepository.existsByRoleAndEnabledTrue(Role.ADMIN)) {
+            return;
+        }
+        if (!StringUtils.hasText(adminProperties.getPassword())) {
+            log.warn("No hay ningun administrador y no se ha creado ninguno: falta ADMIN_PASSWORD en la configuracion");
             return;
         }
 

@@ -114,6 +114,17 @@ class InvitationServiceTest {
     }
 
     @Test
+    @DisplayName("No se invita a una cuenta dada de baja: no podria entrar a responder")
+    void cannotInviteADisabledAccount() {
+        invitada.setEnabled(false);
+
+        assertThatThrownBy(() -> service.invite(5L, new InviteRequest("luis@uni.es", null)))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("dada de baja");
+        verify(invitationRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("No se invita a quien ya esta en el equipo")
     void cannotInviteSomeoneAlreadyIn() {
         when(teamMemberRepository.existsByTeam_IdAndUser_Id(5L, 2L)).thenReturn(true);

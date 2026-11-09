@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { DateInput } from '@/components/ui/DateInput'
 import { parseHours } from '@/lib/hours'
+import { MAX_DESCRIPTION } from '@/lib/tasks'
 import { Modal } from '@/components/ui/Modal'
 import { DialogActions } from '@/components/ui/DialogActions'
 import { AssigneePicker } from '@/components/task/AssigneePicker'
@@ -125,6 +126,7 @@ function NewTaskForm({ columns, members, isPending, onClose, onSubmit }: Omit<Pr
             rows={3}
             value={description}
             placeholder="Qué hay que hacer exactamente"
+            maxLength={MAX_DESCRIPTION}
             onChange={(event) => setDescription(event.target.value)}
           />
         </label>

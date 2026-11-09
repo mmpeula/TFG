@@ -11,7 +11,7 @@ import styles from './TaskPanel.module.css'
 import { useCommentMutations, useComments, useTaskMutations } from '@/hooks/useData'
 import { useEscape } from '@/hooks/useEscape'
 import { useFinishPrompt } from '@/hooks/useFinishPrompt'
-import { taskPayload } from '@/lib/tasks'
+import { MAX_DESCRIPTION, taskPayload, withChanges } from '@/lib/tasks'
 import { dropPosition } from '@/lib/board'
 import type { TaskPayload } from '@/api/endpoints'
 import { useAuth } from '@/state/context'
@@ -147,7 +147,12 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
     : `${delta < 0 ? '↓' : '↑'} ${formatHours(Math.abs(delta))} vs. estimado`
 
   function patch(changes: Partial<TaskPayload>) {
-    taskMutations.update.mutate({ taskId: task!.id, payload: taskPayload(task!, changes) })
+    const current = task!
+    taskMutations.update.mutate({
+      taskId: current.id,
+      payload: taskPayload(current, changes),
+      preview: withChanges(current, changes, members.map((member) => member.user)),
+    })
   }
 
   /** Al final de la columna de destino, como el «Mover a» de la tarjeta. */
@@ -226,6 +231,7 @@ export function TaskPanel({ task, columns, members, role, boardId, projectId, on
             placeholder="Sin descripción. Escribe aquí el contexto de la tarea."
             readOnly={!writable}
             aria-label="Descripción"
+            maxLength={MAX_DESCRIPTION}
             onBlur={(event) => {
               if (writable && event.target.value !== (task.description ?? '')) {
                 patch({ description: event.target.value })

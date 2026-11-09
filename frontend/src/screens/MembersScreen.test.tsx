@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { queryClient } from '@/app/query-client'
 import { currentPath, renderApp } from '@/test/app'
 import { HttpError, server } from '@/test/server'
 
@@ -83,6 +84,18 @@ describe('MembersScreen', () => {
     await user.click(within(screen.getByRole('dialog', { name: 'Quitar a Pablo Ortega' })).getByRole('button', { name: 'Quitar' }))
     expect(await screen.findByText('Ya no está en el espacio de trabajo')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText('pablo@uni.es')).not.toBeInTheDocument())
+  })
+
+  it('al quitar a alguien se recarga el tablero, porque el servidor suelta sus tareas', async () => {
+    // Un tablero ya visto: con la cache de 30 s seguiria ensenando a Pablo en sus tareas.
+    queryClient.setQueryData(['boards', 999], { id: 999, columns: [] })
+    const { user } = renderApp(MIEMBROS, { as: 'lucia' })
+    await screen.findByText('Pablo Ortega')
+    const fila = screen.getByText('pablo@uni.es').closest('li')!
+    await user.click(within(fila).getByRole('button', { name: 'Quitar del espacio de trabajo' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Quitar a Pablo Ortega' })).getByRole('button', { name: 'Quitar' }))
+    await screen.findByText('Ya no está en el espacio de trabajo')
+    expect(queryClient.getQueryState(['boards', 999])?.isInvalidated).toBe(true)
   })
 
   it('un alumno ve el equipo, no invita, y puede salirse', async () => {

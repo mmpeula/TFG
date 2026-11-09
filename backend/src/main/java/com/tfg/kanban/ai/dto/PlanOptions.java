@@ -1,6 +1,8 @@
 package com.tfg.kanban.ai.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -40,6 +42,14 @@ public record PlanOptions(
         @Valid
         List<TeamSlot> team
 ) {
+
+    /** La entrega no puede ser antes del inicio: el plan se quedaria sin dias en los que repartir. */
+    @JsonIgnore
+    @Schema(hidden = true)
+    @AssertTrue(message = "la fecha de entrega no puede ser anterior a la de inicio")
+    public boolean isFechasEnOrden() {
+        return startDate == null || deadline == null || !deadline.isBefore(startDate);
+    }
 
     /** Sin nada ajustado: todo sale del espacio de trabajo y del equipo. */
     public static PlanOptions defaults() {

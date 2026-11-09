@@ -5,7 +5,7 @@ import {
 } from '@/api/endpoints'
 import { toErrorMessage } from '@/lib/api-client'
 import { useUi } from '@/state/context'
-import type { Role } from '@/types/api'
+import type { BoardResponse, Role, TaskResponse } from '@/types/api'
 
 export const keys = {
   workspaces: ['workspaces'] as const,
@@ -253,6 +253,14 @@ export function useMemberMutations(teamId?: number) {
     // La tarjeta del workspace muestra cuanta gente hay.
     queryClient.invalidateQueries({ queryKey: keys.workspaces })
   }
+  // Quien sale deja sus tareas sin terminar (las suelta el servidor), y queda anotado en la
+  // actividad: sin esto el tablero lo seguiria ensenando asignado hasta que caducara la cache.
+  const invalidateWork = () => {
+    invalidate()
+    queryClient.invalidateQueries({ queryKey: ['boards'] })
+    queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    queryClient.invalidateQueries({ queryKey: ['projects'] })
+  }
 
   return {
     updateRole: useMutation({
@@ -274,7 +282,7 @@ export function useMemberMutations(teamId?: number) {
     }),
     removeMember: useMutation({
       mutationFn: (userId: number) => teams.removeMember(teamId!, userId),
-      onSuccess: () => { invalidate(); pushToast('Ya no está en el espacio de trabajo') },
+      onSuccess: () => { invalidateWork(); pushToast('Ya no está en el espacio de trabajo') },
       onError,
     }),
   }
@@ -375,6 +383,8 @@ export function useAdminUserMutations() {
   }
 }
 
+const TASK_UPDATE = ['task-update'] as const
+
 export function useTaskMutations(boardId?: number, projectId?: number) {
   const queryClient = useQueryClient()
   const { pushToast } = useUi()
@@ -394,10 +404,35 @@ export function useTaskMutations(boardId?: number, projectId?: number) {
       onSuccess: () => { invalidate(); pushToast('Tarea creada') },
       onError,
     }),
+    /**
+     * Cada cambio manda la tarea entera, asi que dos seguidos (marcar a dos personas en el
+     * selector, por ejemplo) no pueden partir de la misma foto de la tarea: el segundo
+     * borraria al primero. Por eso el tablero ensena el cambio en el acto (`preview`), los
+     * guardados van de uno en uno y solo se recarga al acabar el ultimo; si se recargara
+     * tras cada uno, la respuesta del primero volveria a pintar la tarea sin el segundo.
+     */
     update: useMutation({
-      mutationFn: ({ taskId, payload }: { taskId: number; payload: TaskPayload }) => tasks.update(taskId, payload),
-      onSuccess: () => { invalidate(); pushToast('Tarea actualizada') },
+      mutationKey: TASK_UPDATE,
+      scope: { id: 'task-update' },
+      mutationFn: ({ taskId, payload }: { taskId: number; payload: TaskPayload; preview?: TaskResponse }) =>
+        tasks.update(taskId, payload),
+      onMutate: async ({ preview }) => {
+        if (!preview || !boardId) return
+        await queryClient.cancelQueries({ queryKey: keys.board(boardId) })
+        queryClient.setQueryData<BoardResponse>(keys.board(boardId), (board) => board && {
+          ...board,
+          columns: board.columns?.map((column) => ({
+            ...column,
+            tasks: column.tasks?.map((item) => (item.id === preview.id ? preview : item)),
+          })),
+        })
+      },
+      onSuccess: () => pushToast('Tarea actualizada'),
+      // Si falla, la recarga del final devuelve la tarea a lo que de verdad hay guardado.
       onError,
+      onSettled: () => {
+        if (queryClient.isMutating({ mutationKey: TASK_UPDATE }) <= 1) invalidate()
+      },
     }),
     /** Persiste el drag & drop. Si el backend lo rechaza, se recarga el tablero. */
     move: useMutation({

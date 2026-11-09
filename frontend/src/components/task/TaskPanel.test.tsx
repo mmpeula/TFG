@@ -141,6 +141,36 @@ describe('TaskPanel: editar', () => {
     await waitFor(() => expect(ultimoPut(503)).toMatchObject({ assigneeIds: [2] }))
   })
 
+  it('marcar a dos personas seguidas no pierde a la primera, aunque el servidor tarde', async () => {
+    // Con la red lenta, el segundo clic llegaba antes de que se recargara el tablero y se
+    // mandaba sin la primera persona: la tarea acababa solo con la segunda.
+    let soltar!: () => void
+    const primeraEnCamino = new Promise<void>((resolve) => { soltar = resolve })
+    let llamadas = 0
+    server.on('put', '/tasks/:id', async (ctx) => {
+      if (++llamadas === 1) await primeraEnCamino
+      const task = ctx.db.tasks.find((item) => item.id === Number(ctx.params.id))!
+      const ids = (ctx.body as { assigneeIds: number[] }).assigneeIds
+      task.assignees = ids.map((id) => {
+        const person = Object.values(ctx.db.users).find((item) => item.id === id)!
+        return { id: person.id, fullName: person.fullName, email: person.email, avatarUrl: null }
+      })
+      return task
+    })
+    const { user, panel } = await abrir(503)
+    await user.click(within(panel).getByText('··').closest('button')!)
+    await user.click(screen.getAllByRole('button', { name: /Pablo Ortega/ }).at(-1)!)
+    await user.click(screen.getAllByRole('button', { name: /Elena Navarro/ }).at(-1)!)
+
+    // Mientras la primera sigue sin contestar, el panel ya ensena a las dos.
+    expect(within(panel).getByText('Pablo Ortega, Elena Navarro')).toBeInTheDocument()
+    soltar()
+
+    await waitFor(() => expect(server.callsTo('put', '/tasks/503')).toHaveLength(2))
+    expect(ultimoPut(503)).toMatchObject({ assigneeIds: [2, 3] })
+    await waitFor(() => expect(server.db.tasks.find((item) => item.id === 503)!.assignees.map((a) => a.id)).toEqual([2, 3]))
+  })
+
   it('cambiar el estado a «Hecho» mueve la tarea y pregunta las horas', async () => {
     const { user, panel } = await abrir(502)
     await user.click(within(panel).getByRole('button', { name: /^En progreso/ }))

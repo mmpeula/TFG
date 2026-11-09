@@ -26,11 +26,12 @@ interface Props {
  * Alta y edicion de un workspace.
  *
  * Nombre, descripcion, color e icono se eligen igual al crear que al editar: son
- * identidad del workspace, no hay motivo para posponerlos. Lo que si se pospone
- * son las fechas y la duracion del sprint, porque esas normalmente ya estan
- * escritas en el guion de la practica: se piden solo al editar, y al crear se
- * rellenan despues por dos caminos — se piden al generar el plan (ver
- * `GeneratePlanScreen`), o se ajustan aqui mismo, en modo edicion, desde Ajustes.
+ * identidad del workspace, no hay motivo para posponerlos. La duracion del sprint
+ * tambien se elige al crear (tiene un valor por defecto, asi que no estorba). Lo que
+ * si se pospone son las fechas, porque normalmente ya estan escritas en el guion
+ * de la practica: se piden solo al editar, y al crear se rellenan despues por dos
+ * caminos — se piden al generar el plan (ver `GeneratePlanScreen`), o se ajustan
+ * aqui mismo, en modo edicion, desde Ajustes.
  */
 export function WorkspaceFormModal({ open, workspace, isPending, onClose, onSubmit }: Props) {
   // El formulario solo existe mientras el dialogo esta abierto: asi se rellena al
@@ -65,18 +66,18 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
   async function submit() {
     if (!valido || isPending || guardandoFoto) return
     try {
-      // Al crear no se mandan fechas ni duracion de sprint: eso se propone desde el
-      // guion (si lo dice) o se ajusta luego a mano, nunca se rellena aqui con un
-      // valor inventado. El resto de la identidad del workspace si se manda ya.
+      // Al crear no se mandan fechas: se proponen desde el guion (si las dice) o se
+      // ajustan luego a mano, nunca se rellenan aqui con un valor inventado. La
+      // duracion del sprint si se manda siempre, tambien al crear.
       const saved = await onSubmit({
         name: name.trim(),
         description: description.trim() || undefined,
         color,
         icon: icon.trim() || undefined,
+        sprintDays: Number(sprintDays),
         ...(editing && {
           startDate: startDate || null,
           deadline: deadline || null,
-          sprintDays: Number(sprintDays),
         }),
       })
 
@@ -185,10 +186,21 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
           </div>
         )}
 
+        <div className={styles.label}>
+          Duración de cada sprint
+          <Segmented
+            options={SPRINT_DURATIONS}
+            value={sprintDays}
+            onChange={setSprintDays}
+            ariaLabel="Duración del sprint"
+          />
+          <span className={styles.hint}>Vale para todo el plan; se puede cambiar más tarde en los ajustes.</span>
+        </div>
+
         {!editing && (
           <p className={styles.createHint}>
-            Las fechas y la duración del sprint se proponen solas al subir el guion al
-            generar el plan —si el documento las dice— o se ajustan luego a mano desde Ajustes.
+            Las fechas se proponen solas al subir el guion al generar el plan
+            —si el documento las dice— o se ajustan luego a mano desde Ajustes.
           </p>
         )}
 
@@ -213,17 +225,6 @@ function WorkspaceForm({ workspace, isPending, onClose, onSubmit }: Omit<Props, 
                   onChange={setDeadline}
                 />
               </label>
-            </div>
-
-            <div className={styles.label}>
-              Duración de cada sprint
-              <Segmented
-                options={SPRINT_DURATIONS}
-                value={sprintDays}
-                onChange={setSprintDays}
-                ariaLabel="Duración del sprint"
-              />
-              <span className={styles.hint}>Vale para todo el plan; se puede cambiar más tarde en los ajustes.</span>
             </div>
           </>
         )}

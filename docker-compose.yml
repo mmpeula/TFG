@@ -88,10 +88,10 @@ services:
       MAIL_FROM: ${MAIL_FROM:-no-reply@planifia.local}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
       # Cuenta de administrador de la plataforma que se crea al primer arranque
-      # si todavia no existe ninguna (vease AdminBootstrapRunner). Cambia el
-      # valor por defecto antes de desplegar de verdad.
+      # si todavia no existe ninguna (vease AdminBootstrapRunner). Sin
+      # ADMIN_PASSWORD no se crea ninguna: no hay contrasena por defecto.
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@planifia.local}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     volumes:
       # Las fotos de perfil y de los espacios viven fuera del contenedor.
       - uploads-data:/app/uploads

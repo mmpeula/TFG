@@ -58,6 +58,10 @@ public class InvitationService {
                         "No hay ninguna cuenta en PlanifIA con el email " + email
                                 + ". Dile que se registre y vuelve a invitarle."));
 
+        if (!invited.isEnabled()) {
+            // No podria entrar a responderla: se quedaria pendiente para siempre.
+            throw new BusinessRuleException("La cuenta de " + email + " está dada de baja");
+        }
         if (teamMemberRepository.existsByTeam_IdAndUser_Id(teamId, invited.getId())) {
             throw new BusinessRuleException("Esa persona ya está en el equipo");
         }

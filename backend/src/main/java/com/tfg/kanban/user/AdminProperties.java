@@ -14,5 +14,6 @@ public class AdminProperties {
     /** Cuenta que {@link AdminBootstrapRunner} crea si todavia no hay ningun ADMIN. */
     private String email = "admin@planifia.local";
 
-    private String password = "admin123";
+    /** Sin valor por defecto: una clave conocida por todos no protege nada. Sin ella no se crea la cuenta. */
+    private String password;
 }

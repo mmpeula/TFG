@@ -167,6 +167,30 @@ class WorkspaceControllerIT extends AbstractApiIT {
     }
 
     @Test
+    @DisplayName("La fecha de entrega no puede ser anterior a la de inicio")
+    void deadlineCannotBeBeforeStart() throws Exception {
+        TestUser user = registerUser(Role.MIEMBRO);
+        Long workspaceId = createWorkspace(user, "Fechas al reves").id();
+
+        mockMvc.perform(authorized(put("/api/workspaces/{id}", workspaceId), user)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Fechas al reves","startDate":"2026-12-01","deadline":"2026-11-01"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].message")
+                        .value("la fecha de entrega no puede ser anterior a la de inicio"));
+
+        // El mismo dia si vale.
+        mockMvc.perform(authorized(put("/api/workspaces/{id}", workspaceId), user)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Fechas al reves","startDate":"2026-12-01","deadline":"2026-12-01"}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("Editar cambia nombre, color, icono y la ventana de fechas")
     void updateChangesTheCard() throws Exception {
         TestUser user = registerUser(Role.MIEMBRO);

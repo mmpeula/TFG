@@ -157,6 +157,19 @@ class AuthControllerIT extends AbstractApiIT {
     }
 
     @Test
+    @DisplayName("Una contrasena de mas de 72 bytes se rechaza con 400, aunque tenga menos de 72 caracteres")
+    void rejectsPasswordsLongerThanBcryptAllows() throws Exception {
+        // 40 eñes: 40 caracteres, pero 80 bytes. BCrypt no admite mas de 72 y antes esto era un 500.
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"eñes-%s@uni.es","password":"%s","fullName":"Larga"}
+                                """.formatted(java.util.UUID.randomUUID(), "ñ".repeat(40))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("password"));
+    }
+
+    @Test
     @DisplayName("Sin token, /me responde 401")
     void meRequiresToken() throws Exception {
         mockMvc.perform(get("/api/auth/me"))

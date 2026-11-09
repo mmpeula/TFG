@@ -5,6 +5,7 @@ import com.tfg.kanban.common.PageResponse;
 import com.tfg.kanban.common.ResourceNotFoundException;
 import com.tfg.kanban.domain.model.Role;
 import com.tfg.kanban.domain.model.User;
+import com.tfg.kanban.domain.repository.TeamMemberRepository;
 import com.tfg.kanban.domain.repository.UserRepository;
 import com.tfg.kanban.security.SecurityUtils;
 import com.tfg.kanban.storage.FileStorageService;
@@ -27,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final TeamMemberRepository teamMemberRepository;
     private final PasswordEncoder passwordEncoder;
     private final FileStorageService fileStorageService;
     private final TaskService taskService;
@@ -96,6 +98,17 @@ public class UserService {
                 case DOCENTE -> "Un docente solo puede pasar a administrador: no puede volver a ser alumno";
                 default -> "Una cuenta de alumno solo puede pasar a docente o a administrador";
             });
+        }
+        // Un administrador no pertenece a ningun equipo y la aplicacion no le deja entrar en
+        // ellos: si se le asciende estando dentro, sus espacios se quedan sin quien los lleve
+        // (y si era su unica persona responsable, sin nadie que pueda administrarlos).
+        if (target == Role.ADMIN && user.getRole() != Role.ADMIN) {
+            long equipos = teamMemberRepository.countByUser_Id(id);
+            if (equipos > 0) {
+                throw new BusinessRuleException(("Esta cuenta está en %d %s: tiene que salir antes de pasar a "
+                        + "administrador, porque un administrador no pertenece a ningún equipo")
+                        .formatted(equipos, equipos == 1 ? "espacio de trabajo" : "espacios de trabajo"));
+            }
         }
         user.setRole(target);
         return UserResponse.from(user);

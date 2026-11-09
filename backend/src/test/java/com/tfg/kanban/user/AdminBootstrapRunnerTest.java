@@ -75,4 +75,15 @@ class AdminBootstrapRunnerTest {
         assertThat(existing.isEnabled()).isTrue();
         assertThat(existing.getPasswordHash()).isEqualTo("hash-que-ya-tenia");
     }
+
+    @Test
+    @DisplayName("Sin contrasena configurada no se crea ningun administrador con una clave conocida")
+    void withoutPasswordNoAdminIsCreated() {
+        properties.setPassword(" ");
+        when(userRepository.existsByRoleAndEnabledTrue(Role.ADMIN)).thenReturn(false);
+
+        runner.run(null);
+
+        verify(userRepository, never()).save(any());
+    }
 }

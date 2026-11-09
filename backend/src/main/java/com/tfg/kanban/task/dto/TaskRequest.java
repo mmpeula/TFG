@@ -22,6 +22,7 @@ public record TaskRequest(
         @Size(max = 200)
         String title,
 
+        @Size(max = MAX_DESCRIPTION, message = "la descripción no puede superar los 10.000 caracteres")
         String description,
 
         @Schema(description = "Si se omite, TAREA")
@@ -44,4 +45,7 @@ public record TaskRequest(
         @Schema(description = "Ids de los miembros asignados; vacio o null para dejarla sin asignar")
         List<Long> assigneeIds
 ) {
+
+    /** Holgado para cualquier descripcion escrita a mano o generada, sin dejar meter un libro entero. */
+    public static final int MAX_DESCRIPTION = 10_000;
 }

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { queryClient } from '@/app/query-client'
 import { resetServer } from './server'
@@ -23,6 +23,11 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: () => {},
   }),
 })
+// Los findBy* esperan 1 s por defecto. Con la suite completa corriendo a la vez que los tests
+// de integracion del backend la maquina va cargada y alguna pantalla tardaba algo mas: fallaba
+// sin que la app hiciera nada mal. Esto solo alarga la espera, no cambia lo que se comprueba.
+configure({ asyncUtilTimeout: 3000 })
+
 URL.createObjectURL = vi.fn(() => 'blob:foto')
 URL.revokeObjectURL = vi.fn()
 Element.prototype.scrollIntoView = vi.fn()

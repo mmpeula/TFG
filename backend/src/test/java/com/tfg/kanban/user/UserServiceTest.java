@@ -4,6 +4,7 @@ import com.tfg.kanban.TestSecurity;
 import com.tfg.kanban.common.BusinessRuleException;
 import com.tfg.kanban.domain.model.Role;
 import com.tfg.kanban.domain.model.User;
+import com.tfg.kanban.domain.repository.TeamMemberRepository;
 import com.tfg.kanban.domain.repository.UserRepository;
 import com.tfg.kanban.task.TaskService;
 import com.tfg.kanban.user.dto.UpdateGlobalRoleRequest;
@@ -47,6 +48,8 @@ class UserServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private TaskService taskService;
+    @Mock
+    private TeamMemberRepository teamMemberRepository;
 
     @InjectMocks
     private UserService userService;
@@ -249,5 +252,22 @@ class UserServiceTest {
 
         verify(taskService).releaseOpenTasksOf(user);
         assertThat(user.isEnabled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("No se asciende a administrador a quien esta en algun espacio de trabajo")
+    void cannotPromoteToAdminWhileInATeam() {
+        User user = User.builder().id(2L).email("ana@uni.es").role(Role.MIEMBRO).build();
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        when(teamMemberRepository.countByUser_Id(2L)).thenReturn(1L);
+
+        assertThatThrownBy(() -> userService.updateGlobalRole(2L, new UpdateGlobalRoleRequest(Role.ADMIN)))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Esta cuenta está en 1 espacio de trabajo");
+        assertThat(user.getRole()).isEqualTo(Role.MIEMBRO);
+
+        // A docente si: sigue pudiendo estar en sus equipos.
+        userService.updateGlobalRole(2L, new UpdateGlobalRoleRequest(Role.DOCENTE));
+        assertThat(user.getRole()).isEqualTo(Role.DOCENTE);
     }
 }

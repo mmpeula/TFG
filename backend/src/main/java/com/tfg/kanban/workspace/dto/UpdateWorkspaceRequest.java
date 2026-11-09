@@ -1,6 +1,8 @@
 package com.tfg.kanban.workspace.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -38,4 +40,12 @@ public record UpdateWorkspaceRequest(
         @Max(value = 28, message = "un sprint dura como mucho cuatro semanas")
         Integer sprintDays
 ) {
+
+    /** La entrega no puede ser antes del inicio: el plan se quedaria sin dias en los que repartir. */
+    @JsonIgnore
+    @Schema(hidden = true)
+    @AssertTrue(message = "la fecha de entrega no puede ser anterior a la de inicio")
+    public boolean isFechasEnOrden() {
+        return startDate == null || deadline == null || !deadline.isBefore(startDate);
+    }
 }

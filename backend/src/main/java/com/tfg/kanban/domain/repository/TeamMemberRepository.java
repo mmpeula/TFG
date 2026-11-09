@@ -41,6 +41,9 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
 
     long countByTeam_IdAndRole(Long teamId, Role role);
 
+    /** En cuantos equipos esta una persona, con cualquier rol. */
+    long countByUser_Id(Long userId);
+
     /** Cuantos miembros tiene cada equipo del lote. Evita una consulta por workspace. */
     @Query("""
             select new com.tfg.kanban.common.CountByEntity(m.team.id, count(m))

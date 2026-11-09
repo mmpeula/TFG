@@ -59,8 +59,21 @@ describe('WorkspacesScreen', () => {
 
     await waitFor(() => expect(currentPath()).toBe('/workspaces/100/plan'))
     expect(server.callsTo('post', '/workspaces')[0].body).toMatchObject({
-      name: 'Redes', description: 'Práctica de sockets', icon: 'RD',
+      name: 'Redes', description: 'Práctica de sockets', icon: 'RD', sprintDays: 14,
     })
+  })
+
+  it('al crear permite elegir la duración del sprint', async () => {
+    const { user } = renderApp('/workspaces', { as: 'lucia' })
+    await user.click(await screen.findByRole('button', { name: 'Nuevo espacio de trabajo' }))
+    const dialogo = screen.getByRole('dialog', { name: 'Nuevo espacio de trabajo' })
+
+    await user.type(within(dialogo).getByPlaceholderText('Bases de Datos'), 'Redes')
+    await user.click(within(dialogo).getByRole('tab', { name: '1 semana' }))
+    await user.click(within(dialogo).getByRole('button', { name: 'Crear espacio de trabajo' }))
+
+    await waitFor(() => expect(server.callsTo('post', '/workspaces')).toHaveLength(1))
+    expect(server.callsTo('post', '/workspaces')[0].body).toMatchObject({ name: 'Redes', sprintDays: 7 })
   })
 
   it('al crear con foto la sube despues del alta', async () => {
