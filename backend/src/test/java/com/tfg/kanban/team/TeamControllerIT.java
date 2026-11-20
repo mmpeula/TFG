@@ -6,6 +6,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
+import java.util.Arrays;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -121,6 +125,67 @@ class TeamControllerIT extends AbstractApiIT {
         // Y quien queda es ya el unico responsable: no puede irse tambien.
         mockMvc.perform(authorized(delete("/api/teams/{id}/members/{userId}", teamId, companero.id()), companero))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("Al salir del equipo se sueltan sus tareas sin terminar; en las terminadas sigue constando")
+    void leavingReleasesOpenTasksButKeepsDoneOnes() throws Exception {
+        TestUser responsable = registerUser(Role.MIEMBRO);
+        TestUser companero = registerUser(Role.MIEMBRO);
+        Workspace workspace = createWorkspace(responsable, "Equipo con una baja");
+        Long teamId = workspace.teamId();
+        addMember(responsable, teamId, companero, Role.MIEMBRO);
+        long[] columns = columnIds(responsable, workspace.boardId());
+        long hecho = columns[columns.length - 1];
+
+        Long soloSuya = createTask(responsable, columns[0], "Solo suya");
+        Long compartida = createTask(responsable, columns[1], "Compartida");
+        Long terminada = createTask(responsable, hecho, "Terminada");
+        assign(responsable, soloSuya, "Solo suya", companero.id());
+        assign(responsable, compartida, "Compartida", companero.id(), responsable.id());
+        assign(responsable, terminada, "Terminada", companero.id());
+
+        mockMvc.perform(authorized(delete("/api/teams/{id}/members/{userId}", teamId, companero.id()), companero))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(authorized(get("/api/tasks/{id}", soloSuya), responsable))
+                .andExpect(jsonPath("$.assignees.length()").value(0));
+        mockMvc.perform(authorized(get("/api/tasks/{id}", compartida), responsable))
+                .andExpect(jsonPath("$.assignees.length()").value(1))
+                .andExpect(jsonPath("$.assignees[0].id").value(responsable.id()));
+        mockMvc.perform(authorized(get("/api/tasks/{id}", terminada), responsable))
+                .andExpect(jsonPath("$.assignees.length()").value(1))
+                .andExpect(jsonPath("$.assignees[0].id").value(companero.id()));
+
+        // La terminada se sigue pudiendo editar sin quitarle a quien la hizo.
+        mockMvc.perform(authorized(put("/api/tasks/{id}", terminada), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Terminada y revisada","assigneeIds":[%d]}
+                                """.formatted(companero.id())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignees[0].id").value(companero.id()));
+
+        // Pero ya no se le puede asignar nada nuevo.
+        mockMvc.perform(authorized(put("/api/tasks/{id}", soloSuya), responsable)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Solo suya","assigneeIds":[%d]}
+                                """.formatted(companero.id())))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(authorized(get("/api/projects/{id}/activity", workspace.id()), responsable))
+                .andExpect(jsonPath("$.content[*].details",
+                        hasItem(containsString("deja la tarea 'Solo suya' sin asignar"))));
+    }
+
+    private void assign(TestUser user, Long taskId, String title, Long... assigneeIds) throws Exception {
+        mockMvc.perform(authorized(put("/api/tasks/{id}", taskId), user)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"%s","assigneeIds":%s}
+                                """.formatted(title, Arrays.toString(assigneeIds))))
+                .andExpect(status().isOk());
     }
 
     @Test

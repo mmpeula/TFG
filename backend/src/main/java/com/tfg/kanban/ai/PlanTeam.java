@@ -52,9 +52,11 @@ final class PlanTeam {
      * @param slots       lo que dice el formulario; null o vacio es "todo el equipo"
      */
     static PlanTeam resolve(List<TeamMember> teamMembers, List<PlanOptions.TeamSlot> slots) {
-        // El docente solo sigue el equipo: no entra en ningun reparto.
+        // El docente solo sigue el equipo: no entra en ningun reparto. Una cuenta dada
+        // de baja tampoco, aunque siga en el equipo: no podria hacer nada de lo que se le de.
         List<TeamMember> elegibles = teamMembers.stream()
                 .filter(member -> member.getRole() != Role.DOCENTE)
+                .filter(member -> member.getUser().isEnabled())
                 .toList();
 
         List<Member> result = new ArrayList<>();

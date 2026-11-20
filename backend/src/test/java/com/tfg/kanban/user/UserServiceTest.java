@@ -5,6 +5,7 @@ import com.tfg.kanban.common.BusinessRuleException;
 import com.tfg.kanban.domain.model.Role;
 import com.tfg.kanban.domain.model.User;
 import com.tfg.kanban.domain.repository.UserRepository;
+import com.tfg.kanban.task.TaskService;
 import com.tfg.kanban.user.dto.UpdateGlobalRoleRequest;
 import com.tfg.kanban.user.dto.UpdateUserRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +23,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -41,6 +45,8 @@ class UserServiceTest {
     private UserRepository userRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
+    @Mock
+    private TaskService taskService;
 
     @InjectMocks
     private UserService userService;
@@ -156,6 +162,8 @@ class UserServiceTest {
         userService.disable(1L);
 
         assertThat(admin.isEnabled()).isFalse();
+        // Sus tareas ya se soltaron cuando se dio de baja la primera vez.
+        verify(taskService, never()).releaseOpenTasksOf(any());
     }
 
     @Test
@@ -228,5 +236,18 @@ class UserServiceTest {
         userService.enable(2L);
 
         assertThat(user.isEnabled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Dar de baja una cuenta suelta sus tareas sin terminar")
+    void disablingReleasesOpenTasks() {
+        TestSecurity.authenticateAs(9L, "ADMIN");
+        User user = User.builder().id(2L).email("carla@uni.es").fullName("Carla Ruiz").build();
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+
+        userService.disable(2L);
+
+        verify(taskService).releaseOpenTasksOf(user);
+        assertThat(user.isEnabled()).isFalse();
     }
 }

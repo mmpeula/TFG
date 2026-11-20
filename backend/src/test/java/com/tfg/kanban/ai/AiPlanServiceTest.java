@@ -1172,6 +1172,24 @@ class AiPlanServiceTest {
     }
 
     @Test
+    @DisplayName("Al aplicar el plan no se asigna nada a una cuenta dada de baja")
+    void applySkipsDisabledAccounts() {
+        project.getTeam().getMembers().get(1).getUser().setEnabled(false);
+        Board board = Board.builder().id(3L).project(project).build();
+        board.getColumns().add(BoardColumn.builder().id(10L).name("Por hacer").position(0).board(board).build());
+        when(boardService.getBoard(3L)).thenReturn(board);
+        when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.apply(7L, new ApplyPlanRequest(3L, List.of(
+                new ProposedTask("Tarea", null, null, null, null, null, null, null, null,
+                        List.of(2L), List.of("Luis Perez"), null, null))));
+
+        ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
+        verify(taskRepository).save(captor.capture());
+        assertThat(captor.getValue().getAssignees()).isEmpty();
+    }
+
+    @Test
     @DisplayName("No se pueden aplicar tareas a un tablero de otro proyecto")
     void applyRejectsForeignBoard() {
         Board board = Board.builder().id(3L).project(Project.builder().id(99L).name("Otro").build()).build();
@@ -1183,5 +1201,19 @@ class AiPlanServiceTest {
         assertThatThrownBy(() -> service.apply(7L, request))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("no pertenece");
+    }
+
+    @Test
+    @DisplayName("Una cuenta dada de baja no entra en el reparto aunque siga en el equipo")
+    void disabledAccountsAreLeftOutOfThePlan() {
+        project.getTeam().getMembers().get(1).getUser().setEnabled(false);
+        modelReplies(PLAN_VALIDO);
+
+        service.generate(7L, null);
+
+        assertThat(promptDeUsuario())
+                .contains("EQUIPO (1 persona)")
+                .contains("Ana García")
+                .doesNotContain("Luis Perez");
     }
 }

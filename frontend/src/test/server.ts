@@ -40,7 +40,7 @@ function seed() {
 
   const members: TeamMemberResponse[] = Object.entries(teamRoles).map(([id, role]) => {
     const user = Object.values(users).find((item) => item.id === Number(id))!
-    return { id: Number(id), user: summary(user), role, joinedAt: '2026-09-02T10:00:00', planNotes: null }
+    return { id: Number(id), user: summary(user), role, joinedAt: '2026-09-02T10:00:00', enabled: true, planNotes: null }
   })
 
   const col = (id: number) => ({ 10: 'Por hacer', 20: 'En progreso', 30: 'En revisión', 40: 'Hecho' } as Record<number, string>)[id]
@@ -378,7 +378,7 @@ routes = [
   compile('get', '/invitations/mine', ({ db }) => db.myInvitations),
   compile('post', '/invitations/:token/accept', ({ params, db, me }) => {
     db.myInvitations = db.myInvitations.filter((item) => item.token !== params.token)
-    return { id: 1, user: summary(me!), role: 'MIEMBRO', joinedAt: `${HOY}T12:00:00` }
+    return { id: 1, user: summary(me!), role: 'MIEMBRO', joinedAt: `${HOY}T12:00:00`, enabled: true }
   }),
   compile('post', '/invitations/:token/reject', ({ params, db }) => {
     db.myInvitations = db.myInvitations.filter((item) => item.token !== params.token)

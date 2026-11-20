@@ -9,7 +9,7 @@ import java.time.Instant;
 
 @Schema(description = "Miembro de un equipo con su rol en ese equipo", example = """
         {"id":3,"user":{"id":1,"fullName":"Ana Garcia","email":"ana@uni.es"},
-         "role":"RESPONSABLE","joinedAt":"2026-08-21T10:15:30Z",
+         "role":"RESPONSABLE","joinedAt":"2026-08-21T10:15:30Z","enabled":true,
          "planNotes":"Se maneja con React y le gusta la parte visual."}
         """)
 public record TeamMemberResponse(
@@ -18,6 +18,9 @@ public record TeamMemberResponse(
         Role role,
         Instant joinedAt,
 
+        @Schema(description = "false si su cuenta esta dada de baja: sigue en el equipo, pero no se le asignan tareas")
+        boolean enabled,
+
         @Schema(description = "Lo que se sabe de esta persona al repartir trabajo en un plan. "
                 + "Se guarda y vale para todas las ejecuciones.")
         String planNotes
@@ -25,6 +28,6 @@ public record TeamMemberResponse(
 
     public static TeamMemberResponse from(TeamMember member) {
         return new TeamMemberResponse(member.getId(), UserSummary.from(member.getUser()),
-                member.getRole(), member.getCreatedAt(), member.getPlanNotes());
+                member.getRole(), member.getCreatedAt(), member.getUser().isEnabled(), member.getPlanNotes());
     }
 }

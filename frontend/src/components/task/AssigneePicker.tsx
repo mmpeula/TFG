@@ -21,8 +21,11 @@ interface Props {
 export function AssigneePicker({ members, selected, onChange, align = 'left', className }: Props) {
   const selectedIds = selected.map((user) => user.id)
   // Los docentes siguen el trabajo, no lo hacen: no se les asignan tareas (el filtro por persona y
-  // el resumen del equipo tampoco los cuentan). Solo sale uno si ya lo estaba, para poder quitarlo.
-  const elegibles = members.filter((member) => member.role !== 'DOCENTE' || selectedIds.includes(member.user.id))
+  // el resumen del equipo tampoco los cuentan). Una cuenta dada de baja tampoco puede hacer nada.
+  // Solo sale alguno de ellos si ya lo estaba, para poder quitarlo.
+  const elegibles = members.filter(
+    (member) => (member.role !== 'DOCENTE' && member.enabled) || selectedIds.includes(member.user.id),
+  )
 
   function toggle(userId: number) {
     onChange(

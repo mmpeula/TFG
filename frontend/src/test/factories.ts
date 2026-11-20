@@ -38,6 +38,11 @@ export function user(id: number, fullName: string): UserSummary {
   return { id, fullName, email: `${id}@uni.es`, avatarUrl: null }
 }
 
-export function member(id: number, fullName: string, role: TeamMemberResponse['role'] = 'MIEMBRO'): TeamMemberResponse {
-  return { id, user: user(id, fullName), role, joinedAt: '2026-09-01T10:00:00' }
+export function member(
+  id: number,
+  fullName: string,
+  role: TeamMemberResponse['role'] = 'MIEMBRO',
+  enabled = true,
+): TeamMemberResponse {
+  return { id, user: user(id, fullName), role, joinedAt: '2026-09-01T10:00:00', enabled }
 }

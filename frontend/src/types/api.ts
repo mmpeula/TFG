@@ -114,6 +114,8 @@ export interface TeamMemberResponse {
   user: UserSummary
   role: Role
   joinedAt: string
+  /** false si su cuenta esta dada de baja: sigue en el equipo, pero no se le asignan tareas. */
+  enabled: boolean
   /** Lo que se sabe de esta persona al repartir trabajo en un plan. Se guarda y vale para todas las ejecuciones. */
   planNotes?: string | null
 }

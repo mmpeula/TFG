@@ -84,7 +84,7 @@ public class TaskService {
                 .boardColumn(column)
                 // Creada ya en «Hecho» (por ejemplo, algo que se hizo y se apunta despues): terminada hoy.
                 .completedAt(column.isDone() ? Instant.now() : null)
-                .assignees(resolveAssignees(column, request.assigneeIds()))
+                .assignees(resolveAssignees(column, request.assigneeIds(), Set.of()))
                 .createdBy(creator)
                 .position((int) tasksInColumn)
                 .build();
@@ -111,7 +111,7 @@ public class TaskService {
         // Se muta la coleccion gestionada por Hibernate, no se reasigna: asi el
         // @ManyToMany refleja el cambio sobre la misma referencia que observa.
         task.getAssignees().clear();
-        task.getAssignees().addAll(resolveAssignees(task.getBoardColumn(), request.assigneeIds()));
+        task.getAssignees().addAll(resolveAssignees(task.getBoardColumn(), request.assigneeIds(), previousIds));
 
         Project project = projectOf(task.getBoardColumn());
         activityService.record(project, ActivityAction.ACTUALIZACION, "Task", task.getId(),
@@ -151,6 +151,9 @@ public class TaskService {
         if (changesColumn) {
             // Entrar en la ultima columna es terminarla, hoy; salir de ella la vuelve a abrir.
             task.setCompletedAt(target.isDone() ? Instant.now() : null);
+            if (origin.isDone() && !target.isDone()) {
+                dropFormerMembers(task, target);
+            }
             reindex(taskRepository.findByBoardColumn_IdOrderByPositionAsc(origin.getId()).stream()
                     .filter(candidate -> !candidate.getId().equals(taskId))
                     .toList(), null);
@@ -179,13 +182,51 @@ public class TaskService {
         reindex(taskRepository.findByBoardColumn_IdOrderByPositionAsc(column.getId()), null);
     }
 
+    /**
+     * Suelta las tareas sin terminar que tenia asignadas alguien que se va del equipo.
+     *
+     * <p>Si siguiera en ellas, nadie veria que se han quedado sin hacer: no saldrian
+     * como «sin asignar» ni en el resumen de nadie del equipo. Las terminadas se
+     * quedan como estan, para que conste quien las hizo.</p>
+     */
+    @Transactional
+    public void releaseOpenTasks(Long teamId, User leaving) {
+        release(taskRepository.findOpenByTeamAndAssignee(teamId, leaving.getId()), leaving,
+                "%s ha salido del equipo y deja la tarea '%s'");
+    }
+
+    /**
+     * Lo mismo al dar de baja una cuenta, en todos sus equipos. La baja no la saca de
+     * ellos (se puede reactivar), pero mientras dure no puede hacer nada.
+     */
+    @Transactional
+    public void releaseOpenTasksOf(User disabled) {
+        release(taskRepository.findOpenByAssignee(disabled.getId()), disabled,
+                "La cuenta de %s se ha dado de baja y deja la tarea '%s'");
+    }
+
+    private void release(List<Task> tasks, User user, String message) {
+        for (Task task : tasks) {
+            task.getAssignees().removeIf(assignee -> assignee.getId().equals(user.getId()));
+            activityService.record(projectOf(task.getBoardColumn()), ActivityAction.ASIGNACION, "Task", task.getId(),
+                    message.formatted(user.getFullName(), task.getTitle())
+                            + (task.getAssignees().isEmpty() ? " sin asignar" : ""));
+        }
+    }
+
     public Task getTask(Long taskId) {
         return taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tarea", taskId));
     }
 
-    /** Solo se puede asignar una tarea a gente que pertenezca al equipo del proyecto. */
-    private Set<User> resolveAssignees(BoardColumn column, List<Long> assigneeIds) {
+    /**
+     * Solo se puede asignar una tarea a gente del equipo del proyecto con la cuenta activa.
+     *
+     * <p>La excepcion es quien ya estaba en ella y se ha ido del equipo o se ha dado de
+     * baja: en una tarea terminada se queda, para que conste quien la hizo y se pueda
+     * seguir editando; en una sin terminar se quita sin dar error, porque ya no puede hacerla.</p>
+     */
+    private Set<User> resolveAssignees(BoardColumn column, List<Long> assigneeIds, Set<Long> alreadyAssigned) {
         if (assigneeIds == null || assigneeIds.isEmpty()) {
             return new LinkedHashSet<>();
         }
@@ -193,11 +234,22 @@ public class TaskService {
         Set<Long> unicos = new LinkedHashSet<>(assigneeIds);
         Set<User> resueltos = new LinkedHashSet<>();
         for (Long id : unicos) {
-            if (!teamMemberRepository.existsByTeam_IdAndUser_Id(teamId, id)) {
+            boolean member = teamMemberRepository.existsByTeam_IdAndUser_Id(teamId, id);
+            if (!member && !alreadyAssigned.contains(id)) {
                 throw new BusinessRuleException("El usuario asignado no pertenece al equipo del proyecto");
             }
-            resueltos.add(userRepository.findById(id)
-                    .orElseThrow(() -> new ResourceNotFoundException("Usuario", id)));
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuario", id));
+            if (!member || !user.isEnabled()) {
+                if (!alreadyAssigned.contains(id)) {
+                    throw new BusinessRuleException(
+                            "La cuenta de %s está dada de baja: no se le pueden asignar tareas".formatted(user.getFullName()));
+                }
+                if (!column.isDone()) {
+                    continue;
+                }
+            }
+            resueltos.add(user);
         }
         return resueltos;
     }
@@ -209,6 +261,25 @@ public class TaskService {
             return "Dejó sin asignar la tarea '%s'".formatted(task.getTitle());
         }
         return "Asignó la tarea '%s' a %s".formatted(task.getTitle(), String.join(", ", nombres));
+    }
+
+    /**
+     * Al reabrir una tarea terminada, quien ya no esta en el equipo o tiene la cuenta
+     * dada de baja deja de estar asignado a ella.
+     */
+    private void dropFormerMembers(Task task, BoardColumn column) {
+        Long teamId = projectOf(column).getTeam().getId();
+        for (User user : List.copyOf(task.getAssignees())) {
+            String motivo = !teamMemberRepository.existsByTeam_IdAndUser_Id(teamId, user.getId())
+                    ? "ya no está en el equipo"
+                    : !user.isEnabled() ? "su cuenta está dada de baja" : null;
+            if (motivo != null) {
+                task.getAssignees().remove(user);
+                activityService.record(projectOf(column), ActivityAction.ASIGNACION, "Task", task.getId(),
+                        "Quitó a %s de la tarea '%s' al reabrirla: %s"
+                                .formatted(user.getFullName(), task.getTitle(), motivo));
+            }
+        }
     }
 
     private Project projectOf(BoardColumn column) {

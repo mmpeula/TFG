@@ -8,6 +8,7 @@ import com.tfg.kanban.domain.model.User;
 import com.tfg.kanban.domain.repository.UserRepository;
 import com.tfg.kanban.security.SecurityUtils;
 import com.tfg.kanban.storage.FileStorageService;
+import com.tfg.kanban.task.TaskService;
 import com.tfg.kanban.user.dto.UpdateGlobalRoleRequest;
 import com.tfg.kanban.user.dto.UpdateUserRequest;
 import com.tfg.kanban.user.dto.UserResponse;
@@ -28,6 +29,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final FileStorageService fileStorageService;
+    private final TaskService taskService;
 
     public PageResponse<UserResponse> search(String search, Pageable pageable) {
         String term = StringUtils.hasText(search) ? search.trim() : "";
@@ -112,6 +114,9 @@ public class UserService {
     /**
      * Baja logica: se deshabilita la cuenta en lugar de borrarla, para no perder
      * la autoria de tareas, comentarios y registros de actividad.
+     *
+     * <p>Sigue en sus equipos, para poder reactivarla, pero suelta sus tareas sin
+     * terminar (ver {@link TaskService#releaseOpenTasksOf}); en las terminadas sigue constando.</p>
      */
     @Transactional
     public void disable(Long id) {
@@ -121,6 +126,9 @@ public class UserService {
         User user = getUser(id);
         if (user.getRole() == Role.ADMIN && user.isEnabled()) {
             ensureNotLastAdmin();
+        }
+        if (user.isEnabled()) {
+            taskService.releaseOpenTasksOf(user);
         }
         user.setEnabled(false);
     }
